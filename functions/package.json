@@ -1,0 +1,13 @@
+{
+  "name": "debatearena-functions",
+  "description": "Cloud Functions for DebateArena multiplayer automation",
+  "engines": {
+    "node": "20"
+  },
+  "main": "index.js",
+  "dependencies": {
+    "firebase-admin": "^12.5.0",
+    "firebase-functions": "^6.0.1"
+  },
+  "private": true
+}

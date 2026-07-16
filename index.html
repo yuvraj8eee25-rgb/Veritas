@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DebateArena — AI Debate Coach</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<canvas id="bg-canvas"></canvas>
+
+<div id="toast-root" class="toast-root" aria-live="polite"></div>
+
+<nav class="app-sidebar" id="app-sidebar">
+  <div class="sidebar-brand">
+    <svg width="26" height="26" viewBox="0 0 88 88" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M44 6L78 24V64L44 82L10 64V24L44 6Z" stroke="var(--cyan)" stroke-width="4"/>
+      <path d="M34 44L41 51L56 36" stroke="var(--cyan)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span>DEBATEARENA</span>
+  </div>
+  <div class="sidebar-links">
+    <button type="button" class="sidebar-link" data-nav="home" aria-label="Home">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 11L12 4L20 11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 10V20H18V10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span>Home</span>
+    </button>
+    <button type="button" class="sidebar-link" data-nav="multiplayer" aria-label="Multiplayer">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M6 4L18 20M18 4L6 20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="6" cy="4" r="2" fill="currentColor"/><circle cx="18" cy="20" r="2" fill="currentColor"/><circle cx="18" cy="4" r="2" fill="currentColor"/><circle cx="6" cy="20" r="2" fill="currentColor"/></svg>
+      <span>Multiplayer</span>
+    </button>
+    <button type="button" class="sidebar-link" data-nav="daily" aria-label="Daily Challenge">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 2L14.5 8.5L21 11L14.5 13.5L12 20L9.5 13.5L3 11L9.5 8.5L12 2Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+      <span>Daily</span>
+    </button>
+    <button type="button" class="sidebar-link" data-nav="leaderboard" aria-label="Leaderboard">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M8 21V10M8 10L4 13M8 10L12 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 21V3M16 3L12 6M16 3L20 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span>Leaderboard</span>
+    </button>
+    <button type="button" class="sidebar-link" data-nav="profile" aria-label="Profile">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="2"/><path d="M4 20C4 16.134 7.582 13 12 13C16.418 13 20 16.134 20 20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      <span>Profile</span>
+    </button>
+  </div>
+  <div class="sidebar-foot">
+    <span class="sidebar-xp-mini" id="sidebar-xp-mini">0 XP</span>
+  </div>
+</nav>
+
+<!-- ============ SPLASH ============ -->
+<section class="screen" data-screen="splash" id="screen-splash">
+  <div class="splash-wrap">
+    <div class="splash-mark">
+      <svg width="88" height="88" viewBox="0 0 88 88" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M44 6L78 24V64L44 82L10 64V24L44 6Z" stroke="url(#gradSplash)" stroke-width="2.5"/>
+        <path d="M44 22L64 33V55L44 66L24 55V33L44 22Z" stroke="url(#gradSplash)" stroke-width="2" opacity="0.7"/>
+        <path d="M34 44L41 51L56 36" stroke="#00e68a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+        <defs>
+          <linearGradient id="gradSplash" x1="10" y1="6" x2="78" y2="82" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#00e68a"/>
+            <stop offset="1" stop-color="#ff7a1a"/>
+          </linearGradient>
+        </defs>
+      </svg>
+    </div>
+    <h1 class="glitch-text splash-title" data-text="DEBATEARENA">DEBATEARENA</h1>
+    <p class="splash-tag">Train your argument. Sharpen your mind.</p>
+    <div class="splash-loader"><span></span></div>
+  </div>
+</section>
+
+<!-- ============ HOME ============ -->
+<section class="screen" data-screen="home" id="screen-home">
+  <header class="topbar">
+    <div class="brand">
+      <svg width="28" height="28" viewBox="0 0 88 88" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M44 6L78 24V64L44 82L10 64V24L44 6Z" stroke="url(#gradTop)" stroke-width="4"/>
+        <path d="M34 44L41 51L56 36" stroke="#00e68a" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+        <defs><linearGradient id="gradTop" x1="10" y1="6" x2="78" y2="82" gradientUnits="userSpaceOnUse"><stop stop-color="#00e68a"/><stop offset="1" stop-color="#ff7a1a"/></linearGradient></defs>
+      </svg>
+      <span>DEBATEARENA</span>
+    </div>
+    <nav class="topbar-actions">
+      <button type="button" class="icon-btn" data-nav="multiplayer" aria-label="Multiplayer">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M6 4L18 20M18 4L6 20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="6" cy="4" r="2" fill="currentColor"/><circle cx="18" cy="20" r="2" fill="currentColor"/><circle cx="18" cy="4" r="2" fill="currentColor"/><circle cx="6" cy="20" r="2" fill="currentColor"/></svg>
+      </button>
+      <button type="button" class="icon-btn" data-nav="leaderboard" aria-label="Leaderboard">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M8 21V10M8 10L4 13M8 10L12 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 21V3M16 3L12 6M16 3L20 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <button type="button" class="icon-btn" data-nav="profile" aria-label="Profile">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="2"/><path d="M4 20C4 16.134 7.582 13 12 13C16.418 13 20 16.134 20 20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+    </nav>
+  </header>
+
+  <div class="home-content">
+    <div class="hero-status glass-card">
+      <div class="xp-block">
+        <div class="xp-label">
+          <span class="rank-badge" id="home-rank">Novice Debater</span>
+          <span class="xp-count"><span id="home-xp-value">0</span> XP</span>
+        </div>
+        <div class="xp-bar"><div class="xp-bar-fill" id="home-xp-fill"></div></div>
+        <div class="xp-sub"><span id="home-xp-next">0 XP to next rank</span></div>
+      </div>
+      <div class="streak-block">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M12 2C12 2 6 8 6 13.5C6 17.09 8.91 20 12.5 20C16.09 20 19 17.09 19 13.5C19 12.5 18.5 11 18.5 11C18.5 11 17 13 15 13C15 13 16 9 12 2Z" fill="url(#flameGrad)"/><defs><linearGradient id="flameGrad" x1="6" y1="2" x2="19" y2="20"><stop stop-color="#ff7a1a"/><stop offset="1" stop-color="#FF7A00"/></linearGradient></defs></svg>
+        <span class="streak-num" id="home-streak">0</span>
+        <span class="streak-label">day streak</span>
+      </div>
+    </div>
+
+    <button type="button" class="daily-card" data-nav="daily">
+      <div class="daily-left">
+        <span class="daily-eyebrow">Today's Challenge</span>
+        <h3 id="daily-title">Steelman Sprint</h3>
+        <p id="daily-desc">3x XP multiplier · 4 questions</p>
+      </div>
+      <div class="daily-timer" id="daily-countdown">--:--:--</div>
+    </button>
+
+    <button type="button" class="battle-card" data-nav="multiplayer">
+      <div class="battle-left">
+        <span class="battle-eyebrow">1v1 Live</span>
+        <h3>Multiplayer Debate</h3>
+        <p>Turn-based · Real opponent · Today's hot topics</p>
+      </div>
+      <div class="battle-icon">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none"><path d="M6 4L18 20M18 4L6 20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </div>
+    </button>
+
+    <h2 class="section-heading">Choose your training</h2>
+    <div class="mode-grid" id="home-mode-grid"><!-- injected --></div>
+  </div>
+</section>
+
+<!-- ============ MODE SELECT (detail) ============ -->
+<section class="screen" data-screen="mode-select" id="screen-mode-select">
+  <header class="subbar">
+    <button type="button" class="back-btn" data-nav="home">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Back
+    </button>
+    <span class="subbar-title" id="mode-select-title">Mode</span>
+    <span class="subbar-spacer"></span>
+  </header>
+  <div class="mode-detail-wrap">
+    <div class="mode-detail-icon" id="mode-detail-icon"></div>
+    <h1 id="mode-detail-name">Fallacy Hunter</h1>
+    <p class="mode-detail-desc" id="mode-detail-desc">Spot the logical fallacy hiding in each argument.</p>
+
+    <div class="difficulty-row" id="difficulty-row"><!-- injected --></div>
+
+    <div class="mode-detail-stats">
+      <div class="stat-chip"><span class="stat-chip-val" id="mode-best-score">--</span><span class="stat-chip-label">Best score</span></div>
+      <div class="stat-chip"><span class="stat-chip-val" id="mode-plays">0</span><span class="stat-chip-label">Runs played</span></div>
+      <div class="stat-chip"><span class="stat-chip-val" id="mode-xp-reward">+120</span><span class="stat-chip-label">XP per run</span></div>
+    </div>
+
+    <button type="button" class="cta-btn" id="mode-start-btn">Start Training</button>
+  </div>
+</section>
+
+<!-- ============ GAME SCREEN ============ -->
+<section class="screen" data-screen="game" id="screen-game">
+  <header class="game-header">
+    <button type="button" class="icon-btn" id="game-exit-btn" aria-label="Exit">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M6 6L18 18M6 18L18 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+    </button>
+    <div class="game-progress-wrap">
+      <span class="game-mode-label" id="game-mode-label">Fallacy Hunter</span>
+      <div class="game-progress-bar"><div class="game-progress-fill" id="game-progress-fill"></div></div>
+    </div>
+    <div class="game-timer" id="game-timer">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="13" r="8" stroke="currentColor" stroke-width="2"/><path d="M12 9V13L15 15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M9 3H15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      <span id="game-timer-value">--</span>
+    </div>
+  </header>
+
+  <div class="game-body">
+    <div class="score-float" id="score-float">
+      <span class="score-float-icon">✦</span>
+      <span id="score-float-value">0</span>
+    </div>
+
+    <div class="question-card glass-card" id="question-card">
+      <span class="q-tag" id="q-difficulty">EASY</span>
+      <p class="q-text" id="q-text">Question text goes here.</p>
+    </div>
+
+    <div class="options-grid" id="options-grid"><!-- injected --></div>
+  </div>
+
+  <!-- Feedback overlay -->
+  <div class="feedback-overlay" id="feedback-overlay">
+    <div class="feedback-panel glass-card" id="feedback-panel">
+      <div class="feedback-icon" id="feedback-icon"></div>
+      <h3 id="feedback-title">Correct!</h3>
+      <p class="feedback-explain" id="feedback-explain">Explanation of why this answer is right.</p>
+      <div class="coach-tip">
+        <div class="coach-tip-head">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 2L14.5 8.5L21 11L14.5 13.5L12 20L9.5 13.5L3 11L9.5 8.5L12 2Z" fill="#00e68a"/></svg>
+          <span>AI COACH TIP</span>
+        </div>
+        <p id="coach-tip-text">Coach tip goes here.</p>
+      </div>
+      <button type="button" class="cta-btn" id="feedback-next-btn">Continue</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============ RUN SUMMARY ============ -->
+<section class="screen" data-screen="summary" id="screen-summary">
+  <div class="summary-wrap">
+    <div class="summary-badge" id="summary-badge">
+      <svg width="64" height="64" viewBox="0 0 64 64" fill="none"><circle cx="32" cy="32" r="30" stroke="url(#sumGrad)" stroke-width="2.5"/><path d="M22 33L28 39L42 25" stroke="#00e68a" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="sumGrad" x1="2" y1="2" x2="62" y2="62"><stop stop-color="#00e68a"/><stop offset="1" stop-color="#ff7a1a"/></linearGradient></defs></svg>
+    </div>
+    <span class="summary-eyebrow" id="summary-eyebrow">Run Complete</span>
+    <h1 id="summary-mode-name">Fallacy Hunter</h1>
+
+    <div class="summary-stats-row">
+      <div class="summary-stat">
+        <span class="summary-stat-value" id="summary-correct">0/8</span>
+        <span class="summary-stat-label">Correct</span>
+      </div>
+      <div class="summary-stat">
+        <span class="summary-stat-value" id="summary-accuracy">0%</span>
+        <span class="summary-stat-label">Accuracy</span>
+      </div>
+      <div class="summary-stat">
+        <span class="summary-stat-value" id="summary-streak-best">0</span>
+        <span class="summary-stat-label">Best streak</span>
+      </div>
+    </div>
+
+    <div class="glass-card radar-card">
+      <span class="radar-card-title">Skill Impact</span>
+      <canvas id="radar-canvas" width="320" height="320"></canvas>
+    </div>
+
+    <div class="glass-card xp-breakdown-card">
+      <span class="xp-breakdown-title">XP Breakdown</span>
+      <div class="xp-line" id="xp-line-base"><span>Base completion</span><span>+0</span></div>
+      <div class="xp-line" id="xp-line-accuracy"><span>Accuracy bonus</span><span>+0</span></div>
+      <div class="xp-line" id="xp-line-streak"><span>Streak bonus</span><span>+0</span></div>
+      <div class="xp-line xp-line-total" id="xp-line-total"><span>Total earned</span><span>+0</span></div>
+    </div>
+
+    <div class="summary-actions">
+      <button type="button" class="cta-btn" id="summary-retry-btn">Train Again</button>
+      <button type="button" class="ghost-btn" id="summary-home-btn">Back to Home</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============ PROFILE ============ -->
+<section class="screen" data-screen="profile" id="screen-profile">
+  <header class="subbar">
+    <button type="button" class="back-btn" data-nav="home">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Back
+    </button>
+    <span class="subbar-title">Profile</span>
+    <span class="subbar-spacer"></span>
+  </header>
+
+  <div class="profile-wrap">
+    <div class="profile-head">
+      <div class="profile-avatar">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="2"/><path d="M4 20C4 16.134 7.582 13 12 13C16.418 13 20 16.134 20 20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </div>
+      <div>
+        <h2 id="profile-rank">Novice Debater</h2>
+        <p id="profile-xp-sub">0 total XP</p>
+      </div>
+    </div>
+
+    <div class="glass-card radar-card">
+      <span class="radar-card-title">Skill Radar</span>
+      <canvas id="profile-radar-canvas" width="300" height="300"></canvas>
+    </div>
+
+    <h3 class="section-heading">Badges</h3>
+    <div class="badge-wall" id="badge-wall"><!-- injected --></div>
+
+    <h3 class="section-heading">Activity</h3>
+    <div class="glass-card heatmap-card">
+      <div class="heatmap-grid" id="heatmap-grid"><!-- injected --></div>
+      <div class="heatmap-legend">
+        <span>Less</span>
+        <span class="heat-swatch heat-0"></span>
+        <span class="heat-swatch heat-1"></span>
+        <span class="heat-swatch heat-2"></span>
+        <span class="heat-swatch heat-3"></span>
+        <span class="heat-swatch heat-4"></span>
+        <span>More</span>
+      </div>
+    </div>
+
+    <button type="button" class="ghost-btn danger-ghost" id="reset-progress-btn">Reset Progress</button>
+  </div>
+</section>
+
+<!-- ============ LEADERBOARD ============ -->
+<section class="screen" data-screen="leaderboard" id="screen-leaderboard">
+  <header class="subbar">
+    <button type="button" class="back-btn" data-nav="home">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Back
+    </button>
+    <span class="subbar-title">Leaderboard</span>
+    <span class="subbar-spacer"></span>
+  </header>
+  <div class="leaderboard-wrap">
+    <div class="lb-tabs">
+      <button type="button" class="lb-tab active" data-lb="weekly">This Week</button>
+      <button type="button" class="lb-tab" data-lb="alltime">All-Time</button>
+    </div>
+    <div class="lb-list" id="lb-list"><!-- injected --></div>
+  </div>
+</section>
+
+<!-- ============ DAILY CHALLENGE ============ -->
+<section class="screen" data-screen="daily" id="screen-daily">
+  <header class="subbar">
+    <button type="button" class="back-btn" data-nav="home">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Back
+    </button>
+    <span class="subbar-title">Daily Challenge</span>
+    <span class="subbar-spacer"></span>
+  </header>
+  <div class="daily-detail-wrap">
+    <div class="daily-detail-icon">
+      <svg width="56" height="56" viewBox="0 0 24 24" fill="none"><path d="M12 2L14.5 8.5L21 11L14.5 13.5L12 20L9.5 13.5L3 11L9.5 8.5L12 2Z" fill="url(#dailyGrad)"/><defs><linearGradient id="dailyGrad" x1="3" y1="2" x2="21" y2="20"><stop stop-color="#00e68a"/><stop offset="1" stop-color="#ff7a1a"/></linearGradient></defs></svg>
+    </div>
+    <h1 id="daily-detail-title">Steelman Sprint</h1>
+    <p class="daily-detail-desc" id="daily-detail-desc">4 hand-picked questions from Steelman Challenge. Complete today for a 3x XP multiplier.</p>
+    <div class="daily-multiplier-badge">3× XP MULTIPLIER</div>
+    <div class="daily-detail-countdown">
+      <span>Resets in</span>
+      <strong id="daily-detail-timer">--:--:--</strong>
+    </div>
+    <button type="button" class="cta-btn" id="daily-start-btn">Start Challenge</button>
+  </div>
+</section>
+
+<!-- ============ MULTIPLAYER LOBBY ============ -->
+<section class="screen" data-screen="multiplayer" id="screen-multiplayer">
+  <header class="subbar">
+    <button type="button" class="back-btn" id="mp-back-btn" data-nav="home">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Back
+    </button>
+    <span class="subbar-title">Multiplayer</span>
+    <span class="subbar-spacer"></span>
+  </header>
+
+  <div class="mp-wrap" id="mp-browse-state">
+      <h3 class="section-heading">🔥 Hot topics today</h3>
+    <p class="mp-hint">Pick a topic (or let it be random), then find a live opponent for a turn-based debate.</p>
+    <div class="hot-topics-list" id="mp-hot-topics">
+      <div class="hot-topic-skel"></div>
+      <div class="hot-topic-skel"></div>
+      <div class="hot-topic-skel"></div>
+    </div>
+
+    <div class="glass-card mp-selected-card hidden" id="mp-selected-card">
+      <span class="mp-selected-label">Selected topic</span>
+      <p id="mp-selected-text"></p>
+      <button type="button" class="mp-clear-btn" id="mp-clear-topic">Clear</button>
+    </div>
+
+    <button type="button" class="cta-btn" id="mp-find-match-btn">Find Match</button>
+    <p class="mp-online-note" id="mp-online-note"></p>
+  </div>
+
+  <div class="mp-wrap mp-searching-state hidden" id="mp-searching-state">
+    <div class="mp-radar-spinner"><span></span><span></span><span></span></div>
+    <h3>Searching for an opponent…</h3>
+    <p class="mp-hint" id="mp-searching-topic"></p>
+    <button type="button" class="ghost-btn" id="mp-cancel-search-btn">Cancel</button>
+  </div>
+</section>
+
+<!-- ============ DEBATE ROOM ============ -->
+<section class="screen debate-screen" data-screen="debate-room" id="screen-debate-room">
+  <div class="debate-main">
+    <header class="game-header slim">
+      <button type="button" class="icon-btn" id="debate-exit-btn" aria-label="Leave">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M6 6L18 18M6 18L18 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+      </button>
+      <span class="subbar-title">Live Debate</span>
+      <span class="subbar-spacer"></span>
+    </header>
+
+    <div class="debate-body" id="debate-transcript"><!-- turns injected --></div>
+
+    <div class="debate-composer" id="debate-composer">
+      <textarea id="debate-input" class="debate-textarea" placeholder="Write your argument…" maxlength="600" rows="3"></textarea>
+      <button type="button" class="cta-btn debate-send-btn" id="debate-send-btn">Send Argument</button>
+    </div>
+
+    <div class="debate-waiting hidden" id="debate-waiting">
+      <div class="mp-radar-spinner small"><span></span><span></span><span></span></div>
+      <span>Waiting for opponent's turn…</span>
+    </div>
+
+    <div class="debate-ended-panel glass-card hidden" id="debate-ended-panel">
+      <h3>Debate complete</h3>
+      <p id="debate-ended-sub">Nicely argued.</p>
+      <div class="debate-rate-row" id="debate-rate-row">
+        <span>Rate your opponent's argument:</span>
+        <div class="debate-rate-btns">
+          <button type="button" data-rate="up" class="rate-btn">👍</button>
+          <button type="button" data-rate="down" class="rate-btn">👎</button>
+        </div>
+      </div>
+      <button type="button" class="cta-btn" id="debate-done-btn">Back to Home</button>
+    </div>
+  </div>
+
+  <aside class="debate-scoreboard">
+    <div class="scoreboard-block">
+      <span class="scoreboard-label">Turn</span>
+      <div class="debate-turn-pill" id="debate-turn-pill">—</div>
+    </div>
+    <div class="scoreboard-block">
+      <span class="scoreboard-label">Turn timer</span>
+      <div class="debate-turn-pill time-pill" id="debate-timer-value">30s</div>
+    </div>
+    <div class="scoreboard-block">
+      <span class="scoreboard-label">Round progress</span>
+      <div class="game-progress-bar"><div class="game-progress-fill" id="debate-progress-fill"></div></div>
+    </div>
+    <div class="scoreboard-block">
+      <span class="scoreboard-label">Topic</span>
+      <p class="scoreboard-topic" id="debate-topic-label">Topic</p>
+    </div>
+  </aside>
+</section>
+
+<script src="app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="multiplayer.js"></script>
+</body>
+</html>
