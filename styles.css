@@ -1459,6 +1459,23 @@ body { position: relative; }
 .mp-selected-card p { margin: 4px 0 8px; font-size: 0.84rem; }
 .mp-clear-btn { background: none; border: none; color: var(--text-tertiary); font-size: 0.72rem; text-decoration: underline; padding: 0; }
 
+.mp-rules-card {
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border-soft);
+}
+.mp-rules-list {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  line-height: 1.6;
+}
+.mp-rules-list li {
+  margin-bottom: 8px;
+}
+
 .mp-online-note { text-align: center; color: var(--text-tertiary); font-size: 0.72rem; margin-top: 10px; }
 
 .mp-searching-state { text-align: center; padding-top: 60px; }
@@ -1596,9 +1613,32 @@ body { position: relative; }
   align-items: center;
   justify-content: center;
   gap: 10px;
-  padding: 14px;
+  padding: 18px 24px;
+  margin: 28px auto 18px auto;
+  width: min(100%, 560px);
+  min-height: 84px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: calc(var(--radius-xl) + 4px);
+  box-shadow: 0 20px 75px rgba(0,0,0,0.12);
   color: var(--text-secondary);
-  font-size: 0.8rem;
+  font-size: 0.92rem;
+  text-align: center;
+  transform: none !important;
+}
+.debate-waiting > p {
+  display: inline-block;
+  white-space: nowrap;
+  transform: none !important;
+  writing-mode: horizontal-tb !important;
+  margin: 0;
+}
+.mp-radar-spinner.small {
+  width: 42px;
+  height: 42px;
+}
+.mp-radar-spinner.small span {
+  border-width: 2.4px;
 }
 
 @keyframes bubbleIn {
@@ -1612,6 +1652,28 @@ body { position: relative; }
 }
 .debate-ended-panel h3 { margin: 0 0 6px; }
 .debate-ended-panel p { color: var(--text-secondary); font-size: 0.82rem; margin: 0 0 14px; }
+.debate-referee-panel {
+  margin: 18px 0 12px;
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+.referee-label {
+  display: block;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--text-tertiary);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+#debate-referee-comment {
+  margin: 0;
+  font-size: 0.86rem;
+  line-height: 1.5;
+  color: var(--text-primary);
+}
 .debate-rate-row { display: flex; align-items: center; justify-content: space-between; font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 16px; }
 .debate-rate-btns { display: flex; gap: 8px; }
 .rate-btn {

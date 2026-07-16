@@ -42,6 +42,7 @@ const FALLBACK_TOPICS = [
 
 const MAX_TURNS_PER_PLAYER = 3;
 const TURN_SECONDS = 30;
+const INACTIVITY_PASSES_TO_END = 2;
 const WAIT_MESSAGES = [
   "Opponent is drafting their best angle…",
   "Your rival is thinking fast.",
@@ -303,7 +304,7 @@ function renderDebateRoom() {
   pill.className = "debate-turn-pill " + (myTurn ? "mine" : "theirs");
   composer.classList.toggle("hidden", !myTurn);
   waiting.classList.toggle("hidden", myTurn);
-  waiting.querySelector("span").textContent = myTurn
+  document.getElementById("debate-waiting-message").textContent = myTurn
     ? "Your opponent is waiting on your next argument."
     : WAIT_MESSAGES[data.turns.length % WAIT_MESSAGES.length];
 
@@ -384,12 +385,16 @@ async function submitTimeoutTurn() {
       if (!data || data.status !== "active") return;
       const whoseTurnUid = data.playerOrder[data.turnIndex % 2];
       if (whoseTurnUid !== myUid) return;
-      const turns = (Array.isArray(data.turns) ? data.turns : []).concat([{ uid: myUid, text: "⏳ Time's up — passing the turn.", ts: Date.now() }]);
+      const previousTurns = Array.isArray(data.turns) ? data.turns : [];
+      const passTurn = { uid: myUid, text: "⏳ Time's up — passing the turn.", ts: Date.now() };
+      const turns = previousTurns.concat([passTurn]);
       const totalTurns = data.maxTurnsPerPlayer * 2;
+      const lastPasses = turns.slice(-INACTIVITY_PASSES_TO_END);
+      const allPasses = lastPasses.length === INACTIVITY_PASSES_TO_END && lastPasses.every((t) => t.text.startsWith("⏳ Time's up"));
       tx.update(ref, {
         turns,
         turnIndex: data.turnIndex + 1,
-        status: turns.length >= totalTurns ? "completed" : "active"
+        status: allPasses || turns.length >= totalTurns ? "completed" : "active"
       });
     });
   } catch (e) {
@@ -397,10 +402,73 @@ async function submitTimeoutTurn() {
   }
 }
 
+function getRefereeVerdict(data) {
+  const turns = Array.isArray(data.turns) ? data.turns : [];
+  if (!turns.length) {
+    return {
+      title: "No arguments were made",
+      comment: "The referee could not score this debate because no turns were submitted."
+    };
+  }
+
+  const scoringRules = [
+    { re: /\bbecause\b/i, bonus: 2 },
+    { re: /\btherefore\b/i, bonus: 2 },
+    { re: /\bhowever\b/i, bonus: 2 },
+    { re: /\bbut\b/i, bonus: 1 },
+    { re: /\bconsequently\b/i, bonus: 2 }
+  ];
+
+  const score = { you: 0, them: 0 };
+  turns.forEach((turn) => {
+    const text = (turn.text || "").trim();
+    const words = text.split(/\s+/).filter(Boolean).length;
+    const sentences = text.split(/[.!?]+/).filter(Boolean).length;
+    let turnScore = Math.min(24, words * 0.35) + sentences * 1.4;
+    scoringRules.forEach((rule) => { if (rule.re.test(text)) turnScore += rule.bonus; });
+    if (words >= 90) turnScore += 2;
+    if (/^⏳/.test(text)) turnScore -= 3;
+    if (turn.uid === myUid) score.you += turnScore;
+    else score.them += turnScore;
+  });
+
+  score.you = Math.round(score.you);
+  score.them = Math.round(score.them);
+  const diff = score.you - score.them;
+  const total = score.you + score.them;
+  const lastPasses = turns.slice(-INACTIVITY_PASSES_TO_END);
+  const endedByInactivity = lastPasses.length === INACTIVITY_PASSES_TO_END && lastPasses.every((t) => /^⏳/.test(t.text));
+
+  if (endedByInactivity) {
+    return {
+      title: "Match ended due to inactivity",
+      comment: "Both players timed out. The referee ended the match and scored the available arguments."
+    };
+  }
+
+  let verdict = "A close finish.";
+  if (diff >= 8) verdict = "You clearly impressed the referee with stronger arguments.";
+  else if (diff >= 3) verdict = "You edged out the opponent with cleaner reasoning.";
+  else if (diff <= -8) verdict = "The opponent took this round with stronger points.";
+  else if (diff <= -3) verdict = "The opponent narrowly outscored you this time.";
+
+  const comment = `${verdict} Score: You ${score.you} — Opponent ${score.them}. ${
+    diff === 0 ? "It was an evenly matched debate." : diff > 0 ? "Keep using clear structure and reasons." : "Try adding more examples and stronger transitions."
+  }`;
+
+  return {
+    title: diff === 0 ? "Tie match" : diff > 0 ? "Your side wins" : "Opponent wins",
+    comment
+  };
+}
+
 function showDebateEnded() {
   const panel = document.getElementById("debate-ended-panel");
   if (!panel.classList.contains("hidden")) return;
   panel.classList.remove("hidden");
+  const referee = getRefereeVerdict(currentDebateData || {});
+  document.getElementById("debate-ended-sub").textContent = referee.title;
+  document.getElementById("debate-referee-comment").textContent = referee.comment;
   window.DA.awardXp(60);
   window.DA.toast("+60 XP for completing a live debate!");
 }

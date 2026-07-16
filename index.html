@@ -375,6 +375,16 @@
       <button type="button" class="mp-clear-btn" id="mp-clear-topic">Clear</button>
     </div>
 
+    <div class="glass-card mp-rules-card">
+      <span class="mp-selected-label">How this match works</span>
+      <ul class="mp-rules-list">
+        <li>Each player gets 3 turns.</li>
+        <li>30 seconds per turn to type your argument.</li>
+        <li>The AI referee scores the winner based on clarity and reasoning.</li>
+        <li>Once you send, your argument is locked in.</li>
+      </ul>
+    </div>
+
     <button type="button" class="cta-btn" id="mp-find-match-btn">Find Match</button>
     <p class="mp-online-note" id="mp-online-note"></p>
   </div>
@@ -407,12 +417,16 @@
 
     <div class="debate-waiting hidden" id="debate-waiting">
       <div class="mp-radar-spinner small"><span></span><span></span><span></span></div>
-      <span>Waiting for opponent's turn…</span>
+      <p id="debate-waiting-message">Waiting for opponent's turn…</p>
     </div>
 
     <div class="debate-ended-panel glass-card hidden" id="debate-ended-panel">
       <h3>Debate complete</h3>
       <p id="debate-ended-sub">Nicely argued.</p>
+      <div class="debate-referee-panel">
+        <span class="referee-label">AI Referee verdict</span>
+        <p id="debate-referee-comment">The referee will judge the match once it ends.</p>
+      </div>
       <div class="debate-rate-row" id="debate-rate-row">
         <span>Rate your opponent's argument:</span>
         <div class="debate-rate-btns">
