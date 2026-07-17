@@ -950,6 +950,7 @@ function finishGame() {
   const accuracyBonus = accuracy >= 80 ? Math.round(mode.xp * 0.25) : accuracy >= 50 ? Math.round(mode.xp * 0.1) : 0;
   const streakBonus = streakBest >= 4 ? 30 : streakBest >= 2 ? 12 : 0;
   let totalXpGain = baseXp + accuracyBonus + streakBonus;
+  // Daily challenge multiplies the entire earned XP total, including base, accuracy, and streak bonuses.
   if (isDaily) totalXpGain *= (xpMultiplier || 1);
   totalXpGain = Math.round(totalXpGain);
 
@@ -1175,8 +1176,6 @@ document.getElementById("daily-start-btn").addEventListener("click", () => {
   document.getElementById("game-mode-label").textContent = mode.name + " \u00B7 Daily";
   showScreen("game");
   renderQuestion();
-
-  const originalFinish = finishGame;
 });
 
 // Wrap finishGame to mark daily completion when relevant

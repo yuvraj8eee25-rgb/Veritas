@@ -59,6 +59,7 @@ let currentDebateId = null;
 let currentDebateData = null;
 let turnTimer = null;
 let turnRemaining = TURN_SECONDS;
+let lastTimedTurnIndex = null; // only restart the turn timer when the turn index actually advances
 
 function db() { return window.mpFirebase.db; }
 function serverTs() { return firebase.firestore.FieldValue.serverTimestamp(); }
@@ -309,8 +310,12 @@ function renderDebateRoom() {
     : WAIT_MESSAGES[data.turns.length % WAIT_MESSAGES.length];
 
   if (myTurn) {
-    beginTurnTimer();
+    if (lastTimedTurnIndex !== data.turnIndex) {
+      lastTimedTurnIndex = data.turnIndex;
+      beginTurnTimer();
+    }
   } else {
+    lastTimedTurnIndex = null;
     stopTurnTimer();
     timerLabel.textContent = "—";
     timerLabel.classList.remove("urgent");
@@ -412,20 +417,29 @@ function getRefereeVerdict(data) {
   }
 
   const scoringRules = [
-    { re: /\bbecause\b/i, bonus: 2 },
-    { re: /\btherefore\b/i, bonus: 2 },
-    { re: /\bhowever\b/i, bonus: 2 },
-    { re: /\bbut\b/i, bonus: 1 },
-    { re: /\bconsequently\b/i, bonus: 2 }
+    { token: "because", bonus: 2 },
+    { token: "therefore", bonus: 2 },
+    { token: "however", bonus: 2 },
+    { token: "but", bonus: 1 },
+    { token: "consequently", bonus: 2 }
   ];
 
   const score = { you: 0, them: 0 };
   turns.forEach((turn) => {
     const text = (turn.text || "").trim();
-    const words = text.split(/\s+/).filter(Boolean).length;
+    const normalized = text.toLowerCase();
+    const wordTokens = normalized.match(/\b[a-z0-9']+\b/g) || [];
+    const uniqueWords = new Set(wordTokens).size;
+    const words = wordTokens.length;
     const sentences = text.split(/[.!?]+/).filter(Boolean).length;
-    let turnScore = Math.min(24, words * 0.35) + sentences * 1.4;
-    scoringRules.forEach((rule) => { if (rule.re.test(text)) turnScore += rule.bonus; });
+    const lengthScore = Math.min(24, Math.sqrt(words) * 5.2);
+    const diversityBonus = Math.round((words > 0 ? uniqueWords / words : 0) * 4);
+
+    const connectiveBonus = scoringRules.reduce((sum, rule) => {
+      return sum + (new RegExp(`\\b${rule.token}\\b`, "i").test(normalized) ? rule.bonus : 0);
+    }, 0);
+
+    let turnScore = lengthScore + sentences * 1.4 + diversityBonus + Math.min(connectiveBonus, 8);
     if (words >= 90) turnScore += 2;
     if (/^⏳/.test(text)) turnScore -= 3;
     if (turn.uid === myUid) score.you += turnScore;
@@ -435,7 +449,6 @@ function getRefereeVerdict(data) {
   score.you = Math.round(score.you);
   score.them = Math.round(score.them);
   const diff = score.you - score.them;
-  const total = score.you + score.them;
   const lastPasses = turns.slice(-INACTIVITY_PASSES_TO_END);
   const endedByInactivity = lastPasses.length === INACTIVITY_PASSES_TO_END && lastPasses.every((t) => /^⏳/.test(t.text));
 
@@ -497,6 +510,7 @@ document.getElementById("debate-exit-btn").addEventListener("click", () => {
 function leaveDebate() {
   window.DA.playClick();
   stopTurnTimer();
+  lastTimedTurnIndex = null;
   if (debateUnsub) { debateUnsub(); debateUnsub = null; }
   currentDebateId = null;
   currentDebateData = null;

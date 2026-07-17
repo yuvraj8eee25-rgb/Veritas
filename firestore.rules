@@ -10,24 +10,88 @@ service cloud.firestore {
     }
 
     // Matchmaking queue: a player may only create/edit/delete their own
-    // waiting-room entry. Anyone signed in can read the queue (needed to
-    // find a waiting opponent client-side).
+    // waiting-room entry. A matcher may claim an opponent's waiting doc by
+    // flipping it to matched with a valid debateId only.
     match /matchQueue/{uid} {
       allow read: if request.auth != null;
-      allow create: if request.auth != null && request.auth.uid == uid;
-      allow update: if request.auth != null; // matcher updates the *other* player's doc too
+      allow create: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.data.uid == uid
+        && request.resource.data.status == 'waiting'
+        && (request.resource.data.topic == null || request.resource.data.topic is string)
+        && request.resource.data.createdAt is timestamp;
+      allow update: if request.auth != null && (
+        request.auth.uid == uid
+          ? isValidSelfUpdate()
+          : isValidMatcherClaim()
+      );
       allow delete: if request.auth != null && request.auth.uid == uid;
+
+      function isValidSelfUpdate() {
+        return request.resource.data.uid == resource.data.uid
+          && request.resource.data.topic == resource.data.topic
+          && request.resource.data.status == resource.data.status
+          && request.resource.data.debateId == resource.data.debateId
+          && request.resource.data.createdAt == resource.data.createdAt;
+      }
+
+      function isValidMatcherClaim() {
+        return request.auth.uid != uid
+          && resource.data.status == 'waiting'
+          && request.resource.data.status == 'matched'
+          && request.resource.data.debateId is string
+          && request.resource.data.uid == resource.data.uid
+          && request.resource.data.topic == resource.data.topic
+          && request.resource.data.createdAt == resource.data.createdAt;
+      }
     }
 
-    // Debates: only the two matched players can read/write their room,
-    // and a player may only ever author a turn as themselves.
+    // Debates: only the two matched players can read/write their room.
+    // Updates are limited to appending one valid turn on your turn, or
+    // adding a rating after the debate is completed.
     match /debates/{debateId} {
-      allow read: if request.auth != null &&
-        request.auth.uid in resource.data.players;
-      allow create: if request.auth != null; // created by the matcher's transaction
-      allow update: if request.auth != null &&
-        request.auth.uid in resource.data.players;
+      allow read: if request.auth != null
+        && request.auth.uid in resource.data.players;
+      allow create: if request.auth != null && isValidDebateCreate();
+      allow update: if request.auth != null
+        && request.auth.uid in resource.data.players
+        && (isValidTurnAppend() || isValidRatingUpdate());
       allow delete: if false;
+
+      function isValidDebateCreate() {
+        return request.resource.data.topic is string
+          && request.resource.data.players is list
+          && request.resource.data.players.size() == 2
+          && request.resource.data.playerOrder is list
+          && request.resource.data.playerOrder.size() == 2
+          && request.resource.data.players == request.resource.data.playerOrder
+          && request.resource.data.turns == []
+          && request.resource.data.turnIndex == 0
+          && request.resource.data.maxTurnsPerPlayer == 3
+          && request.resource.data.status == 'active'
+          && request.resource.data.createdAt is timestamp;
+      }
+
+      function isValidTurnAppend() {
+        return resource.data.status == 'active'
+          && request.resource.data.status in ['active', 'completed']
+          && request.resource.data.players == resource.data.players
+          && request.resource.data.playerOrder == resource.data.playerOrder
+          && request.resource.data.maxTurnsPerPlayer == resource.data.maxTurnsPerPlayer
+          && request.resource.data.topic == resource.data.topic
+          && request.resource.data.turnIndex == resource.data.turnIndex + 1
+          && request.resource.data.turns.size() == resource.data.turns.size() + 1
+          && request.resource.data.turns[0:resource.data.turns.size()] == resource.data.turns
+          && request.resource.data.turns[resource.data.turns.size()].uid == request.auth.uid
+          && request.resource.data.turns[resource.data.turns.size()].text is string
+          && request.resource.data.turns[resource.data.turns.size()].text.size() > 0;
+      }
+
+      function isValidRatingUpdate() {
+        return resource.data.status == 'completed'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['ratings'])
+          && request.resource.data.ratings[request.auth.uid] in ['up', 'down'];
+      }
     }
   }
 }
