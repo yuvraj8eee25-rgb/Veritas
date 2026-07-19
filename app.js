@@ -435,6 +435,11 @@ function onScreenShown(name) {
   if (name === "profile") renderProfile();
   if (name === "leaderboard") renderLeaderboard();
   if (name === "daily") renderDailyDetail();
+  if (name === "multiplayer") {
+    if (window.mpOpenLobby) {
+      window.mpOpenLobby();
+    }
+  }
 }
 
 /* ---------------------------------------------------------

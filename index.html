@@ -361,9 +361,16 @@
   </header>
 
   <div class="mp-wrap" id="mp-browse-state">
-      <h3 class="section-heading">🔥 Hot topics today</h3>
-    <p class="mp-hint">Pick a topic (or let it be random), then find a live opponent for a turn-based debate.</p>
-    <div class="hot-topics-list" id="mp-hot-topics">
+    <div class="mp-topics-header">
+      <div>
+        <h3 class="section-heading">🔥 Hot topics today</h3>
+        <p class="mp-hint">Pick a topic (or let it be random), then find a live opponent for a turn-based debate.</p>
+      </div>
+      <button type="button" class="ghost-btn toggle-btn" id="mp-toggle-topics-btn" aria-expanded="false" aria-controls="mp-category-tabs mp-hot-topics">View topics</button>
+    </div>
+    <div class="mp-topics-collapse-hint" id="mp-topics-collapse-hint">Tap to expand the curated debate topics.</div>
+    <div class="mp-category-tabs hidden" id="mp-category-tabs"></div>
+    <div class="hot-topics-list hidden" id="mp-hot-topics">
       <div class="hot-topic-skel"></div>
       <div class="hot-topic-skel"></div>
       <div class="hot-topic-skel"></div>
