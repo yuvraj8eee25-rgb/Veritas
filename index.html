@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Veritas — AI Debate Coach</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<canvas id="bg-canvas" aria-hidden="true"></canvas>
+
+<div id="toast-root" class="toast-root" aria-live="polite"></div>
+
+<nav class="app-sidebar" id="app-sidebar">
+  <div class="sidebar-brand">
+    <svg width="22" height="22" viewBox="0 0 88 88" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M44 6L78 24V64L44 82L10 64V24L44 6Z" stroke="var(--text-primary)" stroke-width="4"/>
+      <path d="M34 44L41 51L56 36" stroke="var(--accent)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span>VERITAS</span>
+  </div>
+  <div class="sidebar-links">
+    <button type="button" class="sidebar-link" data-nav="home" aria-label="Home">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 11L12 4L20 11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 10V20H18V10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span>Home</span>
+    </button>
+
+    <span class="sidebar-group-label">Play</span>
+    <button type="button" class="sidebar-link" data-nav="ai-debate" aria-label="Debate the AI">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 5H20V16H9L4 20V16V5Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="9" cy="10.5" r="1.2" fill="currentColor"/><circle cx="12" cy="10.5" r="1.2" fill="currentColor"/><circle cx="15" cy="10.5" r="1.2" fill="currentColor"/></svg>
+      <span>Debate AI</span>
+    </button>
+    <button type="button" class="sidebar-link" data-nav="multiplayer" aria-label="Multiplayer">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M6 4L18 20M18 4L6 20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="6" cy="4" r="2" fill="currentColor"/><circle cx="18" cy="20" r="2" fill="currentColor"/><circle cx="18" cy="4" r="2" fill="currentColor"/><circle cx="6" cy="20" r="2" fill="currentColor"/></svg>
+      <span>Multiplayer</span>
+    </button>
+    <button type="button" class="sidebar-link" data-nav="daily" aria-label="Daily Challenge">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 2L14.5 8.5L21 11L14.5 13.5L12 20L9.5 13.5L3 11L9.5 8.5L12 2Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+      <span>Daily</span>
+    </button>
+
+    <span class="sidebar-group-label">Progress</span>
+    <button type="button" class="sidebar-link" data-nav="leaderboard" aria-label="Leaderboard">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M8 21V10M8 10L4 13M8 10L12 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 21V3M16 3L12 6M16 3L20 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span>Leaderboard</span>
+    </button>
+    <button type="button" class="sidebar-link" data-nav="profile" aria-label="Profile">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="2"/><path d="M4 20C4 16.134 7.582 13 12 13C16.418 13 20 16.134 20 20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      <span>Profile</span>
+    </button>
+  </div>
+  <div class="sidebar-foot">
+    <span class="sidebar-xp-mini" id="sidebar-xp-mini">0 XP</span>
+  </div>
+</nav>
+
+<!-- ============ SPLASH ============ -->
+<section class="screen" data-screen="splash" id="screen-splash">
+  <div class="splash-wrap">
+    <div class="splash-mark">
+      <svg width="64" height="64" viewBox="0 0 88 88" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M44 6L78 24V64L44 82L10 64V24L44 6Z" stroke="var(--text-primary)" stroke-width="2.5"/>
+        <path d="M44 22L64 33V55L44 66L24 55V33L44 22Z" stroke="var(--text-secondary)" stroke-width="2" opacity="0.7"/>
+        <path d="M34 44L41 51L56 36" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <h1 class="glitch-text splash-title" data-text="VERITAS">VERITAS</h1>
+    <p class="splash-tag">Train your argument. Sharpen your mind.</p>
+    <div class="splash-loader"><span></span></div>
+  </div>
+</section>
+
+<!-- ============ HOME ============ -->
+<section class="screen" data-screen="home" id="screen-home">
+  <header class="topbar">
+    <div class="brand">
+      <svg width="24" height="24" viewBox="0 0 88 88" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M44 6L78 24V64L44 82L10 64V24L44 6Z" stroke="var(--text-primary)" stroke-width="4"/>
+        <path d="M34 44L41 51L56 36" stroke="var(--accent)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span>VERITAS</span>
+    </div>
+    <nav class="topbar-actions">
+      <button type="button" class="icon-btn" data-nav="ai-debate" aria-label="Debate the AI">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 5H20V16H9L4 20V16V5Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="9" cy="10.5" r="1.2" fill="currentColor"/><circle cx="12" cy="10.5" r="1.2" fill="currentColor"/><circle cx="15" cy="10.5" r="1.2" fill="currentColor"/></svg>
+      </button>
+      <button type="button" class="icon-btn" data-nav="multiplayer" aria-label="Multiplayer">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M6 4L18 20M18 4L6 20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="6" cy="4" r="2" fill="currentColor"/><circle cx="18" cy="20" r="2" fill="currentColor"/><circle cx="18" cy="4" r="2" fill="currentColor"/><circle cx="6" cy="20" r="2" fill="currentColor"/></svg>
+      </button>
+      <button type="button" class="icon-btn" data-nav="daily" aria-label="Daily Challenge">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 2L14.5 8.5L21 11L14.5 13.5L12 20L9.5 13.5L3 11L9.5 8.5L12 2Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+      </button>
+      <button type="button" class="icon-btn" data-nav="leaderboard" aria-label="Leaderboard">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M8 21V10M8 10L4 13M8 10L12 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 21V3M16 3L12 6M16 3L20 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <button type="button" class="icon-btn" data-nav="profile" aria-label="Profile">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="2"/><path d="M4 20C4 16.134 7.582 13 12 13C16.418 13 20 16.134 20 20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+    </nav>
+  </header>
+
+  <div class="home-content">
+
+    <!-- Hero -->
+    <section class="home-hero">
+      <div class="home-hero-main">
+        <span class="hero-eyebrow">AI Debate Coach</span>
+        <h1 class="hero-title">Debate Better.<br>Think Clearly.</h1>
+        <p class="hero-desc">Veritas sharpens your reasoning through AI-judged debates, fast drills, and live 1v1 matches — argue any side, catch the fallacies you'd normally miss, and watch your rank climb.</p>
+        <div class="hero-actions">
+          <button type="button" class="hero-btn hero-btn-primary" data-nav="ai-debate">Start AI Debate</button>
+          <button type="button" class="hero-btn hero-btn-secondary" data-nav="multiplayer">Find Match</button>
+        </div>
+      </div>
+
+      <div class="hero-status glass-card">
+        <div class="xp-block">
+          <div class="xp-label">
+            <span class="rank-badge" id="home-rank">Novice Debater</span>
+            <span class="xp-count"><span id="home-xp-value">0</span> XP</span>
+          </div>
+          <div class="xp-bar"><div class="xp-bar-fill" id="home-xp-fill"></div></div>
+          <div class="xp-sub"><span id="home-xp-next">0 XP to next rank</span></div>
+        </div>
+        <div class="streak-block">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 2C12 2 6 8 6 13.5C6 17.09 8.91 20 12.5 20C16.09 20 19 17.09 19 13.5C19 12.5 18.5 11 18.5 11C18.5 11 17 13 15 13C15 13 16 9 12 2Z" fill="var(--accent)"/></svg>
+          <span class="streak-num" id="home-streak">0</span>
+          <span class="streak-label">day streak</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Statistics -->
+    <section class="home-stats">
+      <div class="home-stat">
+        <span class="home-stat-val" id="home-stat-debates">0</span>
+        <span class="home-stat-label">Debates</span>
+      </div>
+      <div class="home-stat">
+        <span class="home-stat-val" id="home-stat-winrate">—</span>
+        <span class="home-stat-label">Win Rate</span>
+      </div>
+      <div class="home-stat">
+        <span class="home-stat-val" id="home-stat-rating">—</span>
+        <span class="home-stat-label">Rating</span>
+      </div>
+      <div class="home-stat">
+        <span class="home-stat-val" id="home-stat-streak">0</span>
+        <span class="home-stat-label">Current Streak</span>
+      </div>
+    </section>
+
+    <!-- Daily challenge (compact strip) -->
+    <button type="button" class="daily-strip" data-nav="daily">
+      <span class="daily-strip-tag">Today</span>
+      <span class="daily-strip-title" id="daily-title">Steelman Sprint</span>
+      <span class="daily-strip-desc" id="daily-desc">3× XP multiplier · 4 questions</span>
+      <span class="daily-strip-timer" id="daily-countdown">--:--:--</span>
+      <svg class="daily-strip-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6L15 12L9 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+
+    <!-- Practice -->
+    <section class="home-section">
+      <h2 class="section-heading">Practice</h2>
+      <div class="practice-list">
+        <div class="practice-rows" id="home-mode-grid"><!-- injected --></div>
+        <button type="button" class="mode-card" data-nav="multiplayer">
+          <div class="mode-card-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M6 4L18 20M18 4L6 20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div>
+          <div class="mode-card-body">
+            <h3>Live Matchmaking</h3>
+            <p>Turn-based debate against a real opponent, scored by an AI referee.</p>
+          </div>
+          <span class="mode-card-tag">1v1</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- Recent Activity -->
+    <section class="home-section">
+      <h2 class="section-heading">Recent Activity</h2>
+      <div class="activity-list glass-card" id="home-activity-list"><!-- injected --></div>
+    </section>
+
+  </div>
+</section>
+
+<!-- ============ MODE SELECT (detail) ============ -->
+<section class="screen" data-screen="mode-select" id="screen-mode-select">
+  <header class="subbar">
+    <button type="button" class="back-btn" data-nav="home">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Back
+    </button>
+    <span class="subbar-title" id="mode-select-title">Mode</span>
+    <span class="subbar-spacer"></span>
+  </header>
+  <div class="mode-detail-wrap">
+    <div class="mode-detail-icon" id="mode-detail-icon"></div>
+    <h1 id="mode-detail-name">Fallacy Hunter</h1>
+    <p class="mode-detail-desc" id="mode-detail-desc">Spot the logical fallacy hiding in each argument.</p>
+
+    <div class="difficulty-row" id="difficulty-row"><!-- injected --></div>
+
+    <div class="mode-detail-stats">
+      <div class="stat-chip"><span class="stat-chip-val" id="mode-best-score">--</span><span class="stat-chip-label">Best score</span></div>
+      <div class="stat-chip"><span class="stat-chip-val" id="mode-plays">0</span><span class="stat-chip-label">Runs played</span></div>
+      <div class="stat-chip"><span class="stat-chip-val" id="mode-xp-reward">+120</span><span class="stat-chip-label">XP per run</span></div>
+    </div>
+
+    <button type="button" class="cta-btn" id="mode-start-btn">Start Training</button>
+  </div>
+</section>
+
+<!-- ============ GAME SCREEN ============ -->
+<section class="screen" data-screen="game" id="screen-game">
+  <header class="game-header">
+    <button type="button" class="icon-btn" id="game-exit-btn" aria-label="Exit">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M6 6L18 18M6 18L18 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+    </button>
+    <div class="game-progress-wrap">
+      <span class="game-mode-label" id="game-mode-label">Fallacy Hunter</span>
+      <div class="game-progress-bar"><div class="game-progress-fill" id="game-progress-fill"></div></div>
+    </div>
+    <div class="game-timer" id="game-timer">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="13" r="8" stroke="currentColor" stroke-width="2"/><path d="M12 9V13L15 15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M9 3H15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      <span id="game-timer-value">--</span>
+    </div>
+  </header>
+
+  <div class="game-body">
+    <div class="score-float" id="score-float">
+      <span class="score-float-icon">✦</span>
+      <span id="score-float-value">0</span>
+    </div>
+
+    <div class="question-card glass-card" id="question-card">
+      <span class="q-tag" id="q-difficulty">EASY</span>
+      <p class="q-text" id="q-text">Question text goes here.</p>
+    </div>
+
+    <div class="options-grid" id="options-grid"><!-- injected --></div>
+  </div>
+
+  <!-- Feedback overlay -->
+  <div class="feedback-overlay" id="feedback-overlay">
+    <div class="feedback-panel glass-card" id="feedback-panel">
+      <div class="feedback-icon" id="feedback-icon"></div>
+      <h3 id="feedback-title">Correct!</h3>
+      <p class="feedback-explain" id="feedback-explain">Explanation of why this answer is right.</p>
+      <div class="coach-tip">
+        <div class="coach-tip-head">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 2L14.5 8.5L21 11L14.5 13.5L12 20L9.5 13.5L3 11L9.5 8.5L12 2Z" fill="currentColor"/></svg>
+          <span>AI COACH TIP</span>
+        </div>
+        <p id="coach-tip-text">Coach tip goes here.</p>
+      </div>
+      <button type="button" class="cta-btn" id="feedback-next-btn">Continue</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============ RUN SUMMARY ============ -->
+<section class="screen" data-screen="summary" id="screen-summary">
+  <div class="summary-wrap">
+    <div class="summary-badge" id="summary-badge">
+      <svg width="48" height="48" viewBox="0 0 64 64" fill="none"><circle cx="32" cy="32" r="30" stroke="var(--border-soft)" stroke-width="2.5"/><path d="M22 33L28 39L42 25" stroke="var(--accent)" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </div>
+    <span class="summary-eyebrow" id="summary-eyebrow">Run Complete</span>
+    <h1 id="summary-mode-name">Fallacy Hunter</h1>
+
+    <div class="summary-stats-row">
+      <div class="summary-stat">
+        <span class="summary-stat-value" id="summary-correct">0/8</span>
+        <span class="summary-stat-label">Correct</span>
+      </div>
+      <div class="summary-stat">
+        <span class="summary-stat-value" id="summary-accuracy">0%</span>
+        <span class="summary-stat-label">Accuracy</span>
+      </div>
+      <div class="summary-stat">
+        <span class="summary-stat-value" id="summary-streak-best">0</span>
+        <span class="summary-stat-label">Best streak</span>
+      </div>
+    </div>
+
+    <div class="glass-card radar-card">
+      <span class="radar-card-title">Skill Impact</span>
+      <canvas id="radar-canvas" width="320" height="320" role="img" aria-label="Skill impact chart showing this run's strengths across categories"></canvas>
+    </div>
+
+    <div class="glass-card xp-breakdown-card">
+      <span class="xp-breakdown-title">XP Breakdown</span>
+      <div class="xp-line" id="xp-line-base"><span>Base completion</span><span>+0</span></div>
+      <div class="xp-line" id="xp-line-accuracy"><span>Accuracy bonus</span><span>+0</span></div>
+      <div class="xp-line" id="xp-line-streak"><span>Streak bonus</span><span>+0</span></div>
+      <div class="xp-line xp-line-total" id="xp-line-total"><span>Total earned</span><span>+0</span></div>
+    </div>
+
+    <div class="summary-actions">
+      <button type="button" class="cta-btn" id="summary-retry-btn">Train Again</button>
+      <button type="button" class="ghost-btn" id="summary-home-btn">Back to Home</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============ PROFILE ============ -->
+<section class="screen" data-screen="profile" id="screen-profile">
+  <header class="subbar">
+    <button type="button" class="back-btn" data-nav="home">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Back
+    </button>
+    <h1 class="subbar-title">Profile</h1>
+    <span class="subbar-spacer"></span>
+  </header>
+
+  <div class="profile-wrap">
+    <div class="profile-head">
+      <div class="profile-avatar">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="2"/><path d="M4 20C4 16.134 7.582 13 12 13C16.418 13 20 16.134 20 20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </div>
+      <div>
+        <h2 id="profile-rank">Novice Debater</h2>
+        <p id="profile-xp-sub">0 total XP</p>
+        <p id="profile-elo-sub">Debate ELO: —</p>
+      </div>
+    </div>
+
+    <div class="glass-card radar-card">
+      <span class="radar-card-title">Skill Radar</span>
+      <canvas id="profile-radar-canvas" width="300" height="300" role="img" aria-label="Skill radar chart showing your strengths across categories"></canvas>
+    </div>
+
+    <h3 class="section-heading">Badges</h3>
+    <div class="badge-wall" id="badge-wall"><!-- injected --></div>
+
+    <h3 class="section-heading">Activity</h3>
+    <div class="glass-card heatmap-card">
+      <div class="heatmap-grid" id="heatmap-grid"><!-- injected --></div>
+      <div class="heatmap-legend">
+        <span>Less</span>
+        <span class="heat-swatch heat-0"></span>
+        <span class="heat-swatch heat-1"></span>
+        <span class="heat-swatch heat-2"></span>
+        <span class="heat-swatch heat-3"></span>
+        <span class="heat-swatch heat-4"></span>
+        <span>More</span>
+      </div>
+    </div>
+
+    <button type="button" class="ghost-btn danger-ghost" id="reset-progress-btn">Reset Progress</button>
+  </div>
+</section>
+
+<!-- ============ LEADERBOARD ============ -->
+<section class="screen" data-screen="leaderboard" id="screen-leaderboard">
+  <header class="subbar">
+    <button type="button" class="back-btn" data-nav="home">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Back
+    </button>
+    <h1 class="subbar-title">Leaderboard</h1>
+    <span class="subbar-spacer"></span>
+  </header>
+  <div class="leaderboard-wrap">
+    <div class="lb-tabs">
+      <button type="button" class="lb-tab active" data-lb="weekly">This Week</button>
+      <button type="button" class="lb-tab" data-lb="alltime">All-Time</button>
+      <button type="button" class="lb-tab" data-lb="elo">Debate ELO</button>
+    </div>
+    <div class="lb-list" id="lb-list"><!-- injected --></div>
+  </div>
+</section>
+
+<!-- ============ DAILY CHALLENGE ============ -->
+<section class="screen" data-screen="daily" id="screen-daily">
+  <header class="subbar">
+    <button type="button" class="back-btn" data-nav="home">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Back
+    </button>
+    <span class="subbar-title">Daily Challenge</span>
+    <span class="subbar-spacer"></span>
+  </header>
+  <div class="daily-detail-wrap">
+    <div class="daily-detail-icon">
+      <svg width="34" height="34" viewBox="0 0 24 24" fill="none"><path d="M12 2L14.5 8.5L21 11L14.5 13.5L12 20L9.5 13.5L3 11L9.5 8.5L12 2Z" fill="var(--accent)"/></svg>
+    </div>
+    <h1 id="daily-detail-title">Steelman Sprint</h1>
+    <p class="daily-detail-desc" id="daily-detail-desc">4 hand-picked questions from Steelman Challenge. Complete today for a 3× XP multiplier.</p>
+    <div class="daily-multiplier-badge">3× XP MULTIPLIER</div>
+    <div class="daily-detail-countdown">
+      <span>Resets in</span>
+      <strong id="daily-detail-timer">--:--:--</strong>
+    </div>
+    <button type="button" class="cta-btn" id="daily-start-btn">Start Challenge</button>
+  </div>
+</section>
+
+<!-- ============ MULTIPLAYER LOBBY ============ -->
+<section class="screen" data-screen="multiplayer" id="screen-multiplayer">
+  <header class="subbar">
+    <button type="button" class="back-btn" id="mp-back-btn" data-nav="home">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Back
+    </button>
+    <h1 class="subbar-title">Multiplayer</h1>
+    <span class="subbar-spacer"></span>
+  </header>
+
+  <div class="mp-wrap" id="mp-browse-state">
+    <div class="mp-topics-header">
+      <div>
+        <h3 class="section-heading">🔥 Hot topics today</h3>
+        <p class="mp-hint">Pick a topic (or let it be random), then find a live opponent for a turn-based debate.</p>
+      </div>
+      <button type="button" class="ghost-btn toggle-btn" id="mp-toggle-topics-btn" aria-expanded="false" aria-controls="mp-category-tabs mp-hot-topics">View topics</button>
+    </div>
+    <div class="mp-topics-collapse-hint" id="mp-topics-collapse-hint">Tap to expand the curated debate topics.</div>
+    <div class="mp-category-tabs hidden" id="mp-category-tabs"></div>
+    <div class="hot-topics-list hidden" id="mp-hot-topics">
+      <div class="hot-topic-skel"></div>
+      <div class="hot-topic-skel"></div>
+      <div class="hot-topic-skel"></div>
+    </div>
+
+    <div class="glass-card mp-selected-card hidden" id="mp-selected-card">
+      <span class="mp-selected-label">Selected topic</span>
+      <p id="mp-selected-text"></p>
+      <button type="button" class="mp-clear-btn" id="mp-clear-topic">Clear</button>
+    </div>
+
+    <div class="glass-card mp-rules-card">
+      <span class="mp-selected-label">How this match works</span>
+      <ul class="mp-rules-list">
+        <li>Each player gets 3 turns.</li>
+        <li>30 seconds per turn to type your argument.</li>
+        <li>The AI referee scores the winner based on clarity and reasoning.</li>
+        <li>Once you send, your argument is locked in.</li>
+      </ul>
+    </div>
+
+    <button type="button" class="cta-btn" id="mp-find-match-btn">Find Match</button>
+    <p class="mp-online-note" id="mp-online-note"></p>
+  </div>
+
+  <div class="mp-wrap mp-searching-state hidden" id="mp-searching-state">
+    <div class="mp-radar-spinner"><span></span><span></span><span></span></div>
+    <h3>Searching for an opponent…</h3>
+    <p class="mp-hint" id="mp-searching-topic"></p>
+    <button type="button" class="ghost-btn" id="mp-cancel-search-btn">Cancel</button>
+  </div>
+</section>
+
+<!-- ============ DEBATE ROOM ============ -->
+<section class="screen debate-screen" data-screen="debate-room" id="screen-debate-room">
+  <div class="debate-main">
+    <header class="game-header slim">
+      <button type="button" class="icon-btn" id="debate-exit-btn" aria-label="Leave">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M6 6L18 18M6 18L18 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+      </button>
+      <h1 class="subbar-title">Live Debate</h1>
+      <span class="subbar-spacer"></span>
+    </header>
+
+    <div class="debate-body" id="debate-transcript"><!-- turns injected --></div>
+
+    <div class="debate-composer" id="debate-composer">
+      <textarea id="debate-input" class="debate-textarea" placeholder="Write your argument…" maxlength="600" rows="3"></textarea>
+      <button type="button" class="cta-btn debate-send-btn" id="debate-send-btn">Send Argument</button>
+    </div>
+
+    <div class="debate-waiting hidden" id="debate-waiting">
+      <div class="mp-radar-spinner small"><span></span><span></span><span></span></div>
+      <p id="debate-waiting-message">Waiting for opponent's turn…</p>
+    </div>
+
+    <div class="debate-ended-panel glass-card hidden" id="debate-ended-panel">
+      <h3>Debate complete</h3>
+      <p id="debate-ended-sub">Nicely argued.</p>
+      <div class="debate-referee-panel">
+        <span class="referee-label">AI Referee verdict</span>
+        <p id="debate-referee-comment">The referee will judge the match once it ends.</p>
+      </div>
+      <div class="debate-rate-row" id="debate-rate-row">
+        <span>Rate your opponent's argument:</span>
+        <div class="debate-rate-btns">
+          <button type="button" data-rate="up" class="rate-btn" aria-label="Rate opponent's argument helpful">👍</button>
+          <button type="button" data-rate="down" class="rate-btn" aria-label="Rate opponent's argument unhelpful">👎</button>
+        </div>
+      </div>
+      <button type="button" class="cta-btn" id="debate-done-btn">Back to Home</button>
+    </div>
+  </div>
+
+  <aside class="debate-scoreboard">
+    <div class="scoreboard-block">
+      <span class="scoreboard-label">Turn</span>
+      <div class="debate-turn-pill" id="debate-turn-pill">—</div>
+    </div>
+    <div class="scoreboard-block">
+      <span class="scoreboard-label">Turn timer</span>
+      <div class="debate-turn-pill time-pill" id="debate-timer-value">30s</div>
+    </div>
+    <div class="scoreboard-block">
+      <span class="scoreboard-label">Round progress</span>
+      <div class="game-progress-bar"><div class="game-progress-fill" id="debate-progress-fill"></div></div>
+    </div>
+    <div class="scoreboard-block">
+      <span class="scoreboard-label">Topic</span>
+      <p class="scoreboard-topic" id="debate-topic-label">Topic</p>
+    </div>
+  </aside>
+</section>
+
+<!-- ============ AI DEBATE LOBBY ============ -->
+<section class="screen" data-screen="ai-debate" id="screen-ai-debate">
+  <header class="subbar">
+    <button type="button" class="back-btn" data-nav="home">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Back
+    </button>
+    <h1 class="subbar-title">Debate the AI</h1>
+    <span class="subbar-spacer"></span>
+  </header>
+
+  <div class="mp-wrap">
+    <h3 class="section-heading">Pick any topic</h3>
+    <p class="mp-hint">Type your own topic, or grab a random one. Then argue your side against an AI opponent — a referee scores your reasoning at the end.</p>
+
+    <div class="glass-card aidebate-topic-card">
+      <textarea id="aidebate-topic-input" class="debate-textarea" maxlength="200" rows="2" placeholder="e.g. Should college be free for everyone?"></textarea>
+      <button type="button" class="ghost-btn aidebate-random-btn" id="aidebate-random-btn">🎲 Surprise me</button>
+    </div>
+
+    <h3 class="section-heading">Which side will you argue?</h3>
+    <div class="aidebate-stance-row">
+      <button type="button" class="aidebate-stance-btn active" data-stance="for" id="aidebate-stance-for">I'll argue FOR</button>
+      <button type="button" class="aidebate-stance-btn" data-stance="against" id="aidebate-stance-against">I'll argue AGAINST</button>
+    </div>
+
+    <div class="glass-card mp-rules-card">
+      <span class="mp-selected-label">How this works</span>
+      <ul class="mp-rules-list">
+        <li>You get 3 turns; the AI opponent replies after each one.</li>
+        <li>Argue your chosen side as convincingly as you can.</li>
+        <li>The AI referee scores your reasoning, evidence, and responsiveness.</li>
+        <li>Afterward, try a Devil's Advocate Drill: the referee's strongest point you never made.</li>
+      </ul>
+    </div>
+
+    <button type="button" class="cta-btn" id="aidebate-start-btn">Start Debate</button>
+  </div>
+</section>
+
+<!-- ============ AI DEBATE ROOM ============ -->
+<section class="screen debate-screen" data-screen="ai-debate-room" id="screen-ai-debate-room">
+  <div class="debate-main">
+    <header class="game-header slim">
+      <button type="button" class="icon-btn" id="aidebate-exit-btn" aria-label="Leave">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M6 6L18 18M6 18L18 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+      </button>
+      <h1 class="subbar-title">Debate the AI</h1>
+      <span class="subbar-spacer"></span>
+    </header>
+
+    <div class="debate-body" id="aidebate-transcript"><!-- turns injected --></div>
+
+    <div class="debate-composer" id="aidebate-composer">
+      <textarea id="aidebate-input" class="debate-textarea" placeholder="Write your argument…" maxlength="600" rows="3"></textarea>
+      <button type="button" class="cta-btn debate-send-btn" id="aidebate-send-btn">Send Argument</button>
+    </div>
+
+    <div class="debate-waiting hidden" id="aidebate-waiting">
+      <div class="mp-radar-spinner small"><span></span><span></span><span></span></div>
+      <p id="aidebate-waiting-message">The AI opponent is drafting a reply…</p>
+    </div>
+
+    <div class="debate-ended-panel glass-card hidden" id="aidebate-ended-panel">
+      <h3 id="aidebate-ended-title">Debate complete</h3>
+      <p id="aidebate-ended-sub">Nicely argued.</p>
+      <div class="debate-referee-panel">
+        <span class="referee-label">AI Referee verdict</span>
+        <p id="aidebate-referee-comment">The referee will judge the match once it ends.</p>
+      </div>
+      <div class="aidebate-feedback-list" id="aidebate-feedback-list"><!-- per-turn feedback injected --></div>
+
+      <div class="glass-card aidebate-devil-card hidden" id="aidebate-devil-card">
+        <span class="mp-selected-label">🎭 Devil's Advocate Drill</span>
+        <p id="aidebate-devil-point">The strongest point you didn't make.</p>
+        <p class="aidebate-devil-challenge" id="aidebate-devil-challenge">Argue it now.</p>
+        <textarea id="aidebate-devil-input" class="debate-textarea" maxlength="600" rows="3" placeholder="Make the case…"></textarea>
+        <button type="button" class="ghost-btn" id="aidebate-devil-submit-btn">Submit Drill</button>
+        <div class="aidebate-devil-feedback hidden" id="aidebate-devil-feedback"></div>
+      </div>
+
+      <button type="button" class="cta-btn" id="aidebate-done-btn">Back to Home</button>
+    </div>
+  </div>
+
+  <aside class="debate-scoreboard">
+    <div class="scoreboard-block">
+      <span class="scoreboard-label">Turn</span>
+      <div class="debate-turn-pill" id="aidebate-turn-pill">—</div>
+    </div>
+    <div class="scoreboard-block">
+      <span class="scoreboard-label">Round progress</span>
+      <div class="game-progress-bar"><div class="game-progress-fill" id="aidebate-progress-fill"></div></div>
+    </div>
+    <div class="scoreboard-block">
+      <span class="scoreboard-label">Your stance</span>
+      <div class="debate-turn-pill mine" id="aidebate-stance-label">FOR</div>
+    </div>
+    <div class="scoreboard-block">
+      <span class="scoreboard-label">Topic</span>
+      <p class="scoreboard-topic" id="aidebate-topic-label">Topic</p>
+    </div>
+  </aside>
+</section>
+
+<script src="app.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="supabase-config.js"></script>
+<script src="multiplayer.js"></script>
+<script src="ai-debate.js"></script>
+</body>
+</html>
