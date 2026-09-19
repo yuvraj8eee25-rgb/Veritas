@@ -1,0 +1,378 @@
+/* =========================================================
+   VERITAS — Navy Violet
+   ---------------------------------------------------------
+   Drop-in theme layer. Loads AFTER styles.css and overrides
+   the token layer, so all 666 existing rules inherit it.
+
+   Palette from horizon-ui/horizon-ui-chakra (navy surfaces,
+   soft deep elevation) with the accent and glow treatment
+   from Snehashis87/Ai-Image-Editor.
+
+   The design carries its weight in three places: a living
+   aurora field behind the app, an oversized hero headline,
+   and the two debate cards. Everything else stays quiet so
+   those read.
+   ========================================================= */
+
+:root {
+  /* Surfaces */
+  --bg-page: #080f2e;
+  --bg-panel: #111c44;
+  --bg-muted: #1b2559;
+  --bg-obsidian: #050a20;
+
+  /* Accent */
+  --accent: #7c5cfc;
+  --accent-rgb: 124, 92, 252;
+  --accent-soft: rgba(124, 92, 252, 0.15);
+  --accent-deep: #4318ff;
+  --accent-grad: linear-gradient(135deg, #a78bfa 0%, #7c5cfc 45%, #4318ff 100%);
+  --electric: #39b8ff;
+  --electric-grad: linear-gradient(135deg, #5ee7ff 0%, #39b8ff 50%, #2b6bff 100%);
+
+  /* Text */
+  --ink: #f4f7fe;
+  --ink-rgb: 244, 247, 254;
+  --ink-soft: #a9b4d8;
+  --ink-mute: #707eae;
+
+  --line: rgba(163, 174, 208, 0.14);
+  --line-strong: rgba(124, 92, 252, 0.42);
+
+  /* Support */
+  --cyan: #39b8ff;
+  --cyan-rgb: 57, 184, 255;
+  --green: #01d38a;
+  --green-rgb: 1, 211, 138;
+  --magenta: #ff5d8f;
+  --magenta-rgb: 255, 93, 143;
+  --amber: #ffb547;
+  --amber-rgb: 255, 181, 71;
+  --violet: #a78bfa;
+  --violet-rgb: 167, 139, 250;
+  --peach: #d9c8ff;
+  --silver: #a3aed0;
+  --bronze: #ffb547;
+
+  /* Elevation */
+  --shadow-sm: 0 4px 12px rgba(2, 6, 23, 0.4);
+  --shadow-card: 0 20px 44px rgba(2, 6, 23, 0.55);
+  --shadow-overlay: 0 36px 80px rgba(2, 6, 23, 0.78);
+  --shadow-glow: 0 10px 30px rgba(124, 92, 252, 0.45);
+
+  --radius: 18px;
+
+  --font-display: 'Space Grotesk', 'DM Sans', system-ui, sans-serif;
+  --font-serif: 'Space Grotesk', 'DM Sans', system-ui, sans-serif;
+  --font-body: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+
+  --ring: 0 0 0 2px var(--bg-page), 0 0 0 4px rgba(124, 92, 252, 0.6);
+}
+
+/* ---------------------------------------------------------
+   AURORA FIELD
+   One slow ambient drift, 40s, behind everything. This is the
+   only motion on the page nobody asked for, which is why it
+   gets to be slow and large rather than fast and fussy.
+   --------------------------------------------------------- */
+html { background: var(--bg-page); }
+
+body {
+  background: transparent;
+  position: relative;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: -25%;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(38% 38% at 20% 18%, rgba(124, 92, 252, 0.40) 0%, transparent 70%),
+    radial-gradient(34% 34% at 82% 12%, rgba(57, 184, 255, 0.26) 0%, transparent 70%),
+    radial-gradient(40% 40% at 68% 82%, rgba(255, 93, 143, 0.20) 0%, transparent 70%),
+    radial-gradient(30% 30% at 12% 78%, rgba(67, 24, 255, 0.30) 0%, transparent 70%);
+  filter: blur(20px);
+  animation: aurora 40s ease-in-out infinite alternate;
+}
+
+@keyframes aurora {
+  0%   { transform: translate3d(0, 0, 0) scale(1); }
+  50%  { transform: translate3d(2.5%, -2%, 0) scale(1.09); }
+  100% { transform: translate3d(-2%, 2.5%, 0) scale(1.03); }
+}
+
+/* ---------------------------------------------------------
+   TYPE
+   --------------------------------------------------------- */
+h1, h2, h3, h4 { letter-spacing: -0.03em; }
+
+.hero-title {
+  font-size: clamp(2.4rem, 6.2vw, 4.1rem);
+  line-height: 1.02;
+  font-weight: 700;
+  letter-spacing: -0.045em;
+  background: linear-gradient(118deg, #ffffff 0%, #cdbcff 46%, #6fd8ff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  margin: 6px 0 22px;
+}
+
+.hero-greeting {
+  font-size: 0.86rem;
+  color: var(--ink-mute);
+}
+
+/* Section headings carry a short accent rule. It marks where a
+   section starts without resorting to an all-caps eyebrow. */
+.section-heading {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  font-size: 1.05rem;
+}
+
+.section-heading::before {
+  content: "";
+  width: 3px;
+  height: 17px;
+  border-radius: 999px;
+  background: var(--accent-grad);
+  flex: none;
+}
+
+/* ---------------------------------------------------------
+   SURFACES
+   --------------------------------------------------------- */
+.glass-card,
+.stat-chip,
+.question-card,
+.feedback-panel,
+.mode-card,
+.daily-strip {
+  border-radius: var(--radius-xl);
+}
+
+.glass-card {
+  background: linear-gradient(168deg, rgba(27, 37, 89, 0.92) 0%, rgba(17, 28, 68, 0.92) 100%);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.app-sidebar {
+  background: linear-gradient(180deg, rgba(17, 28, 68, 0.94) 0%, rgba(8, 15, 46, 0.94) 100%);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border-right: 1px solid var(--line);
+  box-shadow: 18px 0 50px rgba(2, 6, 23, 0.4);
+}
+
+.sidebar-link { border-radius: var(--radius-lg); }
+
+.sidebar-link.active,
+.sidebar-link[aria-current="page"] {
+  background: var(--accent-grad);
+  color: #ffffff;
+  box-shadow: var(--shadow-glow);
+}
+
+.sidebar-group-label {
+  color: var(--ink-mute);
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+
+/* ---------------------------------------------------------
+   DEBATE CARDS — the front door of the app
+   --------------------------------------------------------- */
+.debate-picks {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(268px, 1fr));
+  gap: 16px;
+}
+
+.debate-card {
+  position: relative;
+  overflow: hidden;
+  text-align: left;
+  padding: 26px 24px 22px;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--line-strong);
+  background: linear-gradient(158deg, rgba(40, 32, 110, 0.9) 0%, rgba(17, 28, 68, 0.95) 62%);
+  color: var(--ink);
+  font-family: var(--font-body);
+  cursor: pointer;
+  box-shadow: var(--shadow-card);
+  transition: transform 0.22s var(--ease-out), box-shadow 0.22s var(--ease-out);
+}
+
+/* A glow sitting behind the card's own content, bleeding in from
+   the corner, so the card reads as lit rather than outlined. */
+.debate-card::before {
+  content: "";
+  position: absolute;
+  top: -55%;
+  right: -25%;
+  width: 78%;
+  height: 165%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(124, 92, 252, 0.55) 0%, transparent 68%);
+  pointer-events: none;
+  opacity: 0.75;
+  transition: opacity 0.25s var(--ease-out);
+}
+
+.debate-card.alt {
+  background: linear-gradient(158deg, rgba(14, 62, 108, 0.9) 0%, rgba(17, 28, 68, 0.95) 62%);
+  border-color: rgba(57, 184, 255, 0.4);
+}
+
+.debate-card.alt::before {
+  background: radial-gradient(circle, rgba(57, 184, 255, 0.5) 0%, transparent 68%);
+}
+
+.debate-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 26px 56px rgba(2, 6, 23, 0.6), var(--shadow-glow);
+}
+
+.debate-card:hover::before { opacity: 1; }
+
+.debate-card.alt:hover {
+  box-shadow: 0 26px 56px rgba(2, 6, 23, 0.6), 0 10px 30px rgba(57, 184, 255, 0.4);
+}
+
+.debate-card > * { position: relative; }
+
+.debate-card-kicker {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--ink-soft);
+  margin-bottom: 10px;
+}
+
+.debate-card h3 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0 0 8px;
+}
+
+.debate-card p {
+  font-size: 0.86rem;
+  line-height: 1.55;
+  color: var(--ink-soft);
+  margin: 0 0 18px;
+  max-width: 44ch;
+}
+
+.debate-card-go {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: #fff;
+  padding: 9px 17px;
+  border-radius: 999px;
+  background: var(--accent-grad);
+  box-shadow: var(--shadow-glow);
+}
+
+.debate-card.alt .debate-card-go {
+  background: var(--electric-grad);
+  box-shadow: 0 8px 22px rgba(57, 184, 255, 0.4);
+}
+
+/* ---------------------------------------------------------
+   CONTROLS
+   --------------------------------------------------------- */
+.cta-btn,
+.hero-btn-primary {
+  background: var(--accent-grad);
+  color: #ffffff;
+  box-shadow: var(--shadow-glow);
+  border-radius: var(--radius-lg);
+}
+
+.cta-btn:hover,
+.hero-btn-primary:hover { box-shadow: 0 14px 38px rgba(124, 92, 252, 0.6); }
+.cta-btn:active,
+.hero-btn-primary:active { box-shadow: 0 4px 14px rgba(124, 92, 252, 0.4); }
+
+.hero-btn-secondary {
+  border-color: var(--line-strong);
+  color: var(--ink);
+}
+
+.option-btn { border-radius: var(--radius-lg); }
+
+.option-btn:hover:not(:disabled) {
+  border-color: var(--line-strong);
+  box-shadow: 0 6px 20px rgba(124, 92, 252, 0.22);
+}
+
+::selection { background: var(--accent); color: #ffffff; }
+
+/* ---------------------------------------------------------
+   PROGRESS + DATA
+   --------------------------------------------------------- */
+.xp-bar-fill,
+.game-progress-fill {
+  background: var(--accent-grad);
+  box-shadow: 0 0 14px rgba(124, 92, 252, 0.6);
+}
+
+.home-stat-val {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 700;
+  background: linear-gradient(120deg, #ffffff 0%, #b9a6ff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.streak-num {
+  background: linear-gradient(120deg, #ffd27a 0%, #ff8a5c 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.daily-strip {
+  background: linear-gradient(100deg, rgba(255, 181, 71, 0.16) 0%, rgba(17, 28, 68, 0.9) 55%);
+  border: 1px solid rgba(255, 181, 71, 0.3);
+}
+
+.daily-strip-tag { color: var(--amber); }
+
+.pipeline-step.active {
+  border-color: var(--line-strong);
+  box-shadow: 0 0 0 1px rgba(124, 92, 252, 0.3), var(--shadow-glow);
+}
+
+/* ---------------------------------------------------------
+   ACCESSIBILITY FLOOR
+   --------------------------------------------------------- */
+:focus-visible {
+  outline: 2px solid var(--electric);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  body::before { animation: none !important; }
+}
+
+@media (max-width: 640px) {
+  .hero-title { font-size: clamp(2rem, 9vw, 2.8rem); }
+  .debate-card { padding: 22px 20px 20px; }
+  .debate-card h3 { font-size: 1.5rem; }
+}
