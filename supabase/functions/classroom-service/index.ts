@@ -1,11 +1,12 @@
 // Trusted Classroom service boundary. Configure EMAIL_PROVIDER_URL and
 // EMAIL_PROVIDER_KEY as Supabase Edge Function secrets before enabling email.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { guardUserRequest, withCors } from "../_shared/http.ts";
 
-const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS" };
+const cors = { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS" };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
 
-Deno.serve(async (request) => {
+Deno.serve(withCors(async (request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers: cors });
   const url = Deno.env.get("SUPABASE_URL");
   const anon = Deno.env.get("SUPABASE_ANON_KEY");
@@ -18,22 +19,27 @@ Deno.serve(async (request) => {
   const payload = await request.json().catch(() => null);
   if (!payload || !["email"].includes(payload.action)) return json({ error: "Unsupported Classroom service action." }, 400);
   if (payload.action === "email") {
+    const guarded = await guardUserRequest(request, "classroom-email", 20, 3600);
+    if (guarded) return guarded;
     const provider = Deno.env.get("EMAIL_PROVIDER_URL");
     const key = Deno.env.get("EMAIL_PROVIDER_KEY");
     const from = Deno.env.get("EMAIL_FROM");
     if (!provider || !key || !from) return json({ error: `Email delivery is not configured. Missing: ${[!provider && "EMAIL_PROVIDER_URL", !key && "EMAIL_PROVIDER_KEY", !from && "EMAIL_FROM"].filter(Boolean).join(", ")}.` }, 503);
     const token = String(payload.token || "");
     if (!/^[a-f0-9]{64}$/.test(token)) return json({ error: "Invalid invitation token." }, 400);
-    const { data, error: rpcError } = await client.rpc("classroom_command", { p_action: "workspace", p_data: {} });
-    if (rpcError || !data) return json({ error: "Unable to verify invitation." }, 403);
-    const invite = (data.invites || []).find((row: { id: string }) => row.id === payload.invite);
-    if (!invite) return json({ error: "Invitation not found or you are not its coach." }, 404);
-    const response = await fetch(provider, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` }, body: JSON.stringify({ from, to: invite.invited_email, subject: "Your Veritas Classroom invitation", text: `Join your Veritas cohort with this link: ${payload.url || ""}` }) });
+    const allowedOrigins = (Deno.env.get("ALLOWED_ORIGINS") || "").split(",").map((origin) => origin.trim()).filter(Boolean);
+    let inviteUrl: URL;
+    try { inviteUrl = new URL(String(payload.url || "")); } catch { return json({ error: "Invalid invitation URL." }, 400); }
+    if (!allowedOrigins.includes(inviteUrl.origin) || inviteUrl.protocol !== "https:" && inviteUrl.hostname !== "localhost" && inviteUrl.hostname !== "127.0.0.1") return json({ error: "Invitation URL must use an approved website origin." }, 400);
+    if (inviteUrl.searchParams.get("classroom_invite") !== token) return json({ error: "Invitation URL does not match this invitation." }, 400);
+    const { data: recipient, error: rpcError } = await client.rpc("validate_classroom_invite_email", { p_invite_id: payload.invite, p_token: token });
+    if (rpcError || !recipient) return json({ error: "Invitation not found, expired, already used, or unavailable to this coach." }, 404);
+    const response = await fetch(provider, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}`, "Idempotency-Key": `veritas-classroom-invite-${payload.invite}` }, body: JSON.stringify({ from, to: recipient, subject: "Your Veritas Classroom invitation", text: `Join your Veritas cohort with this link: ${inviteUrl.href}` }), signal: AbortSignal.timeout(15000) });
     if (!response.ok) {
-      const detail = await response.text().catch(() => "");
-      return json({ error: `Email provider rejected the message${detail ? `: ${detail.slice(0, 500)}` : "."} Copy the invite link instead.` }, 502);
+      console.warn(JSON.stringify({ event: "classroom_email_provider_error", status: response.status }));
+      return json({ error: "Email delivery failed. Copy and share the invitation link instead." }, 502);
     }
     return json({ ok: true });
   }
   return json({ error: "Unsupported Classroom service action." }, 400);
-});
+}));

@@ -34,18 +34,15 @@ const LLMProvider = {
     this.callCount++;
 
     try {
-      const sb = window.mpSupabase && window.mpSupabase.client;
-      if (!sb) return null;
-      const { data, error } = await sb.functions.invoke("assess-evidence", {
-        body: Object.assign({ action: action }, payload)
-      });
-      if (error || !data || !data.ok) {
-        console.warn("[LLM] assess-evidence \"" + action + "\" failed:", error || (data && data.error));
+      if (!window.VeritasApi?.isConfigured) return null;
+      const data = await window.VeritasApi.edge("assess-evidence", Object.assign({ action: action }, payload), { timeoutMs: 30000 });
+      if (!validateEvidenceResult(action, data)) {
+        console.warn("[LLM] assess-evidence \"" + action + "\" returned no usable result.");
         return null;
       }
       return data;
     } catch (e) {
-      console.warn("[LLM] assess-evidence call threw, using heuristic fallback:", e);
+      console.warn("[LLM] assess-evidence call failed; using a local estimate.");
       return null;
     }
   },
@@ -267,13 +264,10 @@ async function performWebSearch(query, state) {
 
   // Real Live Exa.ai API Integration
   try {
-    const sb = window.mpSupabase && window.mpSupabase.client;
-    if (!sb) throw new Error("Supabase client not ready");
-    const { data: exaData, error: exaError } = await sb.functions.invoke("exa-search", {
-      body: { query: query }
-    });
+    if (!window.VeritasApi?.isConfigured) throw new Error("Supabase client not ready");
+    const exaData = await window.VeritasApi.edge("exa-search", { query: query }, { timeoutMs: 25000 });
 
-    if (!exaError) {
+    if (exaData) {
       if (exaData && exaData.ok && Array.isArray(exaData.results) && exaData.results.length > 0) {
         const liveSources = exaData.results
           .filter(r => r && r.url)
@@ -298,7 +292,7 @@ async function performWebSearch(query, state) {
       }
     }
   } catch (err) {
-    console.warn("[AGENT] Exa.ai API fetch failed, using fallback research knowledge base:", err);
+    console.warn("[AGENT] Evidence search failed; using the local sample knowledge base.");
   }
 
   // Offline reference set. Only two topics have hand-written entries; for anything
@@ -1393,3 +1387,4 @@ window.VeritasAgent = {
 };
 
 })();
+import { validateEvidenceResult } from "./src/features/ai-contracts.js";

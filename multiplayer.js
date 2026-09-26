@@ -208,7 +208,7 @@ async function openLobby() {
   document.getElementById("mp-selected-card").classList.add("hidden");
   document.getElementById("mp-online-note").textContent = "Hot topics usually match in under 20 seconds.";
   await window.mpSupabase.ready;
-  const { data: { user } } = await sb().auth.getUser();
+  const user = await window.VeritasApi.currentUser();
   myUid = user && user.id;
   loadHotTopics();
 }
@@ -216,12 +216,10 @@ async function openLobby() {
 async function loadHotTopics() {
   try {
     const today = window.DA.todayStr();
-    const { data, error } = await sb()
-      .from("hot_topics")
+    const data = await window.VeritasApi.tableQuery("hot_topics", query => query
       .select("topics")
       .eq("date", today)
-      .maybeSingle();
-    if (error) throw error;
+      .maybeSingle(), { timeoutMs: 10000, retrySafe: true, retries: 1 });
     const topics = (data && data.topics && data.topics.length) ? data.topics : FALLBACK_TOPICS;
     allHotTopics = topics;
     activeCategory = "All";
@@ -413,7 +411,7 @@ document.getElementById("mp-cancel-search-btn").addEventListener("click", cancel
 async function startSearch() {
   window.DA.playClick();
   await window.mpSupabase.ready;
-  const { data: { user } } = await sb().auth.getUser();
+  const user = await window.VeritasApi.currentUser();
   if (!user) {
     window.DA.toast("Sign in first to join a live debate.");
     return;
@@ -429,15 +427,34 @@ async function startSearch() {
 
   inQueue = true;
   startSearchClock();
-  await sb().from("match_queue").upsert({
-    uid: myUid,
-    topic: selectedTopic || null,
-    status: "waiting",
-    debate_id: null
-  });
+  // A completed match leaves the caller's matched row behind. Clear only
+  // our own row before inserting the next queue entry (there is no UPDATE
+  // policy by design).
+  try {
+    await window.VeritasApi.tableQuery("match_queue", query => query.delete().eq("uid", myUid), { timeoutMs: 10000 });
+  } catch {
+    inQueue = false; stopSearchClock();
+    document.getElementById("mp-searching-state").classList.add("hidden");
+    document.getElementById("mp-browse-state").classList.remove("hidden");
+    window.DA.toast("Could not join the match queue. Check your connection and try again.");
+    return;
+  }
+  try {
+    await window.VeritasApi.tableQuery("match_queue", query => query.insert({
+      uid: myUid,
+      topic: selectedTopic || null,
+      status: "waiting",
+      debate_id: null
+    }), { timeoutMs: 10000 });
+  } catch {
+    inQueue = false; stopSearchClock();
+    document.getElementById("mp-searching-state").classList.add("hidden");
+    document.getElementById("mp-browse-state").classList.remove("hidden");
+    window.DA.toast("Could not join the match queue. Check your connection and try again.");
+    return;
+  }
 
-  queueChannel = sb()
-    .channel(`queue-${myUid}`)
+  queueChannel = window.VeritasApi.realtimeChannel(`queue-${myUid}`)
     .on(
       "postgres_changes",
       { event: "UPDATE", schema: "public", table: "match_queue", filter: `uid=eq.${myUid}` },
@@ -445,7 +462,7 @@ async function startSearch() {
         const row = payload.new;
         if (row && row.status === "matched" && row.debate_id) {
           stopPolling();
-          if (queueChannel) { sb().removeChannel(queueChannel); queueChannel = null; }
+          if (queueChannel) { window.VeritasApi.removeRealtimeChannel(queueChannel); queueChannel = null; }
           enterDebateRoom(row.debate_id);
         }
       }
@@ -484,9 +501,9 @@ async function cancelSearch() {
   stopSearchClock();
   stopPolling();
   inQueue = false;
-  if (queueChannel) { sb().removeChannel(queueChannel); queueChannel = null; }
+  if (queueChannel) { window.VeritasApi.removeRealtimeChannel(queueChannel); queueChannel = null; }
   if (myUid) {
-    try { await sb().from("match_queue").delete().eq("uid", myUid); } catch (e) { /* ignore */ }
+    try { await window.VeritasApi.tableQuery("match_queue", query => query.delete().eq("uid", myUid), { timeoutMs: 10000 }); } catch { /* best-effort queue cleanup */ }
   }
   document.getElementById("mp-browse-state").classList.remove("hidden");
   document.getElementById("mp-searching-state").classList.add("hidden");
@@ -504,7 +521,7 @@ async function attemptMatch() {
     // transaction loop). Both clients learn about the result via their own
     // match_queue row's realtime subscription above, so nothing else is needed here.
     const fallback = FALLBACK_TOPICS[Math.floor(Math.random() * FALLBACK_TOPICS.length)].text;
-    await sb().rpc("attempt_match", { p_fallback_topic: fallback });
+    await window.VeritasApi.rpc("attempt_match", { p_fallback_topic: fallback }, { timeoutMs: 10000, retrySafe: true, retries: 1 });
   } catch (e) {
     // Transient conflict, or nobody else waiting yet — just retry on next poll.
   }
@@ -542,7 +559,7 @@ function enterDebateRoom(debateId) {
   if (draft) { draft.value = ""; }
   updateWordCount();
 
-  sb().from("debates").select("*").eq("id", debateId).single().then(({ data }) => {
+  window.VeritasApi.tableQuery("debates", query => query.select("*").eq("id", debateId).single(), { timeoutMs: 10000, retrySafe: true, retries: 1 }).then(data => {
     if (data) {
       currentDebateData = rowToDebateData(data);
       renderDebateRoom();
@@ -551,12 +568,11 @@ function enterDebateRoom(debateId) {
       // Best-effort: if it fails we just keep showing defaults.
       const theirUid = (data.player_order || []).find((u) => u !== myUid);
       if (theirUid) {
-        sb()
-          .from("profiles")
+        window.VeritasApi.tableQuery("profiles", query => query
           .select("display_name, elo_rating")
           .eq("uid", theirUid)
-          .maybeSingle()
-          .then(({ data: p }) => {
+          .maybeSingle(), { timeoutMs: 10000, retrySafe: true, retries: 1 })
+          .then(p => {
             if (p) {
               if (p.display_name) opponentName = p.display_name;
               if (p.elo_rating !== undefined && p.elo_rating !== null) opponentElo = p.elo_rating;
@@ -568,8 +584,7 @@ function enterDebateRoom(debateId) {
     }
   });
 
-  debateChannel = sb()
-    .channel(`debate-${debateId}`)
+  debateChannel = window.VeritasApi.realtimeChannel(`debate-${debateId}`)
     .on(
       "postgres_changes",
       { event: "UPDATE", schema: "public", table: "debates", filter: `id=eq.${debateId}` },
@@ -764,8 +779,7 @@ async function sendTurn() {
   input.disabled = true;
   if (btn) { btn.disabled = true; btn.textContent = "Sending…"; }
   try {
-    const { error } = await sb().rpc("submit_turn", { p_debate_id: currentDebateId, p_text: text });
-    if (error) throw error;
+    await window.VeritasApi.rpc("submit_turn", { p_debate_id: currentDebateId, p_text: text }, { timeoutMs: 15000 });
     input.value = "";
     updateWordCount();
   } catch (e) {
@@ -834,7 +848,7 @@ function stopTurnTimer() {
 async function submitTimeoutTurn() {
   if (!currentDebateId || !myUid) return;
   try {
-    await sb().rpc("submit_timeout_turn", { p_debate_id: currentDebateId });
+    await window.VeritasApi.rpc("submit_timeout_turn", { p_debate_id: currentDebateId }, { timeoutMs: 10000 });
   } catch (e) {
     console.warn("timeout pass failed", e);
   }
@@ -866,7 +880,7 @@ async function resignMatch() {
     for (let i = currentDebateData.turns.length; i < total; i++) {
       const activeUid = currentDebateData.playerOrder[currentDebateData.turnIndex % 2];
       if (activeUid !== myUid) break;
-      await sb().rpc("submit_timeout_turn", { p_debate_id: currentDebateId });
+      await window.VeritasApi.rpc("submit_timeout_turn", { p_debate_id: currentDebateId }, { timeoutMs: 10000 });
       await new Promise((r) => window.setTimeout(r, 120));
       if (!currentDebateData || currentDebateData.status !== "active") break;
     }
@@ -1048,7 +1062,7 @@ document.querySelectorAll(".rate-btn").forEach((btn) => {
     btn.classList.add("picked");
     if (!currentDebateId || !myUid) return;
     try {
-      await sb().rpc("submit_rating", { p_debate_id: currentDebateId, p_rating: btn.dataset.rate });
+      await window.VeritasApi.rpc("submit_rating", { p_debate_id: currentDebateId, p_rating: btn.dataset.rate }, { timeoutMs: 10000 });
     } catch (e) { /* non-critical */ }
   });
 });
@@ -1064,7 +1078,7 @@ if (rematchBtn) rematchBtn.addEventListener("click", () => {
   window.DA.playClick();
   stopTurnTimer();
   lastTimedTurnIndex = null;
-  if (debateChannel) { sb().removeChannel(debateChannel); debateChannel = null; }
+  if (debateChannel) { window.VeritasApi.removeRealtimeChannel(debateChannel); debateChannel = null; }
   currentDebateId = null;
   currentDebateData = null;
   window.DA.showScreen("multiplayer");
@@ -1092,7 +1106,7 @@ function leaveDebate() {
   window.DA.playClick();
   stopTurnTimer();
   lastTimedTurnIndex = null;
-  if (debateChannel) { sb().removeChannel(debateChannel); debateChannel = null; }
+  if (debateChannel) { window.VeritasApi.removeRealtimeChannel(debateChannel); debateChannel = null; }
   currentDebateId = null;
   currentDebateData = null;
   window.DA.showScreen("home");

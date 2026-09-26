@@ -333,41 +333,14 @@ const BADGES = [
    1. STATE + PERSISTENCE
    --------------------------------------------------------- */
 
-const STORAGE_KEY = "veritas_save_v1";
-
-function defaultState() {
-  return {
-    totalXp: 0,
-    streak: 0,
-    lastPlayDate: null,
-    totalRuns: 0,
-    skills: { logic: 0, speed: 0, rhetoric: 0, analysis: 0, strategy: 0 },
-    modeStats: {},        // { fallacy: { bestScore, bestPct, plays } }
-    dailyCompletedDate: null,
-    activity: {},          // { "YYYY-MM-DD": count }
-    quests: null,          // { date, prog, done, modes } - see arcade.js
-    achievements: [],      // unlocked achievement ids
-    bestCombo: 0           // longest all-time answer chain
-  };
-}
-
-let state = loadState();
+let state = loadProgress();
 
 function loadState() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return defaultState();
-    const parsed = JSON.parse(raw);
-    return Object.assign(defaultState(), parsed);
-  } catch (e) {
-    return defaultState();
-  }
+  return loadProgress();
 }
 
 function saveState() {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch (e) { /* storage unavailable, ignore */ }
+  saveProgress(state);
   // Mirror progress to Supabase in the background (best-effort).
   // pushProfileToServer is defined later in section 17; guard in case
   // saveState is called before that section has executed (e.g. during
@@ -1415,18 +1388,14 @@ async function renderEloLeaderboard(list) {
   list.appendChild(loadEl);
 
   try {
-    const sb = window.mpSupabase && window.mpSupabase.client;
-    if (!sb) throw new Error("Supabase not ready");
+    if (!window.VeritasApi?.isConfigured) throw new Error("Supabase not ready");
     // Wait for auth so we know our own uid
     const myUid = await window.mpSupabase.ready;
 
-    const { data, error } = await sb
-      .from("profiles")
+    const data = await window.VeritasApi.tableQuery("profiles", query => query
       .select("uid, display_name, elo_rating, wins, losses, ties")
       .order("elo_rating", { ascending: false })
-      .limit(50);
-
-    if (error) throw error;
+      .limit(50), { timeoutMs: 12000, retrySafe: true, retries: 1 });
 
     list.innerHTML = "";
     if (!data || !data.length) {
@@ -1656,6 +1625,10 @@ function setupAuthEventListeners() {
   function hideAlert() {
     alertEl.classList.add("hidden");
     alertEl.textContent = "";
+  }
+
+  if (!window.VeritasApi?.isConfigured) {
+    showAlert("Supabase isn't configured. Copy .env.example to .env.local, add your project URL and anon/publishable key, then restart Vite.");
   }
 
   tabLogin.addEventListener("click", () => {
@@ -2088,7 +2061,7 @@ const cachedProfile = {
   losses:       null,
   ties:         null,
   displayName:  null,
-  avatarFileId: null   // Appwrite Storage file id, sourced from profiles.progress
+  avatarFileId: null // Supabase Storage path, sourced from profiles.progress
 };
 
 async function fetchProfileFromServer() {
@@ -2096,19 +2069,18 @@ async function fetchProfileFromServer() {
     if (!window.mpSupabase) return;        // Supabase not loaded yet
     const myUid = await window.mpSupabase.ready;
     if (!myUid) return;
-    const { data, error } = await window.mpSupabase.client
-      .from("profiles")
-      .select("elo_rating, wins, losses, ties, display_name, progress")
+    const data = await window.VeritasApi.tableQuery("profiles", query => query
+      .select("elo_rating, wins, losses, ties, display_name")
       .eq("uid", myUid)
-      .maybeSingle();
-    if (error) throw error;
+      .maybeSingle(), { timeoutMs: 10000, retrySafe: true, retries: 1 });
     if (data) {
+      const progress = await window.VeritasApi.rpc("get_my_profile_progress", {});
       cachedProfile.eloRating    = data.elo_rating   ?? null;
       cachedProfile.wins         = data.wins          ?? null;
       cachedProfile.losses       = data.losses        ?? null;
       cachedProfile.ties         = data.ties          ?? null;
       cachedProfile.displayName  = data.display_name  ?? null;
-      cachedProfile.avatarFileId = (data.progress && data.progress.avatarFileId) || null;
+      cachedProfile.avatarFileId = (progress && progress.avatarFileId) || null;
       // Re-render whichever screens are currently visible
       if (activeScreen === "home")        renderHome();
       if (activeScreen === "profile")     renderProfile();
@@ -2133,11 +2105,10 @@ async function pushProfileToServer() {
       modeStats:    state.modeStats,
       avatarFileId: cachedProfile.avatarFileId || null
     };
-    const { error } = await window.mpSupabase.client.rpc("sync_profile", {
+    await window.VeritasApi.rpc("sync_profile", {
       p_display_name: cachedProfile.displayName || null,
       p_progress:     progress
-    });
-    if (error) throw error;
+    }, { timeoutMs: 15000 });
     return true;
   } catch (e) {
     // Non-fatal for the routine/background callers (localStorage is the
@@ -2160,3 +2131,4 @@ if (window.mpSupabase) {
 }
 
 })();
+import { loadProgress, saveProgress } from "./src/features/practice-state.js";

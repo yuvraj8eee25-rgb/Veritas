@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#080d18">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" type="image/svg+xml" href="/icons/veritas.svg">
 <title>Veritas — Debate, judged</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -15,6 +18,7 @@
 <canvas id="bg-canvas" aria-hidden="true"></canvas>
 
 <div id="toast-root" class="toast-root" aria-live="polite"></div>
+<div id="pwa-status" class="pwa-status" role="status" aria-live="polite" hidden></div>
 
 <nav class="app-sidebar" id="app-sidebar">
   <div class="sidebar-brand">
@@ -126,7 +130,7 @@
 
     <!-- Hero -->
     <section class="home-hero">
-      <img class="hero-visual" src="imgs/classroom/debate-hero.png" alt="Abstract illustration of two opposing ideas balanced for fair judgment" width="1024" height="1024" loading="eager" decoding="async">
+      <img class="hero-visual" src="imgs/classroom/debate-hero.webp" alt="Abstract illustration of two opposing ideas balanced for fair judgment" width="1774" height="887" fetchpriority="high" decoding="async">
       <div class="home-hero-main">
         <p class="hero-greeting"><span id="home-greeting-time">Good evening</span>, <span id="home-greeting-name">Debater</span>.</p>
         <h1 class="hero-title">Build a stronger<br>argument today.</h1>
@@ -182,7 +186,7 @@
       <h2 class="section-heading">Explore another way to practise</h2>
       <div class="debate-picks">
         <button type="button" class="debate-card" data-nav="investigation">
-          <img class="debate-card-image" src="imgs/classroom/evidence-lab.png" alt="" aria-hidden="true" width="1024" height="1024" loading="lazy" decoding="async">
+          <img class="debate-card-image" src="imgs/classroom/evidence-lab.webp" alt="" aria-hidden="true" width="1254" height="1254" loading="lazy" decoding="async">
           <svg class="debate-card-art" viewBox="0 0 120 120" aria-hidden="true" focusable="false">
             <g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
               <rect x="16" y="26" width="88" height="56" rx="10"/>
@@ -199,7 +203,7 @@
           <span class="debate-card-go">Open Evidence Lab ↗</span>
         </button>
         <button type="button" class="debate-card alt" data-nav="multiplayer">
-          <img class="debate-card-image" src="imgs/classroom/debate-hero.png" alt="" aria-hidden="true" width="1024" height="1024" loading="lazy" decoding="async">
+          <img class="debate-card-image" src="imgs/classroom/debate-hero.webp" alt="" aria-hidden="true" width="1774" height="887" loading="lazy" decoding="async">
           <svg class="debate-card-art" viewBox="0 0 120 120" aria-hidden="true" focusable="false">
             <g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
               <rect x="14" y="20" width="60" height="38" rx="9"/>
@@ -940,7 +944,7 @@
   <div class="agent-investigation-wrap">
     <!-- Top Control Card -->
     <div class="glass-card agent-control-card">
-      <img class="agent-lab-visual" src="imgs/classroom/evidence-lab.png" alt="Illustration of research papers being examined with a magnifying glass" width="1024" height="1024" loading="lazy" decoding="async">
+      <img class="agent-lab-visual" src="imgs/classroom/evidence-lab.webp" alt="Illustration of research papers being examined with a magnifying glass" width="1254" height="1254" loading="lazy" decoding="async">
       <div class="agent-badge-row">
         <span class="rank-badge">Evidence Lab</span>
         <span class="agent-loop-pill">Research desk · source-aware reasoning</span>
@@ -970,7 +974,7 @@
         </div>
 
         <div class="agent-demo-mode-select">
-          <span class="agent-label">Watch it handle trouble:</span>
+          <label class="agent-label" for="agent-demo-mode-select">Watch it handle trouble:</label>
           <select id="agent-demo-mode-select" class="agent-select">
             <option value="normal">Normal run</option>
             <option value="search_failure">Demo: search fails, agent recovers</option>
@@ -1295,7 +1299,7 @@
       </div>
 
       <div class="auth-form" id="auth-form">
-        <div class="auth-alert hidden" id="auth-alert"></div>
+        <div class="auth-alert hidden" id="auth-alert" role="alert" aria-live="assertive"></div>
 
         <div class="auth-field">
           <label for="auth-email">Email Address</label>
@@ -1313,7 +1317,7 @@
       </div>
 
       <div class="auth-form hidden" id="auth-forgot-form">
-        <div class="auth-alert hidden" id="auth-forgot-alert"></div>
+        <div class="auth-alert hidden" id="auth-forgot-alert" role="alert" aria-live="assertive"></div>
 
         <p class="auth-hint">Enter the email on your account and we'll send you a link to reset your password.</p>
 
@@ -1328,7 +1332,7 @@
       </div>
 
       <div class="auth-form hidden" id="auth-reset-form">
-        <div class="auth-alert hidden" id="auth-reset-alert"></div>
+        <div class="auth-alert hidden" id="auth-reset-alert" role="alert" aria-live="assertive"></div>
 
         <p class="auth-hint">Choose a new password for your account.</p>
 
@@ -1348,16 +1352,6 @@
   </div>
 </section>
 
-<script src="arcade.js"></script>
-<script src="app.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="supabase-config.js"></script>
-<script src="multiplayer.js"></script>
-<script src="ai-debate.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/appwrite"></script>
-<script src="appwrite-config.js"></script>
-<script src="avatar.js"></script>
-<script src="agentic-investigation.js"></script>
-<script src="classroom.js"></script>
+<script type="module" src="/src/main.js"></script>
 </body>
 </html>

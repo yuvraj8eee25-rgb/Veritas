@@ -1,4 +1,6 @@
 // =========================================================
+import { guardUserRequest, withCors } from "../_shared/http.ts";
+
 // VERITAS — assess-evidence (Supabase Edge Function)
 //
 // The judgment layer for the agentic fact-checker
@@ -45,12 +47,9 @@
 //     -d '{"action":"classify","claim":"Universal basic income reduces employment","sources":[{"id":0,"title":"Employment effects of a guaranteed income","text":"Recipients of $1,000/month worked at similar rates to the control group..."}]}'
 // =========================================================
 
-import { createClient } from "npm:@supabase/supabase-js@2";
 
 const GEMINI_MODEL = "gemini-3.1-flash-lite";
 const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 
 const MAX_CLAIM_CHARS = 500;
 const MAX_SOURCES = 12;
@@ -65,7 +64,6 @@ type Stance = typeof STANCES[number];
 type Strength = typeof STRENGTHS[number];
 
 const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
@@ -87,6 +85,7 @@ async function callGemini(prompt: string, maxTokens: number): Promise<string> {
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      signal: AbortSignal.timeout(25000),
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
@@ -97,8 +96,7 @@ async function callGemini(prompt: string, maxTokens: number): Promise<string> {
     },
   );
   if (!response.ok) {
-    const errorBody = await response.text();
-    throw new Error(`Gemini request failed: ${response.status} ${response.statusText} - ${errorBody}`);
+    throw new Error(`Gemini request failed with status ${response.status}`);
   }
   const payload = await response.json();
   const raw: string = payload?.candidates?.[0]?.content?.parts?.[0]?.text || "";
@@ -152,12 +150,13 @@ Output ONLY the JSON object below. No explanation, no markdown fences, nothing b
   try {
     parsed = safeParseJson(raw);
   } catch {
-    console.error("plan_queries: model returned non-JSON:", raw.slice(0, 300));
+    console.warn("plan_queries: model response failed JSON parsing");
     return json({ ok: false, error: "Model returned an unreadable response" }, 502);
   }
   const supportingQuery = clip(parsed?.supportingQuery, 200);
   const opposingQuery = clip(parsed?.opposingQuery, 200);
-  if (!supportingQuery || !opposingQuery) {
+  const wordCount = (value: string) => value.trim().split(/\s+/).filter(Boolean).length;
+  if (!supportingQuery || !opposingQuery || wordCount(supportingQuery) > 12 || wordCount(opposingQuery) > 12) {
     return json({ ok: false, error: "Model returned incomplete queries" }, 502);
   }
   return json({ ok: true, queries: [supportingQuery, opposingQuery] });
@@ -219,7 +218,7 @@ ${sourceBlock}`;
   try {
     parsed = safeParseJson(raw);
   } catch {
-    console.error("classify: model returned non-JSON:", raw.slice(0, 300));
+    console.warn("classify: model response failed JSON parsing");
     return json({ ok: false, error: "Model returned an unreadable response" }, 502);
   }
 
@@ -232,10 +231,10 @@ ${sourceBlock}`;
       finding: clip(a?.finding, MAX_FINDING_CHARS),
     }))
     .filter((a: { id: number; stance: Stance; strength: Strength }) =>
-      validIds.has(a.id) && STANCES.includes(a.stance) && STRENGTHS.includes(a.strength)
+      validIds.has(a.id) && STANCES.includes(a.stance) && STRENGTHS.includes(a.strength) && !!a.finding
     );
 
-  if (!assessments.length) {
+  if (!assessments.length || assessments.length !== sources.length || new Set(assessments.map((a: { id: number }) => a.id)).size !== sources.length) {
     return json({ ok: false, error: "Model returned no usable assessments" }, 502);
   }
   return json({ ok: true, assessments });
@@ -288,11 +287,11 @@ Output ONLY the JSON object below. No explanation, no markdown fences, nothing b
   try {
     parsed = safeParseJson(raw);
   } catch {
-    console.error("summarize: model returned non-JSON:", raw.slice(0, 300));
+    console.warn("summarize: model response failed JSON parsing");
     return json({ ok: false, error: "Model returned an unreadable response" }, 502);
   }
   const summary = clip(parsed?.summary, MAX_SUMMARY_CHARS);
-  if (!summary) return json({ ok: false, error: "Model returned an empty summary" }, 502);
+  if (!summary || summary.length < 20) return json({ ok: false, error: "Model returned an invalid summary" }, 502);
   return json({ ok: true, summary });
 }
 
@@ -300,23 +299,15 @@ Output ONLY the JSON object below. No explanation, no markdown fences, nothing b
    Entry point
    --------------------------------------------------------- */
 
-Deno.serve(async (req) => {
+Deno.serve(withCors(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS_HEADERS });
   if (req.method !== "POST") return json({ ok: false, error: "Method not allowed" }, 405);
+  const guarded = await guardUserRequest(req, "assess-evidence", 30, 600);
+  if (guarded) return guarded;
 
   if (!GEMINI_API_KEY) {
     console.error("GEMINI_API_KEY secret is not set");
     return json({ ok: false, error: "Assessment is not configured" }, 500);
-  }
-
-  // Require a real signed-in user, not just the public anon key.
-  const authHeader = req.headers.get("Authorization") ?? "";
-  const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    global: { headers: { Authorization: authHeader } },
-  });
-  const { data: userData, error: userError } = await userClient.auth.getUser();
-  if (userError || !userData?.user) {
-    return json({ ok: false, error: "Sign in required" }, 401);
   }
 
   let body: any;
@@ -332,7 +323,7 @@ Deno.serve(async (req) => {
     if (body?.action === "summarize") return await handleSummarize(body);
     return json({ ok: false, error: "Unknown action" }, 400);
   } catch (err) {
-    console.error(err);
+    console.error(JSON.stringify({ event: "assessment_failed", name: err instanceof Error ? err.name : "Error" }));
     return json({ ok: false, error: "Assessment request failed" }, 500);
   }
-});
+}));

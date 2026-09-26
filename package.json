@@ -1,0 +1,36 @@
+{
+  "name": "veritas-frontend",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "check:js": "node --check src/main.js && node --check app.js && node --check multiplayer.js && node --check classroom.js && node --check avatar.js && node --check ai-debate.js && node --check agentic-investigation.js",
+    "check:edge": "node tests/check-edge-syntax.js",
+    "test:focused": "node --test tests/*.test.js",
+    "test:unit": "vitest run",
+    "test:e2e": "playwright test",
+    "test:e2e:credentialed": "playwright test --config playwright.credentialed.config.js",
+    "test:e2e:pwa": "playwright test --config playwright.pwa.config.js",
+    "test:e2e:install": "playwright install chromium",
+    "test:ci": "npm run check:js && npm run check:edge && npm run typecheck && npm run test:focused && npm run test:unit && npm run build",
+    "assets:optimize": "node scripts/optimize-artwork.mjs",
+    "check:assets": "node scripts/check-assets.mjs"
+  },
+  "dependencies": {
+    "@sentry/browser": "^11.0.0",
+    "@supabase/supabase-js": "^2.57.0",
+    "web-vitals": "^6.2.2"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@playwright/test": "^1.63.0",
+    "sharp": "^0.35.4",
+    "typescript": "^5.9.2",
+    "vite": "^7.1.7",
+    "vitest": "^5.0.2"
+  }
+}

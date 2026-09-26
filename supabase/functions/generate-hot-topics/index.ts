@@ -1,4 +1,6 @@
 // =========================================================
+import { withCors } from "../_shared/http.ts";
+
 // VERITAS — generate-hot-topics (Supabase Edge Function)
 //
 // Pulls real, current headlines from NewsAPI.org, then asks
@@ -141,8 +143,7 @@ async function fetchTopicsFromGemini(headlines: Headline[] | null): Promise<Topi
   );
 
   if (!response.ok) {
-    const errorBody = await response.text();
-    throw new Error(`Gemini request failed: ${response.status} ${response.statusText} - ${errorBody}`);
+    throw new Error(`Gemini request failed with status ${response.status}`);
   }
 
   const payload = await response.json();
@@ -172,7 +173,7 @@ function todayKeyUTC(): string {
   return new Date().toISOString().slice(0, 10); // YYYY-MM-DD, matches client's todayStr()
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withCors(async (req) => {
   if (CRON_SECRET && req.headers.get("x-cron-secret") !== CRON_SECRET) {
     return new Response("Unauthorized", { status: 401 });
   }
@@ -207,10 +208,10 @@ Deno.serve(async (req) => {
       headers: { "Content-Type": "application/json" },
     });
   } catch (err) {
-    console.error(err);
-    return new Response(JSON.stringify({ ok: false, error: String(err) }), {
+    console.error(JSON.stringify({ event: "hot_topics_failed", name: err instanceof Error ? err.name : "Error" }));
+    return new Response(JSON.stringify({ ok: false, error: "Hot topics could not be refreshed." }), {
       status: 500,
       headers: { "Content-Type": "application/json" },
     });
   }
-});
+}));

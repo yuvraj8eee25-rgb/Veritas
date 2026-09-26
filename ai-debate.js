@@ -73,7 +73,6 @@ function fmtTimeOfDay(ms) {
   catch (e) { return ""; }
 }
 
-function sb() { return window.mpSupabase.client; }
 
 function escapeHtml(str) {
   const d = document.createElement("div");
@@ -386,20 +385,18 @@ function pushAiTurn(text) {
 
 async function fetchAiReply() {
   try {
-    const { data, error } = await sb().functions.invoke("ai-debate", {
-      body: {
+    const data = await window.VeritasApi.edge("ai-debate", {
         action: "opponent",
         topic: currentTopic,
         transcript: transcript.map((t) => ({ speaker: t.speaker, text: t.text })),
         aiStance: currentStance === "for" ? "against" : "for",
         difficulty: currentBot
-      }
-    });
-    if (error) throw error;
-    const text = (data && data.text) ? data.text : "(The AI opponent had nothing to add.)";
+    }, { timeoutMs: 30000 });
+    if (!validateDebateReply(data)) throw new Error("The AI response did not match the expected format.");
+    const text = data.text;
     pushAiTurn(text);
   } catch (e) {
-    console.error("AI opponent reply failed:", e);
+    console.warn("AI opponent reply failed.");
     pushAiTurn("(The AI opponent couldn't respond — network hiccup. Continue when ready.)");
     window.DA.toast("Couldn't reach the AI opponent — try your next turn.");
   }
@@ -461,18 +458,15 @@ async function finishAiDebate() {
   let verdict;
   let usedFallback = false;
   try {
-    const { data, error } = await sb().functions.invoke("ai-debate", {
-      body: {
+    const data = await window.VeritasApi.edge("ai-debate", {
         action: "referee",
         topic: currentTopic,
         transcript: transcript.map((t) => ({ speaker: t.speaker, text: t.text }))
-      }
-    });
-    if (error) throw error;
-    if (!data || !data.ok || !data.verdict) throw new Error("malformed referee response");
+    }, { timeoutMs: 45000 });
+    if (!validateRefereeResult(data)) throw new Error("malformed referee response");
     verdict = data.verdict;
   } catch (e) {
-    console.error("AI referee failed, using local fallback scoring:", e);
+    console.warn("AI referee failed; using a local estimate.");
     verdict = localHeuristicVerdict();
     usedFallback = true;
     window.DA.toast("Couldn't reach the AI referee — showing a rough estimate instead.");
@@ -600,16 +594,13 @@ async function submitDevilsAdvocateDrill() {
   const feedbackEl = document.getElementById("aidebate-devil-feedback");
 
   try {
-    const { data, error } = await sb().functions.invoke("ai-debate", {
-      body: {
+    const data = await window.VeritasApi.edge("ai-debate", {
         action: "drill",
         topic: currentTopic,
         missedPoint: lastDevilsAdvocate.missedPoint,
         rebuttal
-      }
-    });
-    if (error) throw error;
-    if (!data || !data.ok) throw new Error("malformed drill response");
+    }, { timeoutMs: 30000 });
+    if (!validateDrillResult(data)) throw new Error("malformed drill response");
 
     feedbackEl.innerHTML = `
       <span class="aidebate-devil-score">Score: ${data.score}/100</span>
@@ -620,7 +611,7 @@ async function submitDevilsAdvocateDrill() {
     // rather than clearing it, so the player can see what they argued.
     btn.textContent = "Drill complete";
   } catch (e) {
-    console.error("Devil's Advocate drill scoring failed:", e);
+    console.warn("Devil's Advocate scoring failed.");
     window.DA.toast("Couldn't reach the AI to score that — try again.");
     btn.disabled = false;
     input.disabled = false;
@@ -703,3 +694,4 @@ document.getElementById("aidebate-practise-feedback-btn").addEventListener("clic
 });
 
 })();
+import { validateDebateReply, validateDrillResult, validateRefereeResult } from "./src/features/ai-contracts.js";

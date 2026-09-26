@@ -203,7 +203,7 @@ img, svg, canvas { max-width: 100%; }
   }
 }
 
-::selection { background: var(--accent); color: #fefcf8; }
+::selection { background: var(--accent); color: #080d18; }
 
 button {
   font-family: inherit;
@@ -629,7 +629,7 @@ body { position: relative; }
   white-space: nowrap;
   transition: transform var(--dur-hover) var(--ease-out), filter var(--dur-hover), border-color var(--dur-hover), background var(--dur-hover);
 }
-.hero-btn-primary { background: var(--accent); color: #fefcf8; box-shadow: var(--shadow-sm); }
+.hero-btn-primary { background: var(--accent); color: #080d18; box-shadow: var(--shadow-sm); }
 .hero-btn-primary:hover { filter: brightness(1.08); }
 .hero-btn-primary:active { filter: brightness(0.94); transform: scale(0.98); }
 .hero-btn-secondary { background: var(--bg-panel); border-color: var(--border-soft); color: var(--text-primary); }
@@ -983,7 +983,7 @@ body { position: relative; }
   transition: all var(--dur-hover) var(--ease-out);
 }
 .diff-pill.active {
-  color: #fefcf8;
+  color: #080d18;
   background: var(--accent);
   border-color: var(--accent);
   box-shadow: none;
@@ -1025,7 +1025,7 @@ body { position: relative; }
   border-radius: var(--radius-md);
   border: none;
   background: var(--accent);
-  color: #fefcf8;
+  color: #080d18;
   font-weight: 700;
   font-size: 0.92rem;
   letter-spacing: 0.01em;
@@ -4691,6 +4691,7 @@ body { position: relative; }
 #screen-ai-debate .cta-btn,
 #screen-multiplayer .cta-btn {
   background: var(--mode-accent);
+  color: #080d18;
 }
 #screen-ai-debate .cta-btn:hover,
 #screen-multiplayer .cta-btn:hover { filter: brightness(1.1); }
@@ -4754,6 +4755,7 @@ body { position: relative; }
 .cw-table{overflow:auto;margin:12px 0 24px}.cw-table table{border-collapse:collapse;width:100%;text-align:left;font-size:14px}.cw-table th,.cw-table td{padding:12px;border-bottom:1px solid var(--line-strong);white-space:nowrap}.cw-table th{color:var(--ink-soft)}
 .cw-dialog{color:var(--ink);background:var(--bg-panel);border:1px solid var(--line-strong);border-radius:16px;padding:24px;width:min(760px,calc(100vw - 32px));max-height:90dvh;overflow:auto;box-shadow:var(--shadow-overlay)}.cw-dialog::backdrop{background:rgba(0,0,0,.72)}.cw-dialog header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:20px}.cw-dialog h2{font-family:var(--font-display);font-size:28px}.cw-dialog footer{margin-top:20px}.cw-form{display:grid;gap:16px}.cw-form label{display:grid;gap:8px;font-size:14px}.cw-form input,.cw-form textarea,.cw-form select{font:inherit;color:var(--ink);background:var(--bg-page);border:1px solid var(--line-strong);border-radius:8px;padding:12px;width:100%;min-width:0}.cw-form textarea{min-height:130px;resize:vertical}.cw-form .cw-check{display:flex;align-items:center}.cw-check input{width:18px;height:18px}.cw-dialog button{min-height:42px}.cw-dialog button:disabled,#screen-classroom button:disabled{opacity:.55;cursor:wait}
 .cw-dialog :focus-visible,#screen-classroom :focus-visible{outline:2px solid var(--accent);outline-offset:3px}.cw-skeleton{padding:48px;border-radius:12px;background:var(--bg-panel);animation:cw-pulse 1s ease-in-out infinite alternate}@keyframes cw-pulse{to{opacity:.55}}
+.pwa-status{position:fixed;z-index:10000;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);max-width:min(720px,calc(100vw - 24px));padding:12px 16px;border:1px solid var(--line-strong);border-radius:10px;background:var(--bg-elevated);color:var(--ink);box-shadow:var(--shadow-overlay);font-size:14px}.pwa-status[hidden]{display:none}.pwa-status button{margin-left:10px;padding:7px 11px;border:1px solid var(--line-strong);border-radius:6px;background:var(--accent);color:#080d18;font:inherit;font-weight:700;cursor:pointer}.pwa-status button:focus-visible{outline:3px solid var(--ink);outline-offset:3px}
 @media(max-width:600px){#screen-classroom .classroom-wrap{padding:16px}.cw-header{position:static;display:block}.cw-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.cw-stats>div{padding:14px}.cw-row{flex-wrap:wrap}.cw-dialog{padding:16px}.cw-actions .cta-btn{width:100%}}
 @media(prefers-reduced-motion:reduce){.cw-skeleton{animation:none}#screen-classroom *,.cw-dialog *{scroll-behavior:auto;transition:none;animation:none}}
 

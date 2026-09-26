@@ -28,11 +28,12 @@
 //   GEMINI_API_KEY
 // =========================================================
 
+import { guardUserRequest, withCors } from "../_shared/http.ts";
+
 const GEMINI_MODEL = "gemini-3.1-flash-lite";
 const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
 
 const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
@@ -55,6 +56,7 @@ async function callGemini(prompt: string, maxTokens = 800): Promise<string> {
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      signal: AbortSignal.timeout(25000),
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: { temperature: 0.6, maxOutputTokens: maxTokens },
@@ -62,8 +64,7 @@ async function callGemini(prompt: string, maxTokens = 800): Promise<string> {
     },
   );
   if (!response.ok) {
-    const errorBody = await response.text();
-    throw new Error(`Gemini request failed: ${response.status} ${response.statusText} - ${errorBody}`);
+    throw new Error(`Gemini request failed with status ${response.status}`);
   }
   const payload = await response.json();
   const raw: string = payload?.candidates?.[0]?.content?.parts?.[0]?.text || "";
@@ -112,7 +113,9 @@ ${formatTranscript(transcript)}
 Write only your next rebuttal (plain text, no quotes, no labels).`;
 
   const text = await callGemini(prompt, 300);
-  return json({ ok: true, text: text.replace(/^["']|["']$/g, "").trim() });
+  const reply = text.replace(/^["']|["']$/g, "").trim();
+  if (!reply || reply.length > 2400) throw new Error("Invalid opponent response");
+  return json({ ok: true, text: reply, resultType: "ai" });
 }
 
 /* ---------------------------------------------------------
@@ -153,6 +156,24 @@ Keep "turnFeedback" to one entry per Debater turn only (skip AI turns).`;
 
   const cleaned = await callGemini(prompt, 1300);
   const parsed = JSON.parse(cleaned);
+  if (!parsed || !Number.isInteger(parsed.debaterScore) || parsed.debaterScore < 0 || parsed.debaterScore > 100
+      || !Number.isInteger(parsed.aiScore) || parsed.aiScore < 0 || parsed.aiScore > 100
+      || !["debater", "ai", "tie"].includes(parsed.winner)
+      || typeof parsed.summary !== "string" || !parsed.summary.trim()
+      || !Array.isArray(parsed.turnFeedback) || !parsed.devilsAdvocate
+      || typeof parsed.devilsAdvocate.missedPoint !== "string" || !parsed.devilsAdvocate.missedPoint.trim()
+      || typeof parsed.devilsAdvocate.challenge !== "string" || !parsed.devilsAdvocate.challenge.trim()
+      || parsed.turnFeedback.length !== userTurnCount) {
+    throw new Error("Invalid referee response schema");
+  }
+  const feedbackTurns = new Set<number>();
+  for (const item of parsed.turnFeedback) {
+    if (!Number.isInteger(item?.turn) || item.turn < 1 || item.turn > userTurnCount
+        || feedbackTurns.has(item.turn) || typeof item.logic !== "string"
+        || !item.logic.trim() || typeof item.evidence !== "string" || !item.evidence.trim()
+        || typeof item.responsiveness !== "string" || !item.responsiveness.trim()) throw new Error("Invalid turn feedback schema");
+    feedbackTurns.add(item.turn);
+  }
 
   const debaterScore = Math.max(0, Math.min(100, Math.round(Number(parsed.debaterScore) || 0)));
   const aiScore = Math.max(0, Math.min(100, Math.round(Number(parsed.aiScore) || 0)));
@@ -186,6 +207,7 @@ Keep "turnFeedback" to one entry per Debater turn only (skip AI turns).`;
       devilsAdvocate: devilsAdvocate.missedPoint ? devilsAdvocate : null,
       userTurnCount,
       model: GEMINI_MODEL,
+      resultType: "ai",
     },
   });
 }
@@ -213,8 +235,9 @@ Respond with ONLY a JSON object, exactly this shape:
 
   const cleaned = await callGemini(prompt, 500);
   const parsed = JSON.parse(cleaned);
-  const score = Math.max(0, Math.min(100, Math.round(Number(parsed.score) || 0)));
-  const feedback = String(parsed.feedback || "").trim() || "Solid attempt — keep sharpening this angle.";
+  if (!Number.isFinite(parsed?.score) || parsed.score < 0 || parsed.score > 100 || typeof parsed.feedback !== "string" || !parsed.feedback.trim()) throw new Error("Invalid drill response schema");
+  const score = Math.round(parsed.score);
+  const feedback = parsed.feedback.trim();
 
   return json({ ok: true, score, feedback });
 }
@@ -223,13 +246,15 @@ Respond with ONLY a JSON object, exactly this shape:
    Entry point
    --------------------------------------------------------- */
 
-Deno.serve(async (req) => {
+Deno.serve(withCors(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: CORS_HEADERS });
   }
   if (req.method !== "POST") {
     return json({ ok: false, error: "POST only" }, 405);
   }
+  const guarded = await guardUserRequest(req, "ai-debate", 20, 600);
+  if (guarded) return guarded;
   if (!GEMINI_API_KEY) {
     return json({ ok: false, error: "GEMINI_API_KEY not configured" }, 500);
   }
@@ -253,7 +278,7 @@ Deno.serve(async (req) => {
         return json({ ok: false, error: "action must be one of: opponent, referee, drill" }, 400);
     }
   } catch (err) {
-    console.error(err);
-    return json({ ok: false, error: String(err) }, 500);
+    console.error(JSON.stringify({ event: "ai_debate_failed", name: err instanceof Error ? err.name : "Error" }));
+    return json({ ok: false, error: "AI debate request failed. Please try again." }, 500);
   }
-});
+}));

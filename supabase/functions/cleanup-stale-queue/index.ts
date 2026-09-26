@@ -1,4 +1,6 @@
 // =========================================================
+import { withCors } from "../_shared/http.ts";
+
 // VERITAS — cleanup-stale-queue (Supabase Edge Function)
 //
 // Replaces the Firebase cleanupStaleQueue Cloud Function.
@@ -18,7 +20,7 @@ const CRON_SECRET = Deno.env.get("CRON_SECRET");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-Deno.serve(async (req) => {
+Deno.serve(withCors(async (req) => {
   if (CRON_SECRET && req.headers.get("x-cron-secret") !== CRON_SECRET) {
     return new Response("Unauthorized", { status: 401 });
   }
@@ -42,10 +44,10 @@ Deno.serve(async (req) => {
       headers: { "Content-Type": "application/json" },
     });
   } catch (err) {
-    console.error(err);
+    console.error(JSON.stringify({ event: "cleanup_stale_queue_failed", name: err instanceof Error ? err.name : "Error" }));
     return new Response(JSON.stringify({ ok: false, error: String(err) }), {
       status: 500,
       headers: { "Content-Type": "application/json" },
     });
   }
-});
+}));

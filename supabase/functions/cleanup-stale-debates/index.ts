@@ -1,4 +1,6 @@
 // =========================================================
+import { withCors } from "../_shared/http.ts";
+
 // VERITAS — cleanup-stale-debates (Supabase Edge Function)
 //
 // Fixes: if a player closes their tab mid-debate, their
@@ -37,7 +39,7 @@ const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 // copy that references this number.
 const STALE_MINUTES = 10;
 
-Deno.serve(async (req) => {
+Deno.serve(withCors(async (req) => {
   if (CRON_SECRET && req.headers.get("x-cron-secret") !== CRON_SECRET) {
     return new Response("Unauthorized", { status: 401 });
   }
@@ -57,10 +59,10 @@ Deno.serve(async (req) => {
       headers: { "Content-Type": "application/json" },
     });
   } catch (err) {
-    console.error(err);
+    console.error(JSON.stringify({ event: "cleanup_stale_debates_failed", name: err instanceof Error ? err.name : "Error" }));
     return new Response(JSON.stringify({ ok: false, error: String(err) }), {
       status: 500,
       headers: { "Content-Type": "application/json" },
     });
   }
-});
+}));

@@ -22,15 +22,30 @@
 alter table public.profiles
   add column if not exists display_name text;
 
-alter table public.profiles
-  add constraint profiles_display_name_check
-  check (
-    display_name is null
-    or (
-      char_length(display_name) between 2 and 20
-      and display_name ~ '^[A-Za-z0-9 _.''-]+$'
-    )
-  );
+-- Some existing projects already have this constraint from an earlier
+-- schema setup even though this migration is not in migration history.
+-- Only create it when absent; 0006_reconcile_profiles.sql later normalizes
+-- the constraint to the current 24-character application limit.
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'profiles_display_name_check'
+      and conrelid = 'public.profiles'::regclass
+  ) then
+    alter table public.profiles
+      add constraint profiles_display_name_check
+      check (
+        display_name is null
+        or (
+          char_length(display_name) between 2 and 20
+          and display_name ~ '^[A-Za-z0-9 _.''-]+$'
+        )
+      );
+  end if;
+end;
+$$;
 
 -- ---------------------------------------------------------
 -- set_display_name() — the only way a client can write its own

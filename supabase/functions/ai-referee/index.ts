@@ -1,4 +1,6 @@
 // =========================================================
+import { withCors } from "../_shared/http.ts";
+
 // VERITAS — ai-referee (Supabase Edge Function)
 //
 // Replaces the client-side heuristic scorer with a real AI
@@ -129,8 +131,7 @@ async function fetchVerdictFromGemini(debate: DebateRow): Promise<Verdict> {
   );
 
   if (!response.ok) {
-    const errorBody = await response.text();
-    throw new Error(`Gemini request failed: ${response.status} ${response.statusText} - ${errorBody}`);
+    throw new Error(`Gemini request failed with status ${response.status}`);
   }
 
   const payload = await response.json();
@@ -175,7 +176,7 @@ async function fetchVerdictFromGemini(debate: DebateRow): Promise<Verdict> {
    3. Entry point
    --------------------------------------------------------- */
 
-Deno.serve(async (req) => {
+Deno.serve(withCors(async (req) => {
   if (AI_REFEREE_SECRET && req.headers.get("x-referee-secret") !== AI_REFEREE_SECRET) {
     return new Response("Unauthorized", { status: 401 });
   }
@@ -241,10 +242,10 @@ Deno.serve(async (req) => {
       headers: { "Content-Type": "application/json" },
     });
   } catch (err) {
-    console.error(err);
-    return new Response(JSON.stringify({ ok: false, error: String(err) }), {
+    console.error(JSON.stringify({ event: "ai_referee_failed", name: err instanceof Error ? err.name : "Error" }));
+    return new Response(JSON.stringify({ ok: false, error: "AI referee request failed." }), {
       status: 500,
       headers: { "Content-Type": "application/json" },
     });
   }
-});
+}));
