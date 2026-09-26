@@ -11,41 +11,43 @@
 "use strict";
 
 // Execution Constraints
-const MAX_AGENT_STEPS = 8;
+const MAX_AGENT_STEPS = 10;
 const MAX_SEARCHES = 5;
 const MAX_SOURCES = 12;
 const MAX_LLM_CALLS = 8;
 
 /* ---------------------------------------------------------
-   1. LLM PROVIDER ABSTRACTION
-   Uses Supabase Edge Function if available, fallback to Gemini
-   or deterministic heuristic solver to guarantee 100% uptime.
+   1. LLM PROVIDER
+   Calls the `assess-evidence` Edge Function (Gemini, server-side key).
+   Returns the parsed response, or null on ANY failure so callers
+   can fall back to the keyword heuristic and flag the result as
+   lower-confidence instead of breaking the investigation.
    --------------------------------------------------------- */
 const LLMProvider = {
   callCount: 0,
 
-  async prompt(systemPrompt, userPrompt, maxTokens = 600) {
+  async call(action, payload) {
     if (this.callCount >= MAX_LLM_CALLS) {
-      console.warn("[LLM] Max LLM calls reached (" + MAX_LLM_CALLS + "). Falling back to heuristic.");
+      console.warn("[LLM] Max LLM calls reached (" + MAX_LLM_CALLS + "). Using heuristic fallback.");
       return null;
     }
     this.callCount++;
 
-    // Try Supabase Edge Function first
     try {
-      if (window.mpSupabase && window.mpSupabase.client) {
-        const fullPrompt = `${systemPrompt}\n\nUser Input:\n${userPrompt}\n\nRespond with clean valid JSON when requested.`;
-        const { data, error } = await window.mpSupabase.client.functions.invoke("ai-debate", {
-          body: { action: "opponent", topic: "AGENTIC_QUERY", transcript: [{ speaker: "user", text: fullPrompt }] }
-        });
-        if (!error && data && data.text) {
-          return data.text;
-        }
+      const sb = window.mpSupabase && window.mpSupabase.client;
+      if (!sb) return null;
+      const { data, error } = await sb.functions.invoke("assess-evidence", {
+        body: Object.assign({ action: action }, payload)
+      });
+      if (error || !data || !data.ok) {
+        console.warn("[LLM] assess-evidence \"" + action + "\" failed:", error || (data && data.error));
+        return null;
       }
+      return data;
     } catch (e) {
-      console.warn("[LLM] Edge function call failed, using fallback execution:", e);
+      console.warn("[LLM] assess-evidence call threw, using heuristic fallback:", e);
+      return null;
     }
-    return null;
   },
 
   reset() {
@@ -65,13 +67,18 @@ function createInvestigationState(claim, demoFailureMode = "normal") {
     completed_actions: [],
     pending_actions: ["understand_claim"],
     sources: [],
-    evidence: { supporting: [], opposing: [] },
+    search_queue: [],          // queries still to run, in order (see understand_claim)
+    used_fallback: false,      // true if the offline reference set stood in for live search
+    query_planning_degraded: false, // true if the AI couldn't phrase the opposing-evidence search
+    llm_degraded: false,       // true if the AI stance classifier was unavailable
+    evidence: { supporting: [], opposing: [], neutral: [] },
     contradictions: [],
     confidence: 0,
     step_count: 0,
     search_count: 0,
     demo_failure_mode: demoFailureMode, // 'normal' | 'search_failure' | 'conflicting_evidence'
     has_recovered_search: false,
+    has_deepened_research: false,
     has_resolved_conflict: false,
     adapted: false,
     status: "initialized", // 'initialized' | 'running' | 'adapted' | 'completed' | 'failed'
@@ -130,29 +137,85 @@ const RESEARCH_KNOWLEDGE_BASE = {
       authority: 0.89,
       stance: "opposing"
     }
-  ],
-  "default": [
-    {
-      title: "Global Policy Review & Empirical Meta-Analysis",
-      url: "https://example.org/policy-analysis",
-      snippet: "Meta-analysis of multi-region policy implementation indicates mixed economic outcomes depending on regulatory enforcement and institutional support.",
-      authority: 0.85,
-      stance: "neutral"
-    },
-    {
-      title: "Journal of Public Interest & Risk Analysis",
-      url: "https://example.org/risk-study",
-      snippet: "Empirical trial shows significant benefits under controlled oversight, but highlights secondary risk factors if implemented without regional adaptation.",
-      authority: 0.82,
-      stance: "mixed"
-    }
   ]
 };
 
-const EXA_API_KEY = "6c990482-e367-4219-a7bf-790cc2afd1f6";
+/* Source authority: a rough prior from the publisher's domain. It is a heuristic,
+   not a quality judgement of the individual study, so it only weights evidence. */
+const ACADEMIC_HOSTS = [
+  "nature.com", "science.org", "sciencedirect.com", "springer.com", "link.springer.com",
+  "wiley.com", "onlinelibrary.wiley.com", "jstor.org", "nber.org", "ssrn.com", "arxiv.org",
+  "thelancet.com", "nejm.org", "bmj.com", "pnas.org", "plos.org", "cambridge.org",
+  "oup.com", "academic.oup.com", "tandfonline.com", "sagepub.com", "doi.org",
+  "ncbi.nlm.nih.gov", "pubmed.ncbi.nlm.nih.gov", "nih.gov", "researchgate.net"
+];
+const INSTITUTION_HOSTS = [
+  "who.int", "worldbank.org", "imf.org", "oecd.org", "un.org", "unesco.org", "europa.eu",
+  "ipcc.ch", "brookings.edu", "pewresearch.org", "rand.org", "cbo.gov"
+];
+const NEWS_HOSTS = [
+  "reuters.com", "apnews.com", "bbc.com", "bbc.co.uk", "nytimes.com", "washingtonpost.com",
+  "ft.com", "economist.com", "wsj.com", "theguardian.com", "bloomberg.com", "npr.org", "vox.com"
+];
+const LOW_TRUST_HOSTS = [
+  "medium.com", "substack.com", "wordpress.com", "blogspot.com", "reddit.com", "quora.com",
+  "tumblr.com", "wikipedia.org"
+];
+
+function hostMatches(host, list) {
+  return list.some(h => host === h || host.endsWith("." + h));
+}
+
+const SCRAPE_NOISE_PATTERNS = [
+  /skip to (main content|article)/gi,
+  /view pdf/gi,
+  /download full issue/gi,
+  /search sciencedirect/gi,
+  /purchase pdf/gi,
+  /get access/gi,
+  /show more/gi,
+  /(^|\s)#{1,6}\s+/g,                 // markdown headers, e.g. "## Authors" — mid-line too, since
+                                       // Exa's extracted text often has no real line breaks
+  /h-index:?\s*\d+/gi,
+  /\d+\s*citations?/gi,
+  /issn:?\s*[\d-]+/gi,
+];
+
+function cleanScrapedText(text) {
+  let t = String(text || "");
+  SCRAPE_NOISE_PATTERNS.forEach(p => { t = t.replace(p, " "); });
+  return t.replace(/\s+/g, " ").replace(/^[\s.,;:-]+/, "").trim();
+}
+
+function scoreAuthority(url) {
+  let host = "";
+  try { host = new URL(url).hostname.toLowerCase().replace(/^www\./, ""); } catch (e) { return 0.5; }
+  if (hostMatches(host, LOW_TRUST_HOSTS)) return 0.4;
+  if (hostMatches(host, ACADEMIC_HOSTS) || /\.edu(\.[a-z]{2})?$/.test(host) || /\.ac\.[a-z]{2}$/.test(host)) return 0.92;
+  if (hostMatches(host, INSTITUTION_HOSTS) || /\.gov(\.[a-z]{2})?$/.test(host)) return 0.9;
+  if (hostMatches(host, NEWS_HOSTS)) return 0.8;
+  if (host.endsWith(".org")) return 0.7;
+  return 0.65;
+}
+
+/* Last-resort stance guess, used ONLY when the AI classifier is unreachable.
+   It cannot tell whether a source is for or against the claim (a study finding
+   "no risk" contains the word "risk"), which is why results that rely on it are
+   capped at low confidence and labelled as such. */
+function keywordStance(text) {
+  const t = (text || "").toLowerCase();
+  return /lack evidence|risk|oppose|against|fail|concern/.test(t) ? "contradicts" : "supports";
+}
+
+// Exa search runs server-side via the `exa-search` Edge Function so the
+// API key never ships to the browser (see supabase/functions/exa-search).
 
 async function performWebSearch(query, state) {
   state.search_count++;
+
+  if (state.search_count > MAX_SEARCHES) {
+    return { success: false, error: "Search budget exhausted.", sources: [] };
+  }
 
   // Failure Mode Hook: Search Failure Demo
   if (state.demo_failure_mode === "search_failure" && !state.has_recovered_search && state.search_count === 1) {
@@ -204,46 +267,28 @@ async function performWebSearch(query, state) {
 
   // Real Live Exa.ai API Integration
   try {
-    const res = await fetch("https://api.exa.ai/search", {
-      method: "POST",
-      headers: {
-        "x-api-key": EXA_API_KEY,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        query: query,
-        numResults: 4,
-        contents: { text: { maxCharacters: 400 } }
-      })
+    const sb = window.mpSupabase && window.mpSupabase.client;
+    if (!sb) throw new Error("Supabase client not ready");
+    const { data: exaData, error: exaError } = await sb.functions.invoke("exa-search", {
+      body: { query: query }
     });
 
-    if (res.ok) {
-      const exaData = await res.json();
-      if (exaData && Array.isArray(exaData.results) && exaData.results.length > 0) {
-        const liveSources = exaData.results.map(r => {
-          const url = r.url || "";
-          let authority = 0.82;
-          if (url.includes(".gov") || url.includes(".edu") || url.includes("pewresearch.org") || url.includes("brookings.edu") || url.includes("nature.com")) {
-            authority = 0.95;
-          } else if (url.includes(".org") || url.includes("reuters") || url.includes("bbc") || url.includes("sciencedirect")) {
-            authority = 0.90;
-          }
-
-          const textLower = (r.text || "").toLowerCase();
-          let stance = "supporting";
-          if (textLower.includes("lack evidence") || textLower.includes("risk") || textLower.includes("oppose") || textLower.includes("against") || textLower.includes("fail") || textLower.includes("concern")) {
-            stance = "opposing";
-          }
-
-          return {
-            title: r.title || r.url,
-            url: r.url,
-            snippet: (r.text || "").replace(/\s+/g, " ").trim().slice(0, 260) + "...",
-            authority: authority,
-            stance: stance,
-            publishedDate: r.publishedDate || null
-          };
-        });
+    if (!exaError) {
+      if (exaData && exaData.ok && Array.isArray(exaData.results) && exaData.results.length > 0) {
+        const liveSources = exaData.results
+          .filter(r => r && r.url)
+          .map(r => {
+            const text = cleanScrapedText(r.text);
+            return {
+              title: r.title || r.url,
+              url: r.url,
+              snippet: text.slice(0, 400) + (text.length > 400 ? "..." : ""),
+              text: text,                              // fuller excerpt, used for stance classification
+              authority: scoreAuthority(r.url),
+              hintStance: keywordStance(text),         // fallback only, see keywordStance()
+              publishedDate: r.publishedDate || null
+            };
+          });
 
         return {
           success: true,
@@ -256,15 +301,24 @@ async function performWebSearch(query, state) {
     console.warn("[AGENT] Exa.ai API fetch failed, using fallback research knowledge base:", err);
   }
 
-  // Knowledge base fallback
-  const qLower = query.toLowerCase();
-  let matches = [];
-  if (qLower.includes("social") || qLower.includes("media") || qLower.includes("ban") || qLower.includes("youth") || qLower.includes("teen") || qLower.includes("age")) {
+  // Offline reference set. Only two topics have hand-written entries; for anything
+  // else we report failure rather than invent sources.
+  const words = new Set((query.toLowerCase().match(/[a-z]+/g)) || []);
+  const hasAny = (...terms) => terms.some(t => words.has(t));
+
+  let matches = null;
+  if (hasAny("social", "media", "ban", "youth", "teen", "teens", "teenagers", "minors")) {
     matches = RESEARCH_KNOWLEDGE_BASE["social media"];
-  } else if (qLower.includes("nuclear") || qLower.includes("energy") || qLower.includes("climate")) {
+  } else if (hasAny("nuclear", "energy", "climate")) {
     matches = RESEARCH_KNOWLEDGE_BASE["nuclear"];
-  } else {
-    matches = RESEARCH_KNOWLEDGE_BASE["default"];
+  }
+
+  if (!matches) {
+    return {
+      success: false,
+      error: "Live search is unavailable and there is no offline reference set for this topic.",
+      sources: []
+    };
   }
 
   return {
@@ -275,17 +329,160 @@ async function performWebSearch(query, state) {
 }
 
 /* ---------------------------------------------------------
-   4. TOOL REGISTRY (Initial 5 Tools)
+   4. EVIDENCE ASSESSMENT & SCORING
+   Each source gets an `assessment` { stance, strength, finding, method }:
+     stance   supports | contradicts | neutral | irrelevant
+     strength strong | moderate | weak
+     method   "ai" (Gemini via assess-evidence), "preset" (demo scenario
+              sources that ship with a known stance) or "heuristic"
+              (AI unavailable; keyword guess, capped confidence)
+   The verdict and confidence are computed from these, never hard-coded.
+   --------------------------------------------------------- */
+const STRENGTH_WEIGHT = { strong: 1, moderate: 0.6, weak: 0.3 };
+
+const PRESET_STANCE_MAP = {
+  strongly_supporting: ["supports", "strong"],
+  supporting: ["supports", "moderate"],
+  supporting_nuance: ["supports", "weak"],
+  mixed: ["neutral", "moderate"],
+  neutral: ["neutral", "moderate"],
+  opposing: ["contradicts", "moderate"],
+  strongly_opposing: ["contradicts", "strong"]
+};
+
+function assessmentFromPreset(src, method) {
+  const pair = PRESET_STANCE_MAP[src.stance] || ["neutral", "weak"];
+  return { stance: pair[0], strength: pair[1], finding: src.snippet, method: method };
+}
+
+function heuristicAssessment(src) {
+  if (src.stance) return assessmentFromPreset(src, "heuristic");
+  const stance = src.hintStance || "neutral";
+  const verb = stance === "contradicts" ? "against" : stance === "supports" ? "for" : "neutral on";
+  return {
+    stance: stance,
+    strength: "moderate",
+    finding: `Keyword scan only (AI assessment unavailable): flagged as ${verb} the claim from surface wording, not a read summary.`,
+    method: "heuristic"
+  };
+}
+
+function isPositioned(src) {
+  return !!src.assessment && (src.assessment.stance === "supports" || src.assessment.stance === "contradicts");
+}
+
+function evidenceWeight(src) {
+  return (src.authority || 0.5) * (STRENGTH_WEIGHT[src.assessment.strength] || 0.3);
+}
+
+function strongestSource(state, stance) {
+  const pool = state.sources.filter(s => s.assessment && s.assessment.stance === stance);
+  if (pool.length === 0) return null;
+  return pool.reduce((best, s) => (evidenceWeight(s) > evidenceWeight(best) ? s : best));
+}
+
+function scoreEvidence(state) {
+  const positioned = state.sources.filter(isPositioned);
+  const supporters = positioned.filter(s => s.assessment.stance === "supports");
+  const opponents = positioned.filter(s => s.assessment.stance === "contradicts");
+  const supportW = supporters.reduce((a, s) => a + evidenceWeight(s), 0);
+  const contraW = opponents.reduce((a, s) => a + evidenceWeight(s), 0);
+  const total = supportW + contraW;
+  const heuristic = state.sources.some(s => s.assessment && s.assessment.method === "heuristic");
+
+  const base = {
+    nSup: supporters.length,
+    nOpp: opponents.length,
+    nPositioned: positioned.length,
+    heuristic: heuristic
+  };
+
+  // Not enough weighty, position-taking evidence to call it either way.
+  if (positioned.length < 2 || total < 1.0) {
+    return Object.assign(base, { verdict: "Insufficient Evidence", confidence: 30, insufficient: true, oneSided: false });
+  }
+
+  const share = supportW / total; // weighted fraction of the evidence that supports the claim
+  let verdict = "Partially Supported";
+  if (share >= 0.75) verdict = "Supported";
+  else if (share <= 0.25) verdict = "Refuted";
+
+  const clarity = Math.abs(share - 0.5) * 2;                 // 0 = evenly split, 1 = unanimous
+  const coverage = Math.min(1, positioned.length / 4);       // saturates at 4 position-taking sources
+  const avgAuthority = positioned.reduce((a, s) => a + (s.authority || 0.5), 0) / positioned.length;
+
+  let confidence = Math.round(100 * (0.10 + 0.40 * clarity + 0.20 * coverage + 0.15 * avgAuthority));
+  const oneSided = supporters.length === 0 || opponents.length === 0;
+  if (oneSided) confidence = Math.min(confidence, 78);       // nothing contradicted it; may just be search coverage
+  if (heuristic) confidence = Math.min(confidence, 50);      // keyword stances are unreliable
+  confidence = Math.max(20, Math.min(90, confidence));
+
+  return Object.assign(base, { verdict: verdict, confidence: confidence, insufficient: false, oneSided: oneSided });
+}
+
+function asSentence(text) {
+  const t = (text || "").trim();
+  if (!t) return "";
+  return /[.!?]["')\]]?$/.test(t) ? t : t + ".";
+}
+
+function deterministicSummary(state, score) {
+  if (score.insufficient) {
+    return `Not enough usable evidence: ${state.sources.length} source(s) retrieved, ${score.nPositioned} took a clear position on the claim.`;
+  }
+  const parts = [`${score.nSup} of ${score.nPositioned} position-taking sources support the claim and ${score.nOpp} contradict it.`];
+  const sup = strongestSource(state, "supports");
+  const opp = strongestSource(state, "contradicts");
+  if (sup) parts.push("Strongest support: " + asSentence(sup.assessment.finding));
+  if (opp) parts.push("Strongest counter-evidence: " + asSentence(opp.assessment.finding));
+  return parts.join(" ");
+}
+
+async function buildVerdictSummary(state, score) {
+  let text = null;
+
+  if (!score.insufficient && !state.llm_degraded) {
+    const res = await LLMProvider.call("summarize", {
+      claim: state.claim,
+      verdict: score.verdict,
+      confidence: score.confidence,
+      assessments: state.sources.filter(s => s.assessment).map(s => ({
+        title: s.title,
+        stance: s.assessment.stance,
+        strength: s.assessment.strength,
+        finding: s.assessment.finding
+      })),
+      contradictions: state.contradictions.map(c => ({ sourceA: c.sourceA, sourceB: c.sourceB }))
+    });
+    if (res && res.summary) text = res.summary;
+  }
+  if (!text) text = deterministicSummary(state, score);
+
+  // Caveats are appended in code so the model can't drop them.
+  const caveats = [];
+  if (state.llm_degraded) caveats.push("The AI stance classifier was unavailable, so stances are keyword-based and unreliable.");
+  if (state.used_fallback) caveats.push("Live search was unavailable; this used a small built-in reference set.");
+  if (state.query_planning_degraded) caveats.push("The AI couldn't phrase a targeted opposing-evidence search, so the counter-search may have been weak — a lack of opposing sources here may reflect search coverage, not consensus.");
+  if (score.oneSided && !score.insufficient) {
+    caveats.push("Every source that took a position leans the same way, which may reflect what the search surfaced rather than a real consensus.");
+  }
+  return [text].concat(caveats).join(" ");
+}
+
+/* ---------------------------------------------------------
+   4b. TOOL REGISTRY
    1) understand_claim
    2) search_web
    3) analyze_evidence
    4) compare_sources
    5) final_verification
+   (+ retrieve_source, detect_contradiction, generate_counterargument
+   for the adaptive paths)
    --------------------------------------------------------- */
 const ToolRegistry = {
   async understand_claim(args, state) {
     logAgent(state, `Executing Tool: understand_claim ("${state.claim}")`);
-    
+
     // Decompose claim into subclaims and queries
     const subclaims = [
       `What are the core arguments supporting: "${state.claim}"?`,
@@ -293,21 +490,34 @@ const ToolRegistry = {
       `What does empirical research and regulatory evidence indicate?`
     ];
 
-    const initialPlan = ["search_web", "analyze_evidence", "compare_sources", "final_verification"];
+    // Two searches: one aimed at supporting evidence, one aimed at counter-evidence.
+    // A naive "criticism of: <claim>" prefix barely moves a neural-search embedding
+    // away from the claim's own topic, so ask the model to phrase the opposing
+    // query around what a contradicting finding would actually say. Fall back to
+    // a plain negated framing (still better than literal prefixing) if that fails.
+    const planned = await LLMProvider.call("plan_queries", { claim: state.claim });
+    let queries;
+    if (planned && Array.isArray(planned.queries) && planned.queries.length === 2 && planned.queries.every(Boolean)) {
+      queries = planned.queries;
+    } else {
+      queries = [state.claim, `studies finding no support for, or evidence against: ${state.claim}`];
+      state.query_planning_degraded = true;
+    }
+
+    state.search_queue = queries;
     state.subclaims = subclaims;
-    state.current_plan = initialPlan;
-    state.confidence = 20;
+    state.current_plan = ["search_web", "search_web", "analyze_evidence", "compare_sources", "final_verification"];
 
     return {
       tool: "understand_claim",
-      reason: "Decomposed goal into 3 testable sub-claims and initial search strategy.",
-      summary: `Decomposed claim into ${subclaims.length} sub-claims. Formulated targeted search queries.`,
-      data: { subclaims, initialPlan }
+      reason: "Decomposed goal into 3 testable sub-claims and planned a two-sided search strategy.",
+      summary: `Decomposed claim into ${subclaims.length} sub-claims; queued a supporting search ("${clipText(queries[0], 60)}") and an opposing search ("${clipText(queries[1], 60)}").`,
+      data: { subclaims, plan: state.current_plan, queries }
     };
   },
 
   async search_web(args, state) {
-    const query = args.query || state.claim;
+    const query = state.search_queue[0] || args.query || state.claim;
     logAgent(state, `Executing Tool: search_web (query: "${query}")`);
 
     const result = await performWebSearch(query, state);
@@ -324,22 +534,32 @@ const ToolRegistry = {
       };
     }
 
-    // Accumulate sources without duplicate URLs
+    // Consume the query only on success, so a retry re-runs the same one.
+    state.search_queue.shift();
+
+    // Demo-scenario hooks return no provider; their sources ship with a known stance.
+    const isDemo = !result.provider;
+    const provider = result.provider || "Demo scenario";
+    if (result.provider === "Knowledge Base Fallback") state.used_fallback = true;
+
+    // Accumulate sources without duplicate URLs. Clone so per-investigation
+    // annotations never leak into the shared knowledge-base objects.
     const newSources = [];
     result.sources.forEach(src => {
-      if (!state.sources.some(s => s.url === src.url)) {
-        state.sources.push(src);
-        newSources.push(src);
-      }
+      if (state.sources.length >= MAX_SOURCES) return;
+      if (state.sources.some(s => s.url === src.url)) return;
+      const copy = Object.assign({}, src);
+      if (isDemo) copy.preset = true;
+      state.sources.push(copy);
+      newSources.push(copy);
     });
 
-    state.confidence = Math.min(80, state.confidence + 20);
-
+    const shortQuery = query.length > 70 ? query.slice(0, 67) + "..." : query;
     return {
       tool: "search_web",
       success: true,
-      reason: `Retrieved ${newSources.length} authoritative sources for analysis.`,
-      summary: `Found ${newSources.length} relevant academic & policy sources. Total sources: ${state.sources.length}.`,
+      reason: `Retrieved ${newSources.length} new source(s) from ${provider}.`,
+      summary: `Found ${newSources.length} new source(s) for "${shortQuery}" via ${provider}. Total sources: ${state.sources.length}.`,
       data: newSources
     };
   },
@@ -357,100 +577,150 @@ const ToolRegistry = {
       };
     }
 
+    // Only assess sources we haven't judged yet (this tool can run twice).
+    const toClassify = [];
+    state.sources.filter(src => !src.assessment).forEach(src => {
+      if (src.preset) src.assessment = assessmentFromPreset(src, "preset");
+      else toClassify.push(src);
+    });
+
+    if (toClassify.length > 0) {
+      const res = await LLMProvider.call("classify", {
+        claim: state.claim,
+        sources: toClassify.map((src, i) => ({ id: i, title: src.title, text: src.text || src.snippet }))
+      });
+      const byId = new Map();
+      if (res && Array.isArray(res.assessments)) res.assessments.forEach(a => byId.set(a.id, a));
+
+      toClassify.forEach((src, i) => {
+        const a = byId.get(i);
+        if (a) {
+          src.assessment = { stance: a.stance, strength: a.strength, finding: a.finding || src.snippet, method: "ai" };
+        } else {
+          src.assessment = heuristicAssessment(src);
+          state.llm_degraded = true;
+        }
+      });
+      if (state.llm_degraded) logAgent(state, "Tool Warning: AI stance classifier unavailable; used keyword heuristic.");
+    }
+
     const supporting = [];
     const opposing = [];
-
+    const neutral = [];
     state.sources.forEach(src => {
+      const a = src.assessment;
       const item = {
         title: src.title,
         url: src.url,
         snippet: src.snippet,
-        authority: src.authority
+        authority: src.authority,
+        strength: a.strength,
+        finding: a.finding
       };
-      if (src.stance.includes("opposing")) {
-        opposing.push(item);
-      } else {
-        supporting.push(item);
-      }
+      if (a.stance === "supports") supporting.push(item);
+      else if (a.stance === "contradicts") opposing.push(item);
+      else neutral.push(Object.assign(item, { stance: a.stance }));
     });
 
-    state.evidence = { supporting, opposing };
-    state.confidence = Math.min(85, state.confidence + 15);
+    state.evidence = { supporting, opposing, neutral };
+    state.analyzed = true;
+    state.confidence = scoreEvidence(state).confidence; // provisional; final_verification recomputes
 
+    const note = state.llm_degraded ? " (AI classifier unavailable; keyword fallback used.)" : "";
     return {
       tool: "analyze_evidence",
       success: true,
-      reason: "Analyzed source stances and extracted supporting vs opposing evidence.",
-      summary: `Extracted ${supporting.length} supporting points and ${opposing.length} opposing points.`,
-      data: { supportingCount: supporting.length, opposingCount: opposing.length }
+      reason: "Judged each source's stance toward the claim.",
+      summary: `Assessed ${state.sources.length} sources: ${supporting.length} support, ${opposing.length} contradict, ${neutral.length} neutral or off-topic.${note}`,
+      data: { supportingCount: supporting.length, opposingCount: opposing.length, neutralCount: neutral.length }
     };
   },
 
   async compare_sources(args, state) {
     logAgent(state, "Executing Tool: compare_sources (cross-referencing evidence)");
 
+    const sup = strongestSource(state, "supports");
+    const opp = strongestSource(state, "contradicts");
     const contradictions = [];
 
-    // Check for conflicting evidence
-    if (state.evidence.supporting.length > 0 && state.evidence.opposing.length > 0) {
+    if (sup && opp) {
+      const strongBoth = sup.assessment.strength === "strong" && opp.assessment.strength === "strong";
       contradictions.push({
-        topic: "Impact and Efficacy of the Claim",
-        sourceA: state.evidence.supporting[0].title,
-        claimA: state.evidence.supporting[0].snippet,
-        sourceB: state.evidence.opposing[0].title,
-        claimB: state.evidence.opposing[0].snippet,
-        severity: "high"
+        topic: "Conflicting findings on the claim",
+        sourceA: sup.title,
+        claimA: sup.assessment.finding,
+        sourceB: opp.title,
+        claimB: opp.assessment.finding,
+        severity: strongBoth ? "high" : "moderate"
       });
     }
 
     state.contradictions = contradictions;
 
+    const nSup = state.evidence.supporting.length;
+    const nOpp = state.evidence.opposing.length;
+    let summary;
+    if (contradictions.length > 0) {
+      summary = `${nSup} source(s) support and ${nOpp} contradict the claim. Sharpest conflict: "${sup.title}" vs "${opp.title}".`;
+    } else if (nSup > 0) {
+      summary = `All ${nSup} position-taking source(s) point the same way; no contradicting evidence was retrieved.`;
+    } else if (nOpp > 0) {
+      summary = `All ${nOpp} position-taking source(s) argue against the claim; no supporting evidence was retrieved.`;
+    } else {
+      summary = "No source took a clear position on the claim, so there is nothing to cross-check.";
+    }
+
     return {
       tool: "compare_sources",
       success: true,
       reason: "Cross-examined sources for agreements and contradictions.",
-      summary: contradictions.length > 0 
-        ? `Detected ${contradictions.length} major source contradiction(s) requiring verification.` 
-        : "Sources show broad alignment; no major contradictions found.",
+      summary: summary,
       data: { contradictionsFound: contradictions.length, contradictions }
     };
   },
 
   async retrieve_source(args, state) {
-    logAgent(state, "Executing Tool: retrieve_source (fetching deep source context)");
+    logAgent(state, "Executing Tool: retrieve_source (re-reading most recent source)");
     const targetSource = state.sources[state.sources.length - 1];
     if (!targetSource) {
       return { tool: "retrieve_source", success: false, reason: "No source available to retrieve.", summary: "Source retrieval skipped." };
     }
+    const detail = (targetSource.assessment && targetSource.assessment.finding) || targetSource.snippet;
     return {
       tool: "retrieve_source",
       success: true,
-      reason: `Retrieved full source text and methodology from ${targetSource.title}.`,
-      summary: `Extracted methodology & key empirical claims from ${targetSource.title} (Authority: ${Math.round(targetSource.authority * 100)}%).`,
+      reason: `Re-read ${targetSource.title}.`,
+      summary: `Re-read "${targetSource.title}" (authority ${Math.round(targetSource.authority * 100)}%): ${detail}`,
       data: targetSource
     };
   },
 
   async detect_contradiction(args, state) {
     logAgent(state, "Executing Tool: detect_contradiction (analyzing severity)");
-    const severity = state.contradictions.length > 0 ? "HIGH" : "LOW";
+    const top = state.contradictions[0];
+    const severity = top ? top.severity.toUpperCase() : "NONE";
     return {
       tool: "detect_contradiction",
       success: true,
-      reason: "Audited source claims for logical and factual discrepancies.",
-      summary: `Contradiction detection complete. Severity level: ${severity}.`,
+      reason: "Rated how serious the disagreement between sources is.",
+      summary: top
+        ? `Contradiction check complete. Severity: ${severity}.`
+        : "No contradictions found to rate.",
       data: { severity, count: state.contradictions.length }
     };
   },
 
   async generate_counterargument(args, state) {
     logAgent(state, "Executing Tool: generate_counterargument (preventing confirmation bias)");
-    const counter = `Potential systemic risk or policy friction regarding: "${state.claim}"`;
+    const opp = strongestSource(state, "contradicts");
+    const counter = opp ? opp.assessment.finding : null;
     return {
       tool: "generate_counterargument",
       success: true,
-      reason: "Formulated robust opposing perspective to stress-test supporting evidence.",
-      summary: "Generated counter-perspective to ensure balanced synthesis.",
+      reason: "Surfaced the strongest evidence against the claim to stress-test the verdict.",
+      summary: opp
+        ? `Strongest evidence against the claim: "${opp.title}". ${asSentence(counter)}`
+        : "No retrieved source contradicts the claim; counter-evidence may exist outside these results.",
       data: { counterargument: counter }
     };
   },
@@ -458,40 +728,19 @@ const ToolRegistry = {
   async final_verification(args, state) {
     logAgent(state, "Executing Tool: final_verification (synthesizing verdict)");
 
-    const supCount = state.evidence.supporting.length;
-    const oppCount = state.evidence.opposing.length;
-    const countTotal = supCount + oppCount;
-
-    let verdictLabel = "Partially Supported";
-    let calculatedConfidence = 75;
-
-    if (countTotal === 0) {
-      verdictLabel = "Insufficient Evidence";
-      calculatedConfidence = 30;
-    } else if (supCount > 0 && oppCount === 0) {
-      verdictLabel = "Supported";
-      calculatedConfidence = 88;
-    } else if (oppCount > supCount && state.contradictions.length > 0) {
-      verdictLabel = "Partially Supported / High Nuance";
-      calculatedConfidence = 82;
-    } else if (state.contradictions.length > 0) {
-      verdictLabel = "Partially Supported (Contradictory Evidence)";
-      calculatedConfidence = 78;
-    }
-
-    if (state.adapted) {
-      calculatedConfidence = Math.min(95, calculatedConfidence + 8); // Bonus for dynamic recovery
-    }
-
-    state.confidence = calculatedConfidence;
+    const score = scoreEvidence(state);
+    const summary = await buildVerdictSummary(state, score);
+    state.confidence = score.confidence;
 
     const finalResult = {
-      verdict: verdictLabel,
-      confidence: calculatedConfidence,
+      verdict: score.verdict,
+      confidence: score.confidence,
       claim: state.claim,
-      summary: `After dynamic investigation across ${state.sources.length} sources, the agent determined the claim is "${verdictLabel}" with ${calculatedConfidence}% confidence. Key trade-offs exist between safety regulations and practical implementation.`,
+      summary: summary,
+      method: score.heuristic ? "heuristic" : "ai",
       supportingEvidence: state.evidence.supporting,
       opposingEvidence: state.evidence.opposing,
+      neutralEvidence: state.evidence.neutral,
       contradictionsResolved: state.contradictions,
       adaptationHistory: state.logs.filter(l => l.includes("[ADAPTATION]"))
     };
@@ -502,8 +751,8 @@ const ToolRegistry = {
     return {
       tool: "final_verification",
       success: true,
-      reason: "Completed audit of all evidence, resolved contradictions, and finalized verdict.",
-      summary: `Investigation finalized. Verdict: ${verdictLabel} (${calculatedConfidence}% confidence).`,
+      reason: "Weighed all assessed evidence and finalized the verdict.",
+      summary: `Investigation finalized. Verdict: ${score.verdict} (${score.confidence}% confidence).`,
       data: finalResult
     };
   }
@@ -525,7 +774,7 @@ const AgentEvaluator = {
     };
 
     // Case 1: Search Failure -> Adapt -> Recover
-    if (lastActionResult.tool === "search_web" && !lastActionResult.success) {
+    if (lastActionResult.tool === "search_web" && !lastActionResult.success && !state.has_recovered_search) {
       evaluation.useful = false;
       evaluation.requires_replanning = true;
       evaluation.reason = "Primary search failed. Adaptation needed: switch query strategy and retry search.";
@@ -556,12 +805,44 @@ const AgentEvaluator = {
   }
 };
 
+function clipText(text, max) {
+  const t = String(text || "");
+  return t.length > max ? t.slice(0, max - 3) + "..." : t;
+}
+
+// What this step is about to do, in terms of the current investigation.
+function describeObjective(tool, state) {
+  switch (tool) {
+    case "understand_claim":
+      return `Break "${clipText(state.claim, 80)}" into testable sub-claims and search queries.`;
+    case "search_web": {
+      const q = state.search_queue[0];
+      return q ? `Search for sources: "${clipText(q, 90)}"` : "Search for additional sources on the claim.";
+    }
+    case "retrieve_source":
+      return "Re-read the most recently added source for its key findings.";
+    case "analyze_evidence":
+      return `Judge whether each of the ${state.sources.length} source(s) supports or contradicts the claim.`;
+    case "compare_sources":
+      return "Check whether supporting and contradicting sources conflict with each other.";
+    case "detect_contradiction":
+      return "Rate how serious the disagreement between sources is.";
+    case "generate_counterargument":
+      return "Pull out the strongest evidence against the claim to stress-test the verdict.";
+    case "final_verification":
+      return "Weigh the assessed evidence and produce a verdict.";
+    default:
+      return `Run ${tool}.`;
+  }
+}
+
 /* ---------------------------------------------------------
    6. AGENT CONTROLLER (Dynamic Decision Loop)
    while not goal_satisfied and steps < MAX_STEPS
    --------------------------------------------------------- */
 async function runAgentController(claim, demoMode = "normal", onTraceUpdate) {
   const state = createInvestigationState(claim, demoMode);
+  LLMProvider.reset();
   state.status = "running";
   logAgent(state, `Controller initialized. Goal: "${state.goal}" | Demo Mode: ${demoMode}`);
 
@@ -589,7 +870,7 @@ async function runAgentController(claim, demoMode = "normal", onTraceUpdate) {
         type: "step_start",
         step: state.step_count,
         tool: nextTool,
-        reason: `Executing ${nextTool} based on current investigation plan.`
+        reason: describeObjective(nextTool, state)
       });
     }
 
@@ -717,14 +998,14 @@ function escapeHtml(str) {
 
 function formatToolLabel(toolName) {
   const map = {
-    understand_claim: "Phase 1: Proposition Decomposition",
-    search_web: "Phase 2: Literature Retrieval",
-    retrieve_source: "Phase 3: Deep Source Extraction",
-    analyze_evidence: "Phase 4: Evidence Categorization",
-    compare_sources: "Phase 5: Source Cross-Examination",
-    detect_contradiction: "Phase 6: Contradiction Audit",
-    generate_counterargument: "Phase 7: Counter-Perspective Stress-Test",
-    final_verification: "Phase 8: Analytical Synthesis & Verdict"
+    understand_claim: "Proposition Decomposition",
+    search_web: "Literature Retrieval",
+    retrieve_source: "Source Re-read",
+    analyze_evidence: "Evidence Categorization",
+    compare_sources: "Source Cross-Examination",
+    detect_contradiction: "Contradiction Audit",
+    generate_counterargument: "Counter-Perspective Stress-Test",
+    final_verification: "Analytical Synthesis & Verdict"
   };
   return map[toolName] || toolName;
 }
@@ -744,7 +1025,7 @@ function updateUIOnTrace(state, event) {
   if (stepVal) stepVal.textContent = `${state.step_count} / ${MAX_AGENT_STEPS}`;
 
   const confVal = document.getElementById("agent-confidence-val");
-  if (confVal) confVal.textContent = `${state.confidence}%`;
+  if (confVal) confVal.textContent = state.analyzed ? `${state.confidence}%` : "\u2014";
 
   const sourcesVal = document.getElementById("agent-sources-val");
   if (sourcesVal) sourcesVal.textContent = state.sources.length;
@@ -840,22 +1121,50 @@ function updateUIOnTrace(state, event) {
   if (supCount) supCount.textContent = state.evidence.supporting.length;
   if (oppCount) oppCount.textContent = state.evidence.opposing.length;
 
-  if (supList && state.evidence.supporting.length > 0) {
-    supList.innerHTML = state.evidence.supporting.map(item => `
-      <div class="evidence-item supporting">
-        <strong class="evidence-source">${escapeHtml(item.title)}</strong>
-        <p class="evidence-snippet">"${escapeHtml(item.snippet)}"</p>
+  const renderEvidence = (items, cls) => items.map(item => {
+    // Don't show the raw snippet twice if it's basically the same text as the finding
+    // (happens when the heuristic fallback or a thin excerpt leaves nothing to add).
+    const finding = (item.finding || "").trim();
+    const snippet = (item.snippet || "").trim();
+    const showSnippet = snippet && finding.toLowerCase() !== snippet.toLowerCase();
+    let sourceUrl = "";
+    let sourceHost = "Source link unavailable";
+    try {
+      const parsed = new URL(item.url);
+      if (["https:", "http:"].includes(parsed.protocol)) {
+        sourceUrl = parsed.href;
+        sourceHost = parsed.hostname.replace(/^www\./, "");
+      }
+    } catch (_) { /* Unusable URLs remain plain text. */ }
+    return `
+      <div class="evidence-item ${cls}">
+        <div class="evidence-source-row">
+          <strong class="evidence-source">${escapeHtml(item.title)}</strong>
+        </div>
+        <span class="evidence-domain">${escapeHtml(sourceHost)}</span>
+        ${finding ? `<p class="evidence-finding">${escapeHtml(finding)}</p>` : ""}
+        ${showSnippet ? `<details class="evidence-excerpt"><summary>Read retrieved excerpt</summary><p class="evidence-snippet">${escapeHtml(snippet)}</p></details>` : ""}
+        ${sourceUrl ? `<a class="evidence-open-link" href="${escapeHtml(sourceUrl)}" target="_blank" rel="noopener noreferrer">Open source ↗<span class="sr-only"> (opens in a new tab)</span></a>` : ""}
       </div>
-    `).join("");
+    `;
+  }).join("");
+
+  if (supList) {
+    if (state.evidence.supporting.length > 0) {
+      const markup = renderEvidence(state.evidence.supporting, "supporting");
+      if (supList._evidenceMarkup !== markup) { supList.innerHTML = markup; supList._evidenceMarkup = markup; }
+    } else if (state.analyzed) {
+      supList.innerHTML = `<p class="empty-hint">No retrieved source supports the claim.</p>`;
+    }
   }
 
-  if (oppList && state.evidence.opposing.length > 0) {
-    oppList.innerHTML = state.evidence.opposing.map(item => `
-      <div class="evidence-item opposing">
-        <strong class="evidence-source">${escapeHtml(item.title)}</strong>
-        <p class="evidence-snippet">"${escapeHtml(item.snippet)}"</p>
-      </div>
-    `).join("");
+  if (oppList) {
+    if (state.evidence.opposing.length > 0) {
+      const markup = renderEvidence(state.evidence.opposing, "opposing");
+      if (oppList._evidenceMarkup !== markup) { oppList.innerHTML = markup; oppList._evidenceMarkup = markup; }
+    } else if (state.analyzed) {
+      oppList.innerHTML = `<p class="empty-hint">No retrieved source argues against the claim.</p>`;
+    }
   }
 
   // Contradiction Card
@@ -871,6 +1180,7 @@ function updateUIOnTrace(state, event) {
 
   // Final Verdict Card
   if (event.type === "investigation_complete" && state.final_conclusion) {
+    document.getElementById("agent-activity")?.removeAttribute("open");
     const verdictCard = document.getElementById("agent-verdict-card");
     if (verdictCard) {
       verdictCard.classList.remove("hidden");
@@ -882,7 +1192,7 @@ function updateUIOnTrace(state, event) {
       if (verdictBadge) {
         verdictBadge.textContent = verdict.toUpperCase();
         const isSupported = verdict.toLowerCase().includes("supported") && !verdict.toLowerCase().includes("not") && !verdict.toLowerCase().includes("partial");
-        const isPartial   = verdict.toLowerCase().includes("partial") || verdict.toLowerCase().includes("conflict");
+        const isPartial   = verdict.toLowerCase().includes("partial") || verdict.toLowerCase().includes("conflict") || verdict.toLowerCase().includes("insufficient");
         verdictBadge.style.background = isSupported ? "rgba(82,160,119,0.18)" : isPartial ? "rgba(224,159,62,0.18)" : "rgba(217,107,82,0.18)";
         verdictBadge.style.color      = isSupported ? "var(--green)" : isPartial ? "var(--amber)" : "var(--magenta)";
         verdictBadge.style.borderColor= isSupported ? "var(--green)" : isPartial ? "var(--amber)" : "var(--magenta)";
@@ -925,14 +1235,18 @@ function updateUIOnTrace(state, event) {
 
       const sourcesList = document.getElementById("agent-verdict-sources-list");
       if (sourcesList) {
-        sourcesList.innerHTML = state.sources.map((s, i) => `
+        const stanceLabel = { supports: "supports", contradicts: "contradicts", neutral: "neutral", irrelevant: "off-topic" };
+        sourcesList.innerHTML = state.sources.map((s, i) => {
+          const stance = s.assessment ? (stanceLabel[s.assessment.stance] || s.assessment.stance) : "unassessed";
+          return `
           <li style="animation-delay:${i * 0.07}s">
             <a href="${escapeHtml(s.url)}" target="_blank" rel="noopener" class="source-link">
               <span>${escapeHtml(s.title)}</span>
-              <span style="margin-left:auto;white-space:nowrap;opacity:0.6;font-family:var(--font-mono);font-size:0.72rem;">${Math.round(s.authority * 100)}% authority</span>
+              <span style="margin-left:auto;white-space:nowrap;opacity:0.6;font-family:var(--font-mono);font-size:0.72rem;">${escapeHtml(stance)} \u00b7 ${Math.round(s.authority * 100)}% authority</span>
             </a>
           </li>
-        `).join("");
+        `;
+        }).join("");
       }
 
       // Award XP
@@ -966,6 +1280,9 @@ async function startInvestigationUI() {
   }
 
   // Reset UI elements
+  document.getElementById("agent-activity")?.setAttribute("open", "");
+  document.getElementById("agent-sup-list")._evidenceMarkup = null;
+  document.getElementById("agent-opp-list")._evidenceMarkup = null;
   document.getElementById("agent-trace-list").innerHTML = "";
   document.getElementById("agent-sup-list").innerHTML = `<p class="empty-hint">No supporting evidence compiled yet.</p>`;
   document.getElementById("agent-opp-list").innerHTML = `<p class="empty-hint">No opposing evidence compiled yet.</p>`;
@@ -995,6 +1312,9 @@ async function startInvestigationUI() {
 }
 
 function initAgentEventListeners() {
+  const verdictCard = document.getElementById("agent-verdict-card");
+  const outputHeader = document.querySelector(".agent-output-panel .agent-panel-header");
+  if (verdictCard && outputHeader) outputHeader.after(verdictCard);
   const startBtn = document.getElementById("agent-start-btn");
   if (startBtn) {
     startBtn.addEventListener("click", startInvestigationUI);
@@ -1073,4 +1393,3 @@ window.VeritasAgent = {
 };
 
 })();
-

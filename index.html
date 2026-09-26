@@ -61,6 +61,10 @@
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="2"/><path d="M4 20C4 16.134 7.582 13 12 13C16.418 13 20 16.134 20 20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
       <span>Profile</span>
     </button>
+    <button type="button" class="sidebar-link" data-nav="classroom" aria-label="Classroom">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H17a3 3 0 0 1 3 3v13a2 2 0 0 1-2 2H6.5A2.5 2.5 0 0 1 4 18.5v-13Z" stroke="currentColor" stroke-width="2"/><path d="M8 7h8M8 11h8M8 15h5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      <span>Classroom</span>
+    </button>
   </div>
   <div class="sidebar-foot">
     <span class="sidebar-xp-mini" id="sidebar-xp-mini">0 XP</span>
@@ -112,6 +116,9 @@
       <button type="button" class="icon-btn" data-nav="profile" aria-label="Profile">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="2"/><path d="M4 20C4 16.134 7.582 13 12 13C16.418 13 20 16.134 20 20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
       </button>
+      <button type="button" class="icon-btn" data-nav="classroom" aria-label="Classroom">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H17a3 3 0 0 1 3 3v13a2 2 0 0 1-2 2H6.5A2.5 2.5 0 0 1 4 18.5v-13Z" stroke="currentColor" stroke-width="2"/><path d="M8 7h8M8 11h8M8 15h5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
     </nav>
   </header>
 
@@ -119,12 +126,14 @@
 
     <!-- Hero -->
     <section class="home-hero">
+      <img class="hero-visual" src="imgs/classroom/debate-hero.png" alt="Abstract illustration of two opposing ideas balanced for fair judgment" width="1024" height="1024" loading="eager" decoding="async">
       <div class="home-hero-main">
         <p class="hero-greeting"><span id="home-greeting-time">Good evening</span>, <span id="home-greeting-name">Debater</span>.</p>
-        <h1 class="hero-title">Who are you<br>arguing with today?</h1>
+        <h1 class="hero-title">Build a stronger<br>argument today.</h1>
+        <p class="hero-intro">Three turns with an AI opponent. A fresh perspective and feedback you can use.</p>
         <div class="hero-actions">
-          <button type="button" class="hero-btn hero-btn-primary" data-nav="ai-debate">Debate the AI</button>
-          <button type="button" class="hero-btn hero-btn-secondary" data-nav="multiplayer">Find a live opponent</button>
+          <button type="button" class="hero-btn hero-btn-primary" data-nav="ai-debate">Start a debate <span aria-hidden="true">↗</span></button>
+          <button type="button" class="hero-btn hero-btn-secondary" data-nav="daily">Warm up with today's drill</button>
         </div>
         <svg class="hero-ornament" viewBox="0 0 320 12" aria-hidden="true" focusable="false">
           <path d="M0 6h130M190 6h130" stroke="currentColor" stroke-width="1" opacity="0.35"/>
@@ -170,9 +179,10 @@
 
     <!-- Debate -->
     <section class="home-section">
-      <h2 class="section-heading">Take a side</h2>
+      <h2 class="section-heading">Explore another way to practise</h2>
       <div class="debate-picks">
-        <button type="button" class="debate-card" data-nav="ai-debate">
+        <button type="button" class="debate-card" data-nav="investigation">
+          <img class="debate-card-image" src="imgs/classroom/evidence-lab.png" alt="" aria-hidden="true" width="1024" height="1024" loading="lazy" decoding="async">
           <svg class="debate-card-art" viewBox="0 0 120 120" aria-hidden="true" focusable="false">
             <g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
               <rect x="16" y="26" width="88" height="56" rx="10"/>
@@ -183,12 +193,13 @@
               <path d="M60 10v10M34 16l5 8M86 16l-5 8"/>
             </g>
           </svg>
-          <span class="debate-card-kicker">3 turns &middot; instant</span>
-          <h3>Debate the AI</h3>
-          <p>Choose a topic and a side. The AI argues back, then a referee scores your reasoning and tells you the best point you missed.</p>
-          <span class="debate-card-go">Start a debate</span>
+          <span class="debate-card-kicker">Research &middot; compare perspectives</span>
+          <h3>Investigate a claim</h3>
+          <p>Explore the evidence on both sides. Read the sources, examine disagreements, and bring better evidence to your next debate.</p>
+          <span class="debate-card-go">Open Evidence Lab ↗</span>
         </button>
         <button type="button" class="debate-card alt" data-nav="multiplayer">
+          <img class="debate-card-image" src="imgs/classroom/debate-hero.png" alt="" aria-hidden="true" width="1024" height="1024" loading="lazy" decoding="async">
           <svg class="debate-card-art" viewBox="0 0 120 120" aria-hidden="true" focusable="false">
             <g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
               <rect x="14" y="20" width="60" height="38" rx="9"/>
@@ -472,6 +483,12 @@
     </div>
 
     <!-- Two-column body -->
+    <section class="glass-card profile-week-card" aria-labelledby="profile-week-title">
+      <h3 id="profile-week-title">Your last seven days</h3>
+      <p id="profile-week-summary"></p>
+      <div id="profile-week-chart" class="profile-week-chart"></div>
+      <p class="profile-week-note">Recorded activity on this device. Each bar shows completed activities, not a skill score.</p>
+    </section>
     <div class="profile-grid">
       <div class="glass-card radar-card">
         <span class="radar-card-title">Skill Radar</span>
@@ -494,6 +511,7 @@
             </div>
           </div>
           <div class="xp-bar"><div class="xp-bar-fill" id="profile-xp-fill"></div></div>
+          <p class="profile-week-note">Complete practice rounds and debates to earn XP. Your debate rating changes separately through multiplayer results.</p>
         </div>
 
         <div class="glass-card profile-focus-card">
@@ -642,6 +660,7 @@
       <span class="subbar-spacer"></span>
     </header>
 
+    <div class="debate-status-line" id="debate-live-status" role="status" aria-live="polite">Preparing debate…</div>
     <div class="debate-body" id="debate-transcript"><!-- turns injected --></div>
 
     <div class="debate-composer" id="debate-composer">
@@ -760,23 +779,30 @@
     <h3 class="section-heading">Choose your opponent</h3>
     <div class="bot-row" id="aidebate-bot-row">
       <button type="button" class="bot-card" data-level="sparring">
+        <span class="bot-emblem" aria-hidden="true">◇</span>
         <span class="bot-rating">~1000</span>
         <span class="bot-name">Sparring Partner</span>
         <span class="bot-desc">One clear point per turn, plain language, gives credit where it's due.</span>
+        <span class="bot-sample">“What evidence would help us test that?”</span>
       </button>
       <button type="button" class="bot-card active" data-level="rival">
+        <span class="bot-emblem" aria-hidden="true">◈</span>
         <span class="bot-rating">~1400</span>
         <span class="bot-name">The Rival</span>
         <span class="bot-desc">Answers your strongest point and presses one real weakness.</span>
+        <span class="bot-sample">“That supports your example. Does it support your conclusion?”</span>
       </button>
       <button type="button" class="bot-card" data-level="champion">
+        <span class="bot-emblem" aria-hidden="true">♜</span>
         <span class="bot-rating">~1800</span>
         <span class="bot-name">The Champion</span>
         <span class="bot-desc">Names your fallacies, pre-empts your comeback, concedes nothing.</span>
+        <span class="bot-sample">“Your case depends on an assumption you haven't defended.”</span>
       </button>
     </div>
 
     <h3 class="section-heading">Time control</h3>
+    <p class="mp-hint">The lines above illustrate each opponent's style; actual replies depend on your argument.</p>
     <div class="aidebate-stance-row" id="aidebate-time-row">
       <button type="button" class="aidebate-stance-btn" data-seconds="0">Unlimited</button>
       <button type="button" class="aidebate-stance-btn active" data-seconds="90">90s a turn</button>
@@ -808,6 +834,7 @@
       <span class="subbar-spacer"></span>
     </header>
 
+    <div class="debate-status-line" id="aidebate-live-status" role="status" aria-live="polite">Your turn — make your opening argument.</div>
     <div class="debate-body" id="aidebate-transcript"><!-- turns injected --></div>
 
     <div class="debate-composer" id="aidebate-composer">
@@ -844,6 +871,8 @@
 
       <div class="debate-end-actions">
         <button type="button" class="cta-btn" id="aidebate-again-btn">Rematch, same topic</button>
+        <button type="button" class="ghost-btn" id="aidebate-opposite-btn">Try the opposite side</button>
+        <button type="button" class="ghost-btn hidden" id="aidebate-practise-feedback-btn">Practise the missed argument</button>
         <button type="button" class="ghost-btn" id="aidebate-done-btn">Back home</button>
       </div>
     </div>
@@ -911,13 +940,20 @@
   <div class="agent-investigation-wrap">
     <!-- Top Control Card -->
     <div class="glass-card agent-control-card">
+      <img class="agent-lab-visual" src="imgs/classroom/evidence-lab.png" alt="Illustration of research papers being examined with a magnifying glass" width="1024" height="1024" loading="lazy" decoding="async">
       <div class="agent-badge-row">
         <span class="rank-badge">Evidence Lab</span>
-        <span class="agent-loop-pill">Decompose → Retrieve → Cross-Examine → Evaluate → Verify → Synthesis</span>
+        <span class="agent-loop-pill">Research desk · source-aware reasoning</span>
       </div>
 
       <h2 class="agent-card-title">Claim to investigate</h2>
-      <p class="agent-card-desc">Enter any controversial claim or proposition. Veritas will audit empirical research, cross-examine opposing literature, resolve source contradictions, and synthesize a peer-reviewed executive verdict.</p>
+      <p class="agent-card-desc">Explore a claim, compare sources on both sides, and inspect the evidence behind an AI-generated assessment.</p>
+
+      <div class="agent-method-row" aria-label="Investigation method">
+        <span><b>01</b> Break the claim down</span>
+        <span><b>02</b> Compare the evidence</span>
+        <span><b>03</b> Explain the uncertainty</span>
+      </div>
 
       <div class="agent-input-group">
         <input type="text" id="agent-claim-input" class="agent-text-input" placeholder="e.g. Social media should be banned for people under 18." value="Social media should be banned for people under 18.">
@@ -948,7 +984,9 @@
     <!-- Active Investigation Workspace -->
     <div class="agent-workspace hidden" id="agent-workspace">
       <!-- Left Panel: Live Execution Trace -->
-      <div class="glass-card agent-trace-panel">
+      <details class="glass-card agent-trace-panel" id="agent-activity" open>
+        <summary>Investigation activity <span>Steps, sources, and research progress</span></summary>
+        <div class="agent-activity-content">
         <div class="agent-panel-header">
           <div>
             <h3 class="section-heading">Live trace</h3>
@@ -960,7 +998,7 @@
         <div class="agent-metrics-bar">
           <div class="metric-chip">
             <span class="metric-label">Steps</span>
-            <span class="metric-val" id="agent-step-val">0 / 8</span>
+            <span class="metric-val" id="agent-step-val">0 / 10</span>
           </div>
           <div class="metric-chip">
             <span class="metric-label">Confidence</span>
@@ -1005,6 +1043,7 @@
         </div>
       </div>
 
+        </details>
       <!-- Right Panel: Investigation State & Final Outcome -->
       <div class="glass-card agent-output-panel">
         <div class="agent-panel-header">
@@ -1028,7 +1067,10 @@
         <!-- Evidence Board -->
         <div class="agent-section-block">
           <div class="block-header-row">
-            <h4 class="block-label">Sources, cross-examined</h4>
+            <div>
+              <h4 class="block-label">Sources, cross-examined</h4>
+              <p class="evidence-section-note">Read the finding first, then open the source to inspect the full context.</p>
+            </div>
             <div class="evidence-filter-bar">
               <button type="button" class="filter-tab active" data-filter="all">All</button>
               <button type="button" class="filter-tab" data-filter="supporting">Supporting</button>
@@ -1080,6 +1122,156 @@
           </ul>
         </div>
       </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ CLASSROOM ============ -->
+<section class="screen" data-screen="classroom" id="screen-classroom">
+  <header class="subbar">
+    <button type="button" class="back-btn" data-nav="home">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Back
+    </button>
+    <h1 class="subbar-title">Classroom</h1>
+    <span class="subbar-spacer"></span>
+  </header>
+
+  <div class="classroom-wrap">
+    <div class="classroom-intro" id="classroom-intro">
+      <span class="rank-badge">Club workspace</span>
+      <h2>Practise together, improve together.</h2>
+      <p>Create a private cohort for your club or class, then invite students with a simple code.</p>
+    </div>
+
+    <div class="classroom-actions" id="classroom-actions">
+      <button type="button" class="cta-btn" id="classroom-create-btn">Create a cohort</button>
+      <button type="button" class="ghost-btn" id="classroom-org-btn">Create an organisation</button>
+      <button type="button" class="ghost-btn" id="classroom-join-btn">Join with a code</button>
+    </div>
+
+    <form class="glass-card classroom-form hidden" id="classroom-org-form">
+      <div class="classroom-form-head">
+        <div><span class="classroom-eyebrow">Club workspace</span><h3>Create an organisation</h3></div>
+        <button type="button" class="icon-btn classroom-close-btn" data-close-form="org" aria-label="Close organisation form">×</button>
+      </div>
+      <label class="classroom-field"><span>Organisation name</span>
+        <input id="classroom-org-name-input" type="text" maxlength="120" placeholder="e.g. Veritas MUN Society" required>
+      </label>
+      <button type="submit" class="cta-btn w-full" id="classroom-org-submit">Create organisation</button>
+    </form>
+
+    <form class="glass-card classroom-form hidden" id="classroom-create-form">
+      <div class="classroom-form-head">
+        <div>
+          <span class="classroom-eyebrow">New cohort</span>
+          <h3>Create a cohort</h3>
+        </div>
+        <button type="button" class="icon-btn classroom-close-btn" data-close-form="create" aria-label="Close create form">×</button>
+      </div>
+      <label class="classroom-field">
+        <span>Classroom name</span>
+        <input id="classroom-name-input" type="text" maxlength="80" placeholder="e.g. MUN Beginners — Autumn 2026" required>
+      </label>
+      <label class="classroom-field">
+        <span>Short description <em>optional</em></span>
+        <textarea id="classroom-description-input" maxlength="240" rows="3" placeholder="What will this cohort practise?"></textarea>
+      </label>
+      <label class="classroom-field"><span>Organisation <em>optional</em></span>
+        <select id="classroom-org-input"><option value="">No organisation</option></select>
+      </label>
+      <button type="submit" class="cta-btn w-full" id="classroom-create-submit">Create cohort</button>
+    </form>
+
+    <form class="glass-card classroom-form hidden" id="classroom-join-form">
+      <div class="classroom-form-head">
+        <div>
+          <span class="classroom-eyebrow">Student access</span>
+          <h3>Join a classroom</h3>
+        </div>
+        <button type="button" class="icon-btn classroom-close-btn" data-close-form="join" aria-label="Close join form">×</button>
+      </div>
+      <label class="classroom-field">
+        <span>Invite code</span>
+        <input id="classroom-code-input" type="text" maxlength="8" placeholder="AB12CD34" autocomplete="off" autocapitalize="characters" required>
+      </label>
+      <p class="classroom-form-hint">Ask your coach for the eight-character code.</p>
+      <button type="submit" class="cta-btn w-full" id="classroom-join-submit">Join classroom</button>
+    </form>
+
+    <div class="classroom-list-section" id="classroom-list-section">
+      <div class="classroom-section-head">
+        <h3 class="section-heading">Your classrooms</h3>
+        <span class="classroom-count" id="classroom-count">0</span>
+      </div>
+      <div class="classroom-list" id="classroom-list">
+        <div class="classroom-empty" id="classroom-empty">
+          <div class="classroom-empty-mark">+</div>
+          <strong>No classrooms yet</strong>
+          <span>Create one for your club, or join with a coach's code.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="glass-card classroom-detail hidden" id="classroom-detail">
+      <div class="classroom-detail-head">
+        <button type="button" class="back-btn" id="classroom-detail-back">← All classrooms</button>
+        <span class="classroom-role" id="classroom-detail-role">Coach</span>
+      </div>
+      <div class="classroom-detail-title-row">
+        <div>
+          <span class="classroom-eyebrow">Private cohort</span>
+          <h2 id="classroom-detail-name">Classroom</h2>
+          <p id="classroom-detail-description">—</p>
+        </div>
+        <div class="classroom-invite-box">
+          <span>Invite code</span>
+          <strong id="classroom-detail-code">--------</strong>
+          <button type="button" class="ghost-btn" id="classroom-copy-code">Copy code</button>
+        </div>
+      </div>
+      <div class="classroom-members-head">
+        <h3 class="section-heading">Members</h3>
+        <span id="classroom-member-count">0 members</span>
+      </div>
+      <div class="classroom-members" id="classroom-members"></div>
+
+      <div class="classroom-detail-actions" id="classroom-detail-actions">
+        <button type="button" class="cta-btn" id="classroom-invite-btn">Invite students</button>
+        <button type="button" class="ghost-btn" id="classroom-assignment-btn">New assignment</button>
+        <button type="button" class="ghost-btn danger-btn" id="classroom-archive-btn">Archive cohort</button>
+      </div>
+
+      <form class="classroom-form classroom-inline-form hidden" id="classroom-invite-form">
+        <div class="classroom-form-head"><div><span class="classroom-eyebrow">Invite</span><h3>Invite a student</h3></div>
+          <button type="button" class="icon-btn classroom-close-btn" data-close-form="invite" aria-label="Close invite form">×</button></div>
+        <label class="classroom-field"><span>Email <em>optional</em></span>
+          <input id="classroom-invite-email" type="email" placeholder="student@example.com"></label>
+        <p class="classroom-form-hint">Generate a private link. If an email is provided, your email app will open a ready-to-send invitation.</p>
+        <button type="submit" class="cta-btn w-full" id="classroom-invite-submit">Generate invite</button>
+      </form>
+
+      <form class="classroom-form classroom-inline-form hidden" id="classroom-assignment-form">
+        <div class="classroom-form-head"><div><span class="classroom-eyebrow">Coach tools</span><h3>Create an assignment</h3></div>
+          <button type="button" class="icon-btn classroom-close-btn" data-close-form="assignment" aria-label="Close assignment form">×</button></div>
+        <label class="classroom-field"><span>Type</span><select id="classroom-assignment-kind"><option value="debate">Debate</option><option value="drill">Skill drill</option><option value="position_paper">Position paper</option></select></label>
+        <label class="classroom-field"><span>Title</span><input id="classroom-assignment-title" maxlength="120" placeholder="e.g. Opening statement drill" required></label>
+        <label class="classroom-field"><span>Instructions</span><textarea id="classroom-assignment-instructions" maxlength="8000" rows="4" placeholder="What should students submit?"></textarea></label>
+        <div class="classroom-field-grid"><label class="classroom-field"><span>Deadline <em>optional</em></span><input id="classroom-assignment-due" type="datetime-local"></label><label class="classroom-field"><span>Attempts</span><input id="classroom-assignment-attempts" type="number" min="1" max="10" value="1"></label></div>
+        <button type="submit" class="cta-btn w-full" id="classroom-assignment-submit">Create assignment</button>
+      </form>
+
+      <div class="classroom-assignments-head"><h3 class="section-heading">Assignments</h3><span id="classroom-assignment-count">0</span></div>
+      <div class="classroom-assignments" id="classroom-assignments"></div>
+
+      <form class="classroom-form classroom-inline-form hidden" id="classroom-submission-form">
+        <div class="classroom-form-head"><div><span class="classroom-eyebrow">Student work</span><h3 id="classroom-submission-title">Submit work</h3></div>
+          <button type="button" class="icon-btn classroom-close-btn" data-close-form="submission" aria-label="Close submission form">×</button></div>
+        <p class="classroom-form-hint" id="classroom-submission-instructions"></p>
+        <textarea id="classroom-submission-content" maxlength="30000" rows="8" placeholder="Write your response here…" required></textarea>
+        <button type="submit" class="cta-btn w-full" id="classroom-submission-submit">Submit work</button>
+      </form>
+      <div class="classroom-submissions hidden" id="classroom-submissions"></div>
     </div>
   </div>
 </section>
@@ -1166,5 +1358,6 @@
 <script src="appwrite-config.js"></script>
 <script src="avatar.js"></script>
 <script src="agentic-investigation.js"></script>
+<script src="classroom.js"></script>
 </body>
 </html>

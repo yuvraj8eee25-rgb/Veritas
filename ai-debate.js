@@ -108,6 +108,7 @@ function setBot(level) {
   currentBot = level;
   document.querySelectorAll("#aidebate-bot-row .bot-card").forEach((el) => {
     el.classList.toggle("active", el.dataset.level === level);
+    el.setAttribute("aria-pressed", String(el.dataset.level === level));
   });
 }
 
@@ -240,6 +241,7 @@ function updateAiWordCount() {
 
 function renderTranscript() {
   const wrap = document.getElementById("aidebate-transcript");
+  const previousTurns = new Set([...wrap.querySelectorAll("[id]")].map(el => el.id));
   wrap.innerHTML = "";
   if (!transcript.length) {
     const hint = document.createElement("div");
@@ -264,6 +266,7 @@ function renderTranscript() {
     const bubble = document.createElement("div");
     bubble.className = "debate-bubble " + (mine ? "mine" : "theirs");
     bubble.id = `aidebate-turn-${i}`;
+    if (!previousTurns.has(bubble.id)) bubble.classList.add("new-message");
     bubble.innerHTML = `<div class="debate-bubble-meta">${meta}</div><div>${escapeHtml(t.text)}</div>`;
     wrap.appendChild(bubble);
   });
@@ -305,6 +308,11 @@ function renderAiTurnLog() {
 }
 
 function updateScoreboard() {
+  const status = document.getElementById("aidebate-live-status");
+  if (status) {
+    status.textContent = debateOver ? (awaitingAi ? "Referee reviewing your arguments…" : "Debate complete") : awaitingAi ? "Opponent responding — your argument has been sent." : `Your turn — argument ${Math.min(userTurnsSoFar + 1, MAX_USER_TURNS)} of ${MAX_USER_TURNS}`;
+    status.dataset.state = awaitingAi ? "waiting" : debateOver ? "complete" : "ready";
+  }
   const pill = document.getElementById("aidebate-turn-pill");
   pill.textContent = debateOver ? "Debate over" : `Turn ${userTurnsSoFar + 1} of ${MAX_USER_TURNS}`;
   pill.className = "debate-turn-pill " + (debateOver ? "" : "mine");
@@ -316,6 +324,8 @@ function setWaiting(isWaiting) {
   awaitingAi = isWaiting;
   document.getElementById("aidebate-composer").classList.toggle("hidden", isWaiting);
   document.getElementById("aidebate-waiting").classList.toggle("hidden", !isWaiting);
+  if (debateOver) document.getElementById("aidebate-composer").classList.add("hidden");
+  updateScoreboard();
 }
 
 async function sendUserTurn() {
@@ -471,9 +481,16 @@ async function finishAiDebate() {
   setWaiting(false);
   document.getElementById("aidebate-waiting-message").textContent = "The AI opponent is drafting a reply…";
   renderVerdict(verdict, usedFallback);
+  window.classroomActivityComplete?.('ai_debate', {
+    topic: currentTopic,
+    transcript: transcript.map(t => ({ speaker: t.speaker, text: t.text })),
+    verdict, estimated: usedFallback
+  });
 }
 
 function renderVerdict(verdict, usedFallback) {
+  const status = document.getElementById("aidebate-live-status");
+  if (status) { status.textContent = usedFallback ? "Estimated feedback ready — AI referee unavailable" : "Feedback ready — review your strongest points and next steps."; status.dataset.state = "complete"; }
   const { debaterScore, aiScore, winner, summary, turnFeedback, devilsAdvocate } = verdict;
 
   const titleEl = document.getElementById("aidebate-ended-title");
@@ -489,10 +506,12 @@ function renderVerdict(verdict, usedFallback) {
   const feedbackList = document.getElementById("aidebate-feedback-list");
   feedbackList.innerHTML = "";
   (turnFeedback || []).forEach((f) => {
+    const original = transcript.filter(t => t.speaker === "user")[Number(f.turn) - 1];
     const item = document.createElement("div");
     item.className = "aidebate-feedback-item";
     item.innerHTML = `
       <span class="aidebate-feedback-turn">Your turn ${f.turn}</span>
+      ${original ? `<details class="feedback-original"><summary>Review your argument</summary><blockquote>${escapeHtml(original.text)}</blockquote></details>` : ""}
       <p><strong>Logic:</strong> ${escapeHtml(f.logic)}</p>
       <p><strong>Evidence:</strong> ${escapeHtml(f.evidence)}</p>
       <p><strong>Responsiveness:</strong> ${escapeHtml(f.responsiveness)}</p>
@@ -502,6 +521,7 @@ function renderVerdict(verdict, usedFallback) {
 
   const devilCard = document.getElementById("aidebate-devil-card");
   lastDevilsAdvocate = devilsAdvocate || null;
+  document.getElementById("aidebate-practise-feedback-btn").classList.toggle("hidden", !devilsAdvocate?.missedPoint);
   if (devilsAdvocate && devilsAdvocate.missedPoint) {
     document.getElementById("aidebate-devil-point").textContent = devilsAdvocate.missedPoint;
     document.getElementById("aidebate-devil-challenge").textContent = devilsAdvocate.challenge || "Argue it now.";
@@ -669,5 +689,17 @@ document.getElementById("aidebate-done-btn").addEventListener("click", leaveAiDe
 document.getElementById("aidebate-devil-submit-btn").addEventListener("click", submitDevilsAdvocateDrill);
 
 window.aiDebateOpenLobby = openAiDebateLobby;
+setBot(currentBot);
+document.getElementById("aidebate-opposite-btn").addEventListener("click", () => {
+  document.getElementById("aidebate-topic-input").value = currentTopic || "";
+  setStance(currentStance === "for" ? "against" : "for");
+  window.DA.showScreen("ai-debate");
+  document.getElementById("aidebate-start-btn").focus();
+});
+document.getElementById("aidebate-practise-feedback-btn").addEventListener("click", () => {
+  const input = document.getElementById("aidebate-devil-input");
+  input.scrollIntoView({ block: "center", behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+  input.focus({ preventScroll: true });
+});
 
 })();

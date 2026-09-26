@@ -461,6 +461,7 @@ function onScreenShown(name) {
   }
   if (name === "leaderboard") renderLeaderboard();
   if (name === "daily") renderDailyDetail();
+  if (name === "classroom" && window.classroomOpen) window.classroomOpen();
   if (name === "multiplayer") {
     if (window.mpOpenLobby) {
       window.mpOpenLobby();
@@ -1199,7 +1200,24 @@ document.getElementById("summary-home-btn").addEventListener("click", () => {
    12. PROFILE
    --------------------------------------------------------- */
 
+function renderProfileWeek() {
+  const chart = document.getElementById("profile-week-chart");
+  if (!chart) return;
+  const days = Array.from({length: 14}, (_, i) => {
+    const date = new Date();
+    date.setUTCDate(date.getUTCDate() - (13 - i));
+    return { date, count: Math.max(0, Number(state.activity[date.toISOString().slice(0, 10)]) || 0) };
+  });
+  const recent = days.slice(7);
+  const total = recent.reduce((sum, day) => sum + day.count, 0);
+  const previous = days.slice(0, 7).reduce((sum, day) => sum + day.count, 0);
+  const peak = Math.max(1, ...recent.map(day => day.count));
+  chart.innerHTML = recent.map(({date, count}) => `<div class="profile-day"><span>${count}</span><div class="profile-day-track"><div style="height:${count / peak * 100}%"></div></div><span>${date.toLocaleDateString(undefined, {weekday:'short', timeZone:'UTC'})}</span></div>`).join('');
+  document.getElementById("profile-week-summary").textContent = total ? `${total} activities · ${recent.filter(day => day.count > 0).length} active days · ${total === previous ? 'same as' : Math.abs(total - previous) + (total > previous ? ' more than' : ' fewer than')} the previous seven days.` : 'Your next completed activity starts this week’s chart.';
+}
+
 function renderProfile() {
+  renderProfileWeek();
   const nameEl = document.getElementById("profile-display-name");
   if (nameEl) nameEl.textContent = cachedProfile.displayName || "Debater";
 

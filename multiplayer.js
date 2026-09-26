@@ -613,6 +613,7 @@ function renderDebateRoom() {
 
   /* --- Transcript --------------------------------------------------- */
   const wrap = document.getElementById("debate-transcript");
+  const previousTurns = new Set([...wrap.querySelectorAll("[id]")].map(el => el.id));
   wrap.innerHTML = "";
   if (!turns.length) {
     const hint = document.createElement("div");
@@ -637,6 +638,7 @@ function renderDebateRoom() {
     const bubble = document.createElement("div");
     bubble.className = "debate-bubble " + (mine ? "mine" : "theirs");
     bubble.id = `debate-turn-${i}`;
+    if (!previousTurns.has(bubble.id)) bubble.classList.add("new-message");
     bubble.innerHTML = `<div class="debate-bubble-meta">${meta}</div><div>${escapeHtml(t.text)}</div>`;
     wrap.appendChild(bubble);
   });
@@ -665,6 +667,8 @@ function renderDebateRoom() {
   const myTurn = whoseTurnUid === myUid;
   pill.textContent = myTurn ? "Your turn" : `${opponentName}'s turn`;
   pill.className = "debate-turn-pill " + (myTurn ? "mine" : "theirs");
+  const status = document.getElementById("debate-live-status");
+  if (status) { status.textContent = myTurn ? "Your turn — make your next argument." : `${opponentName}'s turn — waiting for their argument.`; status.dataset.state = myTurn ? "ready" : "waiting"; }
   composer.classList.toggle("hidden", !myTurn);
   waiting.classList.toggle("hidden", myTurn);
   document.getElementById("debate-waiting-message").textContent = myTurn
@@ -975,6 +979,10 @@ function showDebateEnded() {
   const panel = document.getElementById("debate-ended-panel");
   const firstShow = panel.classList.contains("hidden");
   if (firstShow) {
+    window.classroomActivityComplete?.('live_debate', {
+      id: currentDebateId,
+      transcript: (currentDebateData?.turns || []).map(t => ({ uid: t.uid, text: t.text }))
+    });
     panel.classList.remove("hidden");
     window.DA.awardXp(60);
     window.DA.toast("+60 XP for completing a live debate!");
@@ -991,6 +999,8 @@ let xpBonusAwarded = false;
 
 function renderRefereeVerdict() {
   const referee = getRefereeVerdict(currentDebateData || {});
+  const status = document.getElementById("debate-live-status");
+  if (status) { status.textContent = referee.pending ? "Debate complete — referee reviewing arguments…" : "Feedback ready — review the verdict below."; status.dataset.state = referee.pending ? "waiting" : "complete"; }
   // The completion XP used to be flat, so winning and being flattened paid the
   // same. The win bonus lands once, when the real verdict arrives.
   if (!referee.pending && !xpBonusAwarded && currentDebateData && currentDebateData.aiVerdict) {
