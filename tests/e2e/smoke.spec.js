@@ -53,6 +53,19 @@ test("sign-in validation, successful mocked sign-in, and offline practice persis
   expect(savedXp).toBe(42);
 });
 
+test("auth card stays centered when the app sidebar is hidden", async ({ page }) => {
+  await mockSupabase(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/");
+  await expect(page.locator("#screen-auth")).toHaveClass(/active/, { timeout: 8_000 });
+
+  const alignment = await page.locator(".auth-card").evaluate(element => {
+    const rect = element.getBoundingClientRect();
+    return Math.abs((rect.left + rect.width / 2) - (window.innerWidth / 2));
+  });
+  expect(alignment).toBeLessThanOrEqual(1);
+});
+
 test("major debate, evidence, and Classroom screens pass automated accessibility scans", async ({ page }) => {
   await signIn(page);
   for (const [nav, screen] of [["ai-debate", "ai-debate"], ["investigation", "investigation"], ["classroom", "classroom"]]) {

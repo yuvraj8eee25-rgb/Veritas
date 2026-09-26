@@ -1180,13 +1180,15 @@ function updateUIOnTrace(state, event) {
       verdictCard.classList.remove("hidden");
       const conf = state.final_conclusion.confidence;
       const verdict = state.final_conclusion.verdict;
+      const normalizedVerdict = verdict.toLowerCase();
+      const isSupported = normalizedVerdict.includes("supported") && !normalizedVerdict.includes("not") && !normalizedVerdict.includes("partial");
+      const isPartial = normalizedVerdict.includes("partial") || normalizedVerdict.includes("conflict") || normalizedVerdict.includes("insufficient");
+      verdictCard.dataset.verdictTone = isSupported ? "support" : isPartial ? "mixed" : "challenge";
 
       // Verdict badge: colour-code by verdict type
       const verdictBadge = document.getElementById("agent-verdict-badge");
       if (verdictBadge) {
         verdictBadge.textContent = verdict.toUpperCase();
-        const isSupported = verdict.toLowerCase().includes("supported") && !verdict.toLowerCase().includes("not") && !verdict.toLowerCase().includes("partial");
-        const isPartial   = verdict.toLowerCase().includes("partial") || verdict.toLowerCase().includes("conflict") || verdict.toLowerCase().includes("insufficient");
         verdictBadge.style.background = isSupported ? "rgba(82,160,119,0.18)" : isPartial ? "rgba(224,159,62,0.18)" : "rgba(217,107,82,0.18)";
         verdictBadge.style.color      = isSupported ? "var(--green)" : isPartial ? "var(--amber)" : "var(--magenta)";
         verdictBadge.style.borderColor= isSupported ? "var(--green)" : isPartial ? "var(--amber)" : "var(--magenta)";

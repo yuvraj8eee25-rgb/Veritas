@@ -2612,12 +2612,19 @@ body { position: relative; }
 /* =========================================================
    Authentication Screen Styles
    ========================================================= */
+#screen-auth {
+  /* The sidebar is hidden on auth, so center this screen in the full viewport. */
+  left: 0;
+  max-width: none;
+  margin: 0;
+}
+
 .auth-wrap {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 100vh;
+  min-height: 100%;
   padding: 40px var(--safe-r) calc(40px + var(--safe-b)) var(--safe-l);
   box-sizing: border-box;
 }
@@ -3832,6 +3839,8 @@ body { position: relative; }
 }
 
 .agent-verdict-card {
+  --verdict-accent: var(--amber);
+  --verdict-accent-rgb: var(--amber-rgb);
   background: linear-gradient(135deg, rgba(82,160,119,0.06) 0%, var(--bg-page) 50%);
   border: 1px solid var(--green);
   border-radius: var(--radius-lg);
@@ -3840,6 +3849,21 @@ body { position: relative; }
   flex-direction: column;
   gap: 14px;
   animation: fadeSlideIn 0.4s ease both;
+}
+
+.agent-verdict-card[data-verdict-tone="support"] {
+  --verdict-accent: var(--green);
+  --verdict-accent-rgb: var(--green-rgb);
+}
+
+.agent-verdict-card[data-verdict-tone="mixed"] {
+  --verdict-accent: var(--amber);
+  --verdict-accent-rgb: var(--amber-rgb);
+}
+
+.agent-verdict-card[data-verdict-tone="challenge"] {
+  --verdict-accent: var(--magenta);
+  --verdict-accent-rgb: var(--magenta-rgb);
 }
 
 .verdict-header {
@@ -3867,20 +3891,43 @@ body { position: relative; }
 }
 
 .verdict-title {
-  font-size: 0.72rem;
-  font-weight: 700;
-  color: var(--text-tertiary);
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: var(--verdict-accent);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.09em;
   margin: 0;
 }
 
+.verdict-title::before {
+  content: "";
+  width: 18px;
+  height: 3px;
+  flex: 0 0 auto;
+  border-radius: 99px;
+  background: var(--verdict-accent);
+}
+
 .verdict-text {
-  font-family: var(--font-serif);
-  font-size: 1.05rem;
+  max-width: 82ch;
+  padding: 18px 21px;
+  border: 1px solid rgba(var(--verdict-accent-rgb), 0.3);
+  border-left: 4px solid var(--verdict-accent);
+  border-radius: var(--radius-md);
+  background: linear-gradient(105deg, rgba(var(--verdict-accent-rgb), 0.13), rgba(var(--verdict-accent-rgb), 0.055) 58%, rgba(var(--verdict-accent-rgb), 0.025));
+  font-family: var(--font-body);
+  font-size: clamp(1.05rem, 0.98rem + 0.28vw, 1.18rem);
+  font-weight: 500;
   color: var(--ink);
-  line-height: 1.7;
+  line-height: 1.75;
   margin: 0;
+}
+
+@media (max-width: 640px) {
+  .verdict-text { padding: 15px 16px; }
 }
 
 /* Animated confidence bar */
@@ -4848,4 +4895,66 @@ button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); 
 @media (prefers-reduced-motion: reduce) {
   .sidebar-link:hover, .hero-btn-primary:hover, .cta-btn:hover,
   .debate-card:hover, .cw-card:hover { transform: none; }
+}
+
+/* Palette hierarchy: keep the midnight/periwinkle identity, then use a quiet
+   periwinkle wash to separate cards from the page. Reserve brighter hues for
+   values, actions, rewards, and evidence outcomes so important information
+   stands out without turning every surface into an accent block. */
+:root {
+  --surface-card: linear-gradient(rgba(var(--accent-rgb), .035), rgba(var(--accent-rgb), .035)), var(--bg-panel);
+  --surface-card-hover: linear-gradient(rgba(var(--accent-rgb), .075), rgba(var(--accent-rgb), .075)), var(--bg-muted);
+  --border-card: rgba(var(--accent-rgb), .16);
+  --border-card-hover: rgba(var(--accent-rgb), .42);
+}
+
+.glass-card,
+.mode-card,
+.stat-chip,
+.cw-card,
+.cw-stats > div {
+  background: var(--surface-card);
+  border-color: var(--border-card);
+}
+
+.mode-card:hover,
+.stat-chip:hover {
+  background: var(--surface-card-hover);
+  border-color: var(--border-card-hover);
+}
+
+.stat-chip-val,
+.xp-count,
+.cw-stats strong {
+  color: var(--accent);
+}
+
+.streak-num { color: var(--amber); }
+
+.section-heading {
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-color: rgba(var(--accent-rgb), .42);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 7px;
+}
+
+.agent-verdict-card {
+  border-color: rgba(var(--verdict-accent-rgb), .64);
+  background:
+    linear-gradient(135deg, rgba(var(--verdict-accent-rgb), .09), transparent 58%),
+    var(--bg-panel);
+}
+
+.verdict-badge {
+  background: rgba(var(--verdict-accent-rgb), .15);
+  color: var(--verdict-accent);
+  border-color: rgba(var(--verdict-accent-rgb), .72);
+}
+
+.confidence-bar-value { color: var(--verdict-accent); }
+.confidence-bar-fill { background: var(--verdict-accent); }
+
+@media (prefers-reduced-motion: reduce) {
+  .mode-card, .stat-chip { transition: none; }
 }
