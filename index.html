@@ -104,24 +104,31 @@
     <nav class="topbar-actions">
       <button type="button" class="icon-btn" data-nav="investigation" aria-label="Agentic Investigation">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="2"/><path d="M12 8v8M8 12h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        <span class="mobile-nav-label" aria-hidden="true">Evidence</span>
       </button>
       <button type="button" class="icon-btn" data-nav="ai-debate" aria-label="Debate the AI">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 5H20V16H9L4 20V16V5Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="9" cy="10.5" r="1.2" fill="currentColor"/><circle cx="12" cy="10.5" r="1.2" fill="currentColor"/><circle cx="15" cy="10.5" r="1.2" fill="currentColor"/></svg>
+        <span class="mobile-nav-label" aria-hidden="true">Debate</span>
       </button>
       <button type="button" class="icon-btn" data-nav="multiplayer" aria-label="Multiplayer">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M6 4L18 20M18 4L6 20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="6" cy="4" r="2" fill="currentColor"/><circle cx="18" cy="20" r="2" fill="currentColor"/><circle cx="18" cy="4" r="2" fill="currentColor"/><circle cx="6" cy="20" r="2" fill="currentColor"/></svg>
+        <span class="mobile-nav-label" aria-hidden="true">Live 1v1</span>
       </button>
       <button type="button" class="icon-btn" data-nav="daily" aria-label="Daily Challenge">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 2L14.5 8.5L21 11L14.5 13.5L12 20L9.5 13.5L3 11L9.5 8.5L12 2Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+        <span class="mobile-nav-label" aria-hidden="true">Daily</span>
       </button>
       <button type="button" class="icon-btn" data-nav="leaderboard" aria-label="Leaderboard">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M8 21V10M8 10L4 13M8 10L12 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 21V3M16 3L12 6M16 3L20 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="mobile-nav-label" aria-hidden="true">Ranks</span>
       </button>
       <button type="button" class="icon-btn" data-nav="profile" aria-label="Profile">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="2"/><path d="M4 20C4 16.134 7.582 13 12 13C16.418 13 20 16.134 20 20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        <span class="mobile-nav-label" aria-hidden="true">Profile</span>
       </button>
       <button type="button" class="icon-btn" data-nav="classroom" aria-label="Classroom">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H17a3 3 0 0 1 3 3v13a2 2 0 0 1-2 2H6.5A2.5 2.5 0 0 1 4 18.5v-13Z" stroke="currentColor" stroke-width="2"/><path d="M8 7h8M8 11h8M8 15h5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        <span class="mobile-nav-label" aria-hidden="true">Classroom</span>
       </button>
     </nav>
   </header>
@@ -1120,10 +1127,12 @@
             <span class="reading-time-badge" id="agent-reading-badge">⏱ ~2 min reading audit</span>
           </div>
 
-          <h4 class="verdict-sources-title">Sources (<span id="agent-sources-count">0</span>)</h4>
-          <ul class="verdict-sources-list" id="agent-verdict-sources-list">
-            <!-- Sources injected here -->
-          </ul>
+          <details class="verdict-sources-details">
+            <summary>Sources used (<span id="agent-sources-count">0</span>)</summary>
+            <ul class="verdict-sources-list" id="agent-verdict-sources-list">
+              <!-- Sources injected here -->
+            </ul>
+          </details>
         </div>
       </div>
     </div>
