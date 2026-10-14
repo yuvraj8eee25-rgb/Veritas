@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#080d18">
+  <meta name="description" content="Learn what Veritas offers and how it helps learners build stronger debate skills.">
+  <title>About Veritas — Debate, judged</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root { color-scheme: dark; --page:#080d18; --panel:#111a2b; --line:rgba(237,243,255,.12); --ink:#edf3ff; --muted:#aebbd2; --accent:#8ea7ff; }
+    * { box-sizing:border-box; }
+    body { margin:0; min-height:100vh; background:var(--page); color:var(--ink); font:16px/1.7 'Plus Jakarta Sans',sans-serif; }
+    main { width:min(900px,calc(100% - 40px)); margin:0 auto; padding:32px 0 72px; }
+    header { display:flex; align-items:center; justify-content:space-between; gap:20px; padding:12px 0 64px; }
+    .brand { color:var(--ink); font-size:.85rem; font-weight:700; letter-spacing:.18em; text-decoration:none; }
+    .back { color:var(--accent); font-size:.9rem; font-weight:600; text-decoration:none; }
+    .eyebrow { color:var(--accent); font-size:.75rem; font-weight:700; letter-spacing:.16em; text-transform:uppercase; }
+    h1,h2 { font-family:'Newsreader',Georgia,serif; font-weight:500; line-height:1.12; }
+    h1 { max-width:760px; margin:12px 0 20px; font-size:clamp(2.8rem,8vw,5.5rem); letter-spacing:-.035em; }
+    .lead { max-width:700px; color:var(--muted); font-size:1.15rem; }
+    .panel { margin-top:40px; padding:30px; border:1px solid var(--line); border-radius:12px; background:var(--panel); }
+    h2 { margin:0 0 12px; font-size:2rem; }
+    p { margin:0 0 16px; color:var(--muted); }
+    p:last-child { margin-bottom:0; }
+    .features { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; margin-top:24px; }
+    .feature { padding:20px; border:1px solid var(--line); border-radius:10px; }
+    .feature h3 { margin:0 0 7px; font-size:1rem; }
+    .feature p { font-size:.92rem; }
+    @media(max-width:600px) { main { width:min(100% - 28px,900px); padding-top:18px; } header { padding-bottom:42px; } .panel { padding:22px; } .features { grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <a class="brand" href="/">VERITAS</a>
+      <a class="back" href="/">Back to practice <span aria-hidden="true">→</span></a>
+    </header>
+    <section aria-labelledby="about-title">
+      <span class="eyebrow">About Veritas</span>
+      <h1>Build stronger arguments through practice.</h1>
+      <p class="lead">Veritas is an online platform for learning and practising debate. It gives learners a place to shape arguments, test ideas, and grow their confidence with structured practice and useful feedback.</p>
+    </section>
+    <section class="panel" aria-labelledby="purpose-title">
+      <h2 id="purpose-title">Why Veritas exists</h2>
+      <p>Good debate is more than having a quick answer. It takes clear reasoning, reliable evidence, and the ability to understand another point of view. Veritas makes it easier to practise those skills regularly, reflect on the result, and see where to improve.</p>
+      <p>The Evidence Lab supports this goal by helping learners break a claim into questions, explore relevant sources, and compare evidence from different perspectives. It is designed to encourage careful thinking about information behind an argument.</p>
+    </section>
+    <section class="panel" aria-labelledby="tools-title">
+      <h2 id="tools-title">Ways to learn and compete</h2>
+      <div class="features">
+        <article class="feature"><h3>Debate the AI</h3><p>Practise making a case in a guided debate, then use feedback to strengthen your next argument.</p></article>
+        <article class="feature"><h3>Evidence Lab</h3><p>Investigate a claim, review sources, and compare supporting and opposing evidence.</p></article>
+        <article class="feature"><h3>Study and daily challenges</h3><p>Build knowledge and practise specific debate skills with topic study and short recurring challenges.</p></article>
+        <article class="feature"><h3>Live 1v1 and Classroom</h3><p>Debate real opponents, track your progress, or work through assignments and feedback in a classroom.</p></article>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
