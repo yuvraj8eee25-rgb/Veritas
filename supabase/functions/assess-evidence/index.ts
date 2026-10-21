@@ -87,25 +87,34 @@ class GeminiRequestError extends Error {
 }
 
 async function callGemini(prompt: string, maxTokens: number): Promise<string> {
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      // Evidence excerpts can take longer than a short chat prompt. Keep the
-      // server timeout below Supabase's request idle limit, while allowing a
-      // slower Gemini response to finish instead of silently falling back.
-      signal: AbortSignal.timeout(60000),
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.1,
-          maxOutputTokens: maxTokens,
-          thinkingConfig: { thinkingLevel: "minimal" },
-        },
-      }),
-    },
-  );
+  let response: Response;
+  for (let attempt = 0; ; attempt++) {
+    response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        // Evidence excerpts can take longer than a short chat prompt. Keep the
+        // server timeout below Supabase's request idle limit, while allowing a
+        // slower Gemini response to finish instead of silently falling back.
+        signal: AbortSignal.timeout(60000),
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.1,
+            maxOutputTokens: maxTokens,
+            thinkingConfig: { thinkingLevel: "minimal" },
+          },
+        }),
+      },
+    );
+    // Gemini can briefly return 503 while a model is under heavy demand. Retry
+    // just those transient responses, with short exponential backoff, so one
+    // capacity spike does not immediately force keyword-based classification.
+    if (response.status !== 503 || attempt >= 2) break;
+    const delayMs = 500 * (2 ** attempt) + Math.floor(Math.random() * 300);
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+  }
   if (!response.ok) {
     let providerMessage = "";
     try {
