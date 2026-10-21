@@ -34,27 +34,33 @@
       <span>Home</span>
     </button>
 
-    <span class="sidebar-group-label">Debate</span>
+    <span class="sidebar-group-label">Practice</span>
     <button type="button" class="sidebar-link" data-nav="ai-debate" aria-label="Debate the AI">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 5H20V16H9L4 20V16V5Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="9" cy="10.5" r="1.2" fill="currentColor"/><circle cx="12" cy="10.5" r="1.2" fill="currentColor"/><circle cx="15" cy="10.5" r="1.2" fill="currentColor"/></svg>
       <span>Debate the AI</span>
     </button>
-    <button type="button" class="sidebar-link" data-nav="multiplayer" aria-label="Multiplayer">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M6 4L18 20M18 4L6 20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="6" cy="4" r="2" fill="currentColor"/><circle cx="18" cy="20" r="2" fill="currentColor"/><circle cx="18" cy="4" r="2" fill="currentColor"/><circle cx="6" cy="20" r="2" fill="currentColor"/></svg>
-      <span>Live 1v1</span>
-    </button>
     <button type="button" class="sidebar-link" data-nav="daily" aria-label="Daily Challenge">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 2L14.5 8.5L21 11L14.5 13.5L12 20L9.5 13.5L3 11L9.5 8.5L12 2Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
-      <span>Daily challenge</span>
+      <span>Daily Challenge</span>
     </button>
-
-    <span class="sidebar-group-label">Sharpen</span>
-    <button type="button" class="sidebar-link" data-nav="investigation" aria-label="Agentic Investigation">
+    <button type="button" class="sidebar-link" data-nav="investigation" aria-label="Evidence Lab">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z" fill="currentColor"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>
-      <span>Evidence lab</span>
+      <span>Evidence Lab</span>
+    </button>
+    <button type="button" class="sidebar-link" data-nav="study" aria-label="Study">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 1 4 16.5v-11Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M4 16.5A2.5 2.5 0 0 1 6.5 14H20M8 7h8M8 10h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      <span>Study</span>
     </button>
 
     <span class="sidebar-group-label">Compete</span>
+    <button type="button" class="sidebar-link" data-nav="multiplayer" aria-label="Live 1v1">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="3" stroke="currentColor" stroke-width="1.8"/><circle cx="16" cy="8" r="3" stroke="currentColor" stroke-width="1.8"/><path d="M2.8 19c.5-3.1 2.3-4.7 5.2-4.7M21.2 19c-.5-3.1-2.3-4.7-5.2-4.7M9 17h6m-3-3v6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      <span>Live 1v1</span>
+    </button>
+
+
+
+
     <button type="button" class="sidebar-link" data-nav="leaderboard" aria-label="Leaderboard">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M8 21V10M8 10L4 13M8 10L12 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 21V3M16 3L12 6M16 3L20 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       <span>Leaderboard</span>
@@ -71,8 +77,16 @@
     </button>
   </div>
   <div class="sidebar-foot">
-    <span class="sidebar-xp-mini" id="sidebar-xp-mini">0 XP</span>
+    <span class="sidebar-foot-note">Practice · reflect · improve</span>
   </div>
+</nav>
+
+<nav class="mobile-tabbar" aria-label="Main navigation">
+  <button type="button" class="mobile-tab" data-nav="home" aria-label="Home"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11 12 4l9 7M5.5 10v10h13V10M9.5 20v-6h5v6"/></svg><span>Home</span></button>
+  <button type="button" class="mobile-tab" data-nav="ai-debate" aria-label="Debate the AI"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4V5Z"/><path d="M8 10h.01M12 10h.01M16 10h.01"/></svg><span>Practice</span></button>
+  <button type="button" class="mobile-tab" data-nav="study" aria-label="Study"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 1 4 16.5v-11Z"/><path d="M4 16.5A2.5 2.5 0 0 1 6.5 14H20M8 7h8M8 10h6"/></svg><span>Study</span></button>
+  <button type="button" class="mobile-tab" data-nav="multiplayer" aria-label="Live 1v1"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="8" r="3"/><circle cx="16" cy="8" r="3"/><path d="M3 19c.4-3 2-4.5 5-4.5M21 19c-.4-3-2-4.5-5-4.5M9 17h6m-3-3v6"/></svg><span>Live</span></button>
+  <details class="mobile-more"><summary class="mobile-tab" aria-label="More destinations"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg><span>More</span></summary><div class="mobile-more-menu" aria-label="More destinations"><button type="button" data-nav="investigation"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5M8 10.5h5M10.5 8v5"/></svg><span>Evidence Lab</span></button><button type="button" data-nav="daily"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2 2.5 7.5L22 12l-7.5 2.5L12 22l-2.5-7.5L2 12l7.5-2.5L12 2Z"/></svg><span>Daily Challenge</span></button><button type="button" data-nav="leaderboard"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19V9m0 0L2 12m3-3 3 3m8 7V5m0 0-3 3m3-3 3 3"/></svg><span>Leaderboard</span></button><button type="button" data-nav="profile"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg><span>Profile</span></button><button type="button" data-nav="classroom"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg><span>Classroom</span></button></div></details>
 </nav>
 
 <!-- ============ SPLASH ============ -->
@@ -102,7 +116,7 @@
       <span>VERITAS</span>
     </div>
     <nav class="topbar-actions">
-      <button type="button" class="icon-btn" data-nav="investigation" aria-label="Agentic Investigation">
+      <button type="button" class="icon-btn" data-nav="investigation" aria-label="Evidence Lab">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="2"/><path d="M12 8v8M8 12h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
         <span class="mobile-nav-label" aria-hidden="true">Evidence</span>
       </button>
@@ -110,8 +124,8 @@
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 5H20V16H9L4 20V16V5Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="9" cy="10.5" r="1.2" fill="currentColor"/><circle cx="12" cy="10.5" r="1.2" fill="currentColor"/><circle cx="15" cy="10.5" r="1.2" fill="currentColor"/></svg>
         <span class="mobile-nav-label" aria-hidden="true">Debate</span>
       </button>
-      <button type="button" class="icon-btn" data-nav="multiplayer" aria-label="Multiplayer">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M6 4L18 20M18 4L6 20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="6" cy="4" r="2" fill="currentColor"/><circle cx="18" cy="20" r="2" fill="currentColor"/><circle cx="18" cy="4" r="2" fill="currentColor"/><circle cx="6" cy="20" r="2" fill="currentColor"/></svg>
+      <button type="button" class="icon-btn" data-nav="multiplayer" aria-label="Live 1v1">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="3" stroke="currentColor" stroke-width="1.8"/><circle cx="16" cy="8" r="3" stroke="currentColor" stroke-width="1.8"/><path d="M2.8 19c.5-3.1 2.3-4.7 5.2-4.7M21.2 19c-.5-3.1-2.3-4.7-5.2-4.7M9 17h6m-3-3v6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
         <span class="mobile-nav-label" aria-hidden="true">Live 1v1</span>
       </button>
       <button type="button" class="icon-btn" data-nav="daily" aria-label="Daily Challenge">
@@ -139,52 +153,75 @@
     <section class="home-hero">
       <img class="hero-visual" src="imgs/classroom/debate-hero.webp" alt="Abstract illustration of two opposing ideas balanced for fair judgment" width="1774" height="887" fetchpriority="high" decoding="async">
       <div class="home-hero-main">
-        <p class="hero-greeting"><span id="home-greeting-time">Good evening</span>, <span id="home-greeting-name">Debater</span>.</p>
+        <p class="hero-greeting"><span id="home-greeting-time">Good evening</span>, <span id="home-greeting-name">Debater</span></p>
         <h1 class="hero-title">Build a stronger<br>argument today.</h1>
         <p class="hero-intro">Three turns with an AI opponent. A fresh perspective and feedback you can use.</p>
         <div class="hero-actions">
-          <button type="button" class="hero-btn hero-btn-primary" data-nav="ai-debate">Start a debate <span aria-hidden="true">↗</span></button>
-          <button type="button" class="hero-btn hero-btn-secondary" data-nav="daily">Warm up with today's drill</button>
+          <a class="hero-btn hero-btn-secondary" href="/demo/index.html">Preview the club workflow</a>
+          <button type="button" class="hero-btn hero-btn-primary" data-nav="ai-debate">Start a debate <span aria-hidden="true">→</span></button>
         </div>
-        <svg class="hero-ornament" viewBox="0 0 320 12" aria-hidden="true" focusable="false">
-          <path d="M0 6h130M190 6h130" stroke="currentColor" stroke-width="1" opacity="0.35"/>
-          <path d="M160 1l7 5-7 5-7-5z" fill="none" stroke="currentColor" stroke-width="1.2" opacity="0.6"/>
-        </svg>
+        <button type="button" class="hero-next-step" id="home-hero-next-step">Your next step: choose a short practice drill <span aria-hidden="true">↗</span></button>
       </div>
 
       <div class="hero-status">
         <div class="xp-block">
           <div class="xp-label">
-            <span class="rank-badge" id="home-rank">Novice Debater</span>
-            <span class="xp-count"><span id="home-xp-value">0</span> XP</span>
+            <span class="rank-badge" id="home-rank" title="Your rank title is based on total XP earned.">Novice Debater</span>
+            <span class="xp-count" title="XP rewards your completed drills, daily challenges, and achievements."><span id="home-xp-value">0</span> XP <span class="stat-info" aria-hidden="true">ⓘ</span></span>
           </div>
-          <div class="xp-bar"><div class="xp-bar-fill" id="home-xp-fill"></div></div>
+          <div class="xp-bar" id="home-xp-bar" role="progressbar" aria-label="Progress toward the next rank" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-describedby="home-xp-next"><div class="xp-bar-fill" id="home-xp-fill"></div></div>
           <div class="xp-sub"><span id="home-xp-next">0 XP to next rank</span></div>
         </div>
         <div class="streak-block">
-          <span class="streak-num" id="home-streak">0</span>
+          <span class="streak-num" id="home-streak" title="Consecutive days with at least one completed practice session.">0</span>
           <span class="streak-label">day streak</span>
         </div>
       </div>
     </section>
 
+    <aside class="guest-banner" id="guest-banner" aria-label="Guest account">
+      <div><strong>Exploring as a guest</strong><span>Your practice progress is saved on this device. Create an account for AI debates, research, and live matches.</span></div>
+      <button type="button" class="guest-banner-btn" data-open-auth data-auth-mode="signup">Create free account</button>
+    </aside>
+
     <!-- Statistics -->
     <section class="home-stats">
       <div class="home-stat">
-        <span class="home-stat-val" id="home-stat-rating">—</span>
-        <span class="home-stat-label">Rating</span>
+        <span class="home-stat-val" id="home-stat-rating" title="Your matchmaking rating from Live 1v1 debates." aria-label="Live debate rating">—</span>
+        <span class="home-stat-label">Live debate rating <span class="stat-info" title="A matchmaking rating based on rated Live 1v1 debates." aria-label="About live debate rating">ⓘ</span></span>
       </div>
       <div class="home-stat">
         <span class="home-stat-val" id="home-stat-winrate">—</span>
         <span class="home-stat-label">Win Rate</span>
+        <span class="home-stat-note" id="home-stat-winrate-note">Complete a rated Live 1v1 to see your win rate</span>
       </div>
       <div class="home-stat">
-        <span class="home-stat-val" id="home-stat-debates">0</span>
-        <span class="home-stat-label">Debates</span>
+        <span class="home-stat-val" id="home-stat-debates" title="Completed drill sessions saved on this device.">0</span>
+        <span class="home-stat-label">Practice runs</span>
       </div>
-      <div class="home-stat">
-        <span class="home-stat-val" id="home-stat-streak">0</span>
-        <span class="home-stat-label">Streak</span>
+    </section>
+
+    <div class="home-daily-challenge">
+      <button type="button" class="daily-strip" data-nav="daily" aria-label="Open today's daily challenge">
+        <span class="daily-strip-tag">Today’s challenge</span>
+        <span class="daily-strip-title" id="daily-title">Steelman Sprint</span>
+        <span class="daily-strip-desc" id="daily-desc">3× XP multiplier · 4 questions</span>
+        <span class="daily-strip-timer" id="daily-countdown">--:--:--</span>
+        <span class="daily-strip-cta" id="daily-cta-label">Start challenge <span aria-hidden="true">→</span></span>
+      </button>
+    </div>
+
+    <!-- Practice skill progress -->
+    <section class="home-coach" aria-label="Practice skill progress">
+      <div class="coach-skills">
+        <div class="coach-skills-heading">
+          <div>
+            <span class="coach-eyebrow">DRILL ASSESSMENT</span>
+            <h2>Drill mastery</h2>
+          </div>
+          <span class="coach-skills-note">Fresh questions and delayed reviews update mastery · XP rewards practice</span>
+        </div>
+        <div id="home-skill-list" class="coach-skill-list" aria-live="polite"></div>
       </div>
     </section>
 
@@ -219,22 +256,13 @@
               <path d="M90 100v13l-15-13"/>
             </g>
           </svg>
-          <span class="debate-card-kicker">3 turns &middot; 30s each</span>
+          <span class="debate-card-kicker">3 or 5 turns &middot; written or recorded speech</span>
           <h3>Live 1v1</h3>
-          <p>Get matched with a real opponent on a live topic. Same referee, same scoring, and your ELO on the line.</p>
+          <p>Get matched with a real opponent on a live topic. Same referee, same scoring, and your live debate rating on the line.</p>
           <span class="debate-card-go">Find an opponent</span>
         </button>
       </div>
     </section>
-
-    <!-- Daily challenge (compact strip) -->
-    <button type="button" class="daily-strip" data-nav="daily">
-      <span class="daily-strip-tag">Today</span>
-      <span class="daily-strip-title" id="daily-title">Steelman Sprint</span>
-      <span class="daily-strip-desc" id="daily-desc">3× XP multiplier · 4 questions</span>
-      <span class="daily-strip-timer" id="daily-countdown">--:--:--</span>
-      <svg class="daily-strip-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6L15 12L9 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    </button>
 
     <!-- Daily goals + achievements (rendered by arcade.js) -->
     <section class="home-section" id="arcade-quests"></section>
@@ -242,6 +270,7 @@
     <!-- Practice -->
     <section class="home-section">
       <h2 class="section-heading">Drills between debates</h2>
+      <div id="home-practice-highlight"></div>
       <div class="practice-list">
         <div class="practice-rows" id="home-mode-grid"><!-- injected --></div>
         
@@ -250,7 +279,7 @@
 
     <!-- Recent activity -->
     <section class="home-section">
-      <h2 class="section-heading">What you've been arguing</h2>
+      <h2 class="section-heading">Recent practice</h2>
       <div class="activity-list glass-card" id="home-activity-list"><!-- injected --></div>
     </section>
 
@@ -363,9 +392,26 @@
       </div>
     </div>
 
+    <section class="summary-coaching" aria-labelledby="summary-coaching-title">
+      <h2 id="summary-coaching-title">What to carry forward</h2>
+      <div class="summary-coaching-grid">
+        <article class="summary-coaching-point is-strength">
+          <span>Strength</span>
+          <p id="summary-strength-copy">Your strongest answer will appear here.</p>
+          <small id="summary-strength-detail"></small>
+        </article>
+        <article class="summary-coaching-point is-focus">
+          <span>Next to improve</span>
+          <p id="summary-improve-copy">A focused tip from this run will appear here.</p>
+          <small id="summary-improve-tip"></small>
+        </article>
+      </div>
+      <button type="button" class="cta-btn" id="summary-retry-btn">Practice this skill next</button>
+    </section>
+
     <div class="glass-card radar-card">
       <span class="radar-card-title">Skill Impact</span>
-      <canvas id="radar-canvas" width="320" height="320" role="img" aria-label="Skill impact chart showing this run's strengths across categories"></canvas>
+    <canvas id="radar-canvas" width="320" height="320" role="img" aria-label="Skill impact chart showing this run's strengths across categories" aria-describedby="summary-strength-detail"></canvas>
     </div>
 
     <div class="glass-card xp-breakdown-card">
@@ -377,7 +423,6 @@
     </div>
 
     <div class="summary-actions">
-      <button type="button" class="cta-btn" id="summary-retry-btn">Go again</button>
       <button type="button" class="ghost-btn" id="summary-home-btn">Back home</button>
     </div>
   </div>
@@ -459,7 +504,7 @@
         <div class="profile-chips">
           <span class="profile-chip profile-chip-rank" id="profile-rank">Novice Debater</span>
           <span class="profile-chip" id="profile-xp-sub">0 total XP</span>
-          <span class="profile-chip profile-chip-quiet" id="profile-elo-sub">Debate ELO: —</span>
+          <span class="profile-chip profile-chip-quiet" id="profile-elo-sub">Live rating: —</span>
         </div>
       </div>
 
@@ -473,7 +518,7 @@
     <div class="profile-stats">
       <div class="profile-stat">
         <span class="profile-stat-val" id="profile-stat-elo">—</span>
-        <span class="profile-stat-label">Debate ELO</span>
+        <span class="profile-stat-label">Live debate rating</span>
       </div>
       <div class="profile-stat">
         <span class="profile-stat-val" id="profile-stat-winrate">—</span>
@@ -485,7 +530,7 @@
       </div>
       <div class="profile-stat">
         <span class="profile-stat-val" id="profile-stat-runs">0</span>
-        <span class="profile-stat-label">Practice runs</span>
+        <span class="profile-stat-label">Sessions</span>
       </div>
       <div class="profile-stat">
         <span class="profile-stat-val" id="profile-stat-streak">0</span>
@@ -498,7 +543,7 @@
       <h3 id="profile-week-title">Your last seven days</h3>
       <p id="profile-week-summary"></p>
       <div id="profile-week-chart" class="profile-week-chart"></div>
-      <p class="profile-week-note">Recorded activity on this device. Each bar shows completed activities, not a skill score.</p>
+      <p class="profile-week-note">Counts completed sessions on this device. XP also includes bonus rewards, so the totals won’t match.</p>
     </section>
     <div class="profile-grid">
       <div class="glass-card radar-card">
@@ -522,7 +567,7 @@
             </div>
           </div>
           <div class="xp-bar"><div class="xp-bar-fill" id="profile-xp-fill"></div></div>
-          <p class="profile-week-note">Complete practice rounds and debates to earn XP. Your debate rating changes separately through multiplayer results.</p>
+          <p class="profile-week-note">XP unlocks ranks and titles. Your live debate rating changes separately through multiplayer results.</p>
         </div>
 
         <div class="glass-card profile-focus-card">
@@ -553,7 +598,8 @@
     </div>
 
     <div class="profile-actions">
-      <button type="button" class="ghost-btn" id="profile-signout-btn">Sign Out</button>
+      <button type="button" class="ghost-btn" id="profile-signin-btn" data-open-auth data-auth-mode="signup">Create account</button>
+      <button type="button" class="ghost-btn" id="profile-signout-btn" hidden>Sign Out</button>
       <button type="button" class="ghost-btn danger-ghost" id="reset-progress-btn">Reset Progress</button>
     </div>
   </div>
@@ -571,10 +617,10 @@
   </header>
   <div class="leaderboard-wrap">
     <div class="lb-tabs">
-      <button type="button" class="lb-tab active" data-lb="weekly">This Week</button>
-      <button type="button" class="lb-tab" data-lb="alltime">All-Time</button>
-      <button type="button" class="lb-tab" data-lb="elo">Debate ELO</button>
+      <button type="button" class="lb-tab active" data-lb="xp" aria-label="XP standings with sample opponents">XP · sample</button>
+      <button type="button" class="lb-tab" data-lb="elo">Live debate rating</button>
     </div>
+    <p class="lb-caption" id="lb-caption" aria-live="polite">Your XP is your real total from this device. Other names and scores here are sample standings.</p>
     <div class="lb-list" id="lb-list"><!-- injected --></div>
   </div>
 </section>
@@ -607,52 +653,92 @@
 <!-- ============ MULTIPLAYER LOBBY ============ -->
 <section class="screen" data-screen="multiplayer" id="screen-multiplayer">
   <header class="subbar">
-    <button type="button" class="back-btn" id="mp-back-btn" data-nav="home">
+    <button type="button" class="back-btn" id="mp-back-btn">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
       Back
     </button>
-    <h1 class="subbar-title">Multiplayer</h1>
+    <h1 class="subbar-title">Live 1v1</h1>
     <span class="subbar-spacer"></span>
   </header>
 
   <div class="mp-wrap" id="mp-browse-state">
     <div class="mp-topics-header">
       <div>
-        <h3 class="section-heading">🔥 Hot topics today</h3>
-        <p class="mp-hint">Pick a topic or roll the dice, then get matched with someone live.</p>
+        <h3 class="section-heading">Choose your debate topic</h3>
+        <p class="mp-hint">Pick a prompt, or join an open match and let the queue choose.</p>
       </div>
-      <button type="button" class="ghost-btn toggle-btn" id="mp-toggle-topics-btn" aria-expanded="false" aria-controls="mp-category-tabs mp-hot-topics">View topics</button>
+      <button type="button" class="ghost-btn toggle-btn" id="mp-toggle-topics-btn" aria-expanded="false" aria-controls="mp-topic-browser">Browse all topics</button>
     </div>
-    <div class="mp-topics-collapse-hint" id="mp-topics-collapse-hint">Tap to expand the curated debate topics.</div>
-    <div class="mp-category-tabs hidden" id="mp-category-tabs"></div>
-    <div class="hot-topics-list hidden" id="mp-hot-topics">
-      <div class="hot-topic-skel"></div>
-      <div class="hot-topic-skel"></div>
-      <div class="hot-topic-skel"></div>
-    </div>
+    <section class="mp-featured-section" aria-labelledby="mp-featured-title">
+      <div class="mp-section-heading-row">
+        <h4 id="mp-featured-title">Quick picks</h4>
+        <span>Choose one to set the match topic</span>
+      </div>
+      <div class="mp-featured-topics" id="mp-featured-topics">
+        <div class="hot-topic-skel"></div>
+        <div class="hot-topic-skel"></div>
+        <div class="hot-topic-skel"></div>
+      </div>
+    </section>
+
+    <section class="mp-topic-browser hidden" id="mp-topic-browser" aria-label="Browse all debate topics">
+      <div class="mp-section-heading-row">
+        <h4>All topics</h4>
+        <span>Filter by category, then select a prompt</span>
+      </div>
+      <label class="mp-topic-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></svg><span class="sr-only">Search topics</span><input id="mp-topic-search" type="search" placeholder="Search all topics…" autocomplete="off"></label>
+      <div class="mp-category-tabs" id="mp-category-tabs" aria-label="Topic categories"></div>
+      <p class="mp-category-scroll-hint">Swipe to explore categories <span aria-hidden="true">→</span></p>
+      <div class="hot-topics-list" id="mp-hot-topics">
+        <div class="hot-topic-skel"></div>
+        <div class="hot-topic-skel"></div>
+        <div class="hot-topic-skel"></div>
+      </div>
+    </section>
 
     <div class="glass-card mp-selected-card hidden" id="mp-selected-card">
       <span class="mp-selected-label">Selected topic</span>
       <p id="mp-selected-text"></p>
-      <button type="button" class="mp-clear-btn" id="mp-clear-topic">Clear</button>
+      <div class="mp-selected-actions">
+        <button type="button" class="mp-clear-btn" id="mp-change-topic">Change topic</button>
+        <button type="button" class="mp-clear-btn" id="mp-clear-topic">Clear</button>
+      </div>
     </div>
 
-    <div class="glass-card mp-rules-card">
-      <span class="mp-selected-label">How this match works</span>
+    <p class="mp-topic-state" id="mp-topic-state" role="status">No topic selected · you can still join an open match.</p>
+    <div class="mp-queue-info" id="mp-queue-info" role="status"><span class="mp-queue-dot" aria-hidden="true"></span><span id="mp-queue-type">Open match · the queue will choose a topic</span></div>
+
+    <details class="glass-card mp-rules-card mp-rules-collapsible">
+      <summary>How the match works <span>3 or 5 turns · written or recorded speech</span></summary>
       <ul class="mp-rules-list">
-        <li>Each player gets 3 turns.</li>
-        <li>30 seconds per turn to type your argument.</li>
-        <li>The AI referee scores the winner based on clarity and reasoning.</li>
+        <li>Each player gets 3 or 5 turns, according to the practice settings.</li>
+        <li>Written turns allow 3 minutes and 4,000 characters. Speech turns allow 60, 90 or 180 seconds of recording plus 3 minutes for preparation and transcript review.</li>
+        <li>The AI referee scores the debate based on clarity and reasoning.</li>
         <li>Once you send, your argument is locked in.</li>
       </ul>
-    </div>
+    </details>
 
-    <button type="button" class="cta-btn" id="mp-find-match-btn">Find Match</button>
+    <div class="training-options">
+      <label>Practice mode<select id="mp-practice-mode"><option value="written">Written (3 min per turn)</option><option value="speech">Recorded speech</option></select></label>
+      <label>Speech length<select id="mp-speech-seconds"><option value="60">60 seconds</option><option value="90" selected>90 seconds</option><option value="180">3 minutes</option></select></label>
+      <label>Turns per side<select id="mp-turns"><option value="3">3</option><option value="5">5</option></select></label>
+    </div>
+    <p class="training-note">Speech turns include 3 minutes for preparation, transcription and review. Partners are matched on the same practice settings.</p>
+    <section class="glass-card private-room-panel" id="mp-private-panel" aria-label="Private practice room">
+      <h3>Private practice</h3><p id="mp-private-context" class="training-note"></p>
+      <label>Motion<input id="mp-private-topic" maxlength="200" placeholder="Enter your debate motion"></label>
+      <div class="cw-actions"><button type="button" class="ghost-btn" id="mp-private-create">Create private room</button></div>
+      <label>Room code<input id="mp-private-code" maxlength="12" autocomplete="off" placeholder="Code from your partner"></label>
+      <div class="cw-actions"><button type="button" class="ghost-btn" id="mp-private-join">Join private room</button><button type="button" class="ghost-btn" id="mp-private-copy">Copy code</button></div>
+      <p id="mp-private-status" role="status" aria-live="polite"></p>
+    </section>
+    <button type="button" class="cta-btn" id="mp-find-match-btn">Find a public match</button>
     <p class="mp-online-note" id="mp-online-note"></p>
   </div>
 
   <div class="mp-wrap mp-searching-state hidden" id="mp-searching-state">
-    <div class="mp-radar-spinner"><span></span><span></span><span></span></div>
+    <img class="mp-search-illustration" src="imgs/debate/matchmaking.svg" alt="" width="220" height="150" decoding="async">
+    <div class="mp-radar-spinner small" aria-hidden="true"><span></span><span></span><span></span></div>
     <h3>Searching for an opponent…</h3>
     <div class="mp-search-elapsed" id="mp-search-elapsed">0:00</div>
     <p class="mp-hint" id="mp-searching-topic"></p>
@@ -675,9 +761,9 @@
     <div class="debate-body" id="debate-transcript"><!-- turns injected --></div>
 
     <div class="debate-composer" id="debate-composer">
-      <textarea id="debate-input" class="debate-textarea" placeholder="Write your argument…" maxlength="600" rows="3"></textarea>
+      <textarea id="debate-input" class="debate-textarea" placeholder="Write your argument…" maxlength="4000" rows="3"></textarea>
       <div class="composer-foot">
-        <span class="composer-count" id="debate-word-count">0 words · 600 left</span>
+        <span class="composer-count" id="debate-word-count">0 words · 4000 left</span>
         <span class="composer-hint">Ctrl/⌘ + Enter to send</span>
       </div>
       <button type="button" class="cta-btn debate-send-btn" id="debate-send-btn">Send Argument</button>
@@ -724,7 +810,7 @@
             <span class="clock-name" id="debate-opp-name">Opponent</span>
             <span class="clock-sub"><span id="debate-opp-elo">1200</span> · <span id="debate-opp-used">0:00</span> used</span>
           </span>
-          <span class="clock-time" id="debate-opp-clock">0:30</span>
+          <span class="clock-time" id="debate-opp-clock">3:00</span>
         </div>
         <div class="clock-player self" id="clock-self">
           <span class="clock-avatar" id="debate-self-avatar">Y</span>
@@ -732,7 +818,7 @@
             <span class="clock-name">You</span>
             <span class="clock-sub"><span id="debate-self-elo">1200</span> · <span id="debate-self-used">0:00</span> used</span>
           </span>
-          <span class="clock-time" id="debate-self-clock">0:30</span>
+          <span class="clock-time" id="debate-self-clock">3:00</span>
         </div>
       </div>
     </div>
@@ -773,64 +859,80 @@
   </header>
 
   <div class="mp-wrap">
-    <h3 class="section-heading">Pick any topic</h3>
-    <p class="mp-hint">Type your own topic, or grab a random one. Then argue your side against an AI opponent — a referee scores your reasoning at the end.</p>
+    <h3 class="section-heading">Pick a topic</h3>
+    <p class="mp-hint">Choose a prompt or write your own. You’ll argue one side; the AI takes the other.</p>
 
     <div class="glass-card aidebate-topic-card">
       <textarea id="aidebate-topic-input" class="debate-textarea" maxlength="200" rows="2" placeholder="e.g. Should college be free for everyone?"></textarea>
-      <button type="button" class="ghost-btn aidebate-random-btn" id="aidebate-random-btn">🎲 Surprise me</button>
+      <div class="aidebate-topic-actions">
+        <div class="aidebate-topic-suggestions" aria-label="Example topics">
+          <button type="button" class="aidebate-topic-suggestion" data-topic="Should schools ban homework?">School homework</button>
+          <button type="button" class="aidebate-topic-suggestion" data-topic="Should cities make public transport free?">Free public transport</button>
+          <button type="button" class="aidebate-topic-suggestion" data-topic="Should social media be restricted for teens?">Social media for teens</button>
+        </div>
+        <div class="aidebate-topic-utilities"><button type="button" class="aidebate-browse-topics" id="aidebate-browse-topics-btn">Browse topics <span aria-hidden="true">↗</span></button><button type="button" class="ghost-btn aidebate-random-btn" id="aidebate-random-btn">Surprise me</button></div>
+      </div>
     </div>
 
     <h3 class="section-heading">Which side will you argue?</h3>
-    <div class="aidebate-stance-row">
-      <button type="button" class="aidebate-stance-btn active" data-stance="for" id="aidebate-stance-for">I'll argue FOR</button>
-      <button type="button" class="aidebate-stance-btn" data-stance="against" id="aidebate-stance-against">I'll argue AGAINST</button>
+    <div class="aidebate-stance-row" id="aidebate-stance-row" role="group" aria-label="Choose the side you will argue">
+      <button type="button" class="aidebate-stance-btn active" aria-pressed="true" data-stance="for" id="aidebate-stance-for">I'll argue FOR</button>
+      <button type="button" class="aidebate-stance-btn" aria-pressed="false" data-stance="against" id="aidebate-stance-against">I'll argue AGAINST</button>
+      <button type="button" class="aidebate-inline-action" id="aidebate-random-side-btn">Random side</button>
     </div>
 
     <h3 class="section-heading">Choose your opponent</h3>
-    <div class="bot-row" id="aidebate-bot-row">
-      <button type="button" class="bot-card" data-level="sparring">
-        <span class="bot-emblem" aria-hidden="true">◇</span>
-        <span class="bot-rating">~1000</span>
+    <div class="bot-row" id="aidebate-bot-row" role="group" aria-label="Choose an AI opponent">
+      <button type="button" class="bot-card" aria-pressed="false" data-level="sparring">
+        <img class="bot-emblem" src="imgs/debate/sparring-partner.svg" alt="" width="64" height="64" loading="lazy" decoding="async">
+        <span class="bot-rating">GENTLE <span>· ~1000</span></span>
         <span class="bot-name">Sparring Partner</span>
         <span class="bot-desc">One clear point per turn, plain language, gives credit where it's due.</span>
         <span class="bot-sample">“What evidence would help us test that?”</span>
       </button>
-      <button type="button" class="bot-card active" data-level="rival">
-        <span class="bot-emblem" aria-hidden="true">◈</span>
-        <span class="bot-rating">~1400</span>
+      <button type="button" class="bot-card active" aria-pressed="true" data-level="rival">
+        <img class="bot-emblem" src="imgs/debate/the-rival.svg" alt="" width="64" height="64" loading="lazy" decoding="async">
+        <span class="bot-rating">BALANCED <span>· ~1400</span></span>
         <span class="bot-name">The Rival</span>
-        <span class="bot-desc">Answers your strongest point and presses one real weakness.</span>
+        <span class="bot-desc">Responds to your strongest point and tests one weakness.</span>
         <span class="bot-sample">“That supports your example. Does it support your conclusion?”</span>
+        <span class="bot-recommended" hidden>Recommended for your rating</span>
       </button>
-      <button type="button" class="bot-card" data-level="champion">
-        <span class="bot-emblem" aria-hidden="true">♜</span>
-        <span class="bot-rating">~1800</span>
+      <button type="button" class="bot-card" aria-pressed="false" data-level="champion">
+        <img class="bot-emblem" src="imgs/debate/the-champion.svg" alt="" width="64" height="64" loading="lazy" decoding="async">
+        <span class="bot-rating">ADVANCED <span>· ~1800</span></span>
         <span class="bot-name">The Champion</span>
-        <span class="bot-desc">Names your fallacies, pre-empts your comeback, concedes nothing.</span>
+        <span class="bot-desc">Challenges assumptions, spots weak reasoning, and pushes back hard.</span>
         <span class="bot-sample">“Your case depends on an assumption you haven't defended.”</span>
       </button>
     </div>
 
-    <h3 class="section-heading">Time control</h3>
-    <p class="mp-hint">The lines above illustrate each opponent's style; actual replies depend on your argument.</p>
-    <div class="aidebate-stance-row" id="aidebate-time-row">
-      <button type="button" class="aidebate-stance-btn" data-seconds="0">Unlimited</button>
-      <button type="button" class="aidebate-stance-btn active" data-seconds="90">90s a turn</button>
-      <button type="button" class="aidebate-stance-btn" data-seconds="45">45s — blitz</button>
+    <div class="training-options">
+      <label>Practice mode<select id="aidebate-practice-mode"><option value="written">Written argument</option><option value="speech">Recorded speech</option></select></label>
+      <label>Speech length<select id="aidebate-speech-seconds"><option value="60">60 seconds</option><option value="90" selected>90 seconds</option><option value="180">3 minutes</option></select></label>
+      <label>Turns per side<select id="aidebate-turns"><option value="3">3 (opening, rebuttal, closing)</option><option value="5">5 (extended practice)</option></select></label>
+    </div>
+    <p class="training-note">Speech mode adds 3 minutes per turn for preparation, transcription and review. Recordings are private. This is practice, with content feedback rather than delivery scoring.</p>
+    <h3 class="section-heading">Written turn time</h3>
+    <div class="aidebate-stance-row" id="aidebate-time-row" role="group" aria-label="Choose a turn time limit">
+      <button type="button" class="aidebate-stance-btn" aria-pressed="false" data-seconds="0"><strong>Unlimited</strong><span>No clock</span></button>
+      <button type="button" class="aidebate-stance-btn active" aria-pressed="true" data-seconds="180"><strong>3 minutes</strong><span>Preparation and argument · recommended</span></button>
+      <button type="button" class="aidebate-stance-btn" aria-pressed="false" data-seconds="45"><strong>45 seconds</strong><span>Quick-fire blitz</span></button>
     </div>
 
-    <div class="glass-card mp-rules-card">
-      <span class="mp-selected-label">How this works</span>
+    <details class="glass-card mp-rules-card aidebate-rules">
+      <summary>How it works <span>3 or 5 turns · content feedback · optional challenge</span></summary>
       <ul class="mp-rules-list">
-        <li>You get 3 turns; the AI opponent replies after each one.</li>
-        <li>Argue your chosen side as convincingly as you can.</li>
-        <li>The AI referee scores your reasoning, evidence, and responsiveness.</li>
-        <li>Afterward, try a Devil's Advocate Drill: the referee's strongest point you never made.</li>
+        <li>Choose 3 or 5 turns; the AI opponent replies after each one.</li>
+        <li>The referee scores your reasoning, evidence, and responsiveness.</li>
+        <li>Afterward, try an optional Devil’s Advocate challenge based on a strong point you missed.</li>
       </ul>
-    </div>
+    </details>
 
-    <button type="button" class="cta-btn" id="aidebate-start-btn">Start Debate</button>
+    <div class="aidebate-start-dock" role="region" aria-label="Debate setup summary">
+      <p class="aidebate-start-summary" id="aidebate-setup-summary" aria-live="polite">The Rival · For · 180s</p>
+      <button type="button" class="cta-btn" id="aidebate-start-btn">Start Debate</button>
+    </div>
   </div>
 </section>
 
@@ -849,9 +951,9 @@
     <div class="debate-body" id="aidebate-transcript"><!-- turns injected --></div>
 
     <div class="debate-composer" id="aidebate-composer">
-      <textarea id="aidebate-input" class="debate-textarea" placeholder="Write your argument…" maxlength="600" rows="3"></textarea>
+      <textarea id="aidebate-input" class="debate-textarea" placeholder="Write your argument…" maxlength="4000" rows="3"></textarea>
       <div class="composer-foot">
-        <span class="composer-count" id="aidebate-word-count">0 words · 600 left</span>
+        <span class="composer-count" id="aidebate-word-count">0 words · 4000 left</span>
         <span class="composer-hint">Ctrl/⌘ + Enter to send</span>
       </div>
       <button type="button" class="cta-btn debate-send-btn" id="aidebate-send-btn">Send Argument</button>
@@ -872,9 +974,11 @@
       <div class="aidebate-feedback-list" id="aidebate-feedback-list"><!-- per-turn feedback injected --></div>
 
       <div class="glass-card aidebate-devil-card hidden" id="aidebate-devil-card">
-        <span class="mp-selected-label">🎭 Devil's Advocate Drill</span>
+        <span class="mp-selected-label">YOUR NEXT PRACTICE</span>
+        <h4>Strengthen the missing point</h4>
         <p id="aidebate-devil-point">The strongest point you didn't make.</p>
         <p class="aidebate-devil-challenge" id="aidebate-devil-challenge">Argue it now.</p>
+        <button type="button" class="ghost-btn hidden" id="aidebate-practise-feedback-btn">Start this drill</button>
         <textarea id="aidebate-devil-input" class="debate-textarea" maxlength="600" rows="3" placeholder="Make the case…"></textarea>
         <button type="button" class="ghost-btn" id="aidebate-devil-submit-btn">Submit Drill</button>
         <div class="aidebate-devil-feedback hidden" id="aidebate-devil-feedback"></div>
@@ -883,7 +987,6 @@
       <div class="debate-end-actions">
         <button type="button" class="cta-btn" id="aidebate-again-btn">Rematch, same topic</button>
         <button type="button" class="ghost-btn" id="aidebate-opposite-btn">Try the opposite side</button>
-        <button type="button" class="ghost-btn hidden" id="aidebate-practise-feedback-btn">Practise the missed argument</button>
         <button type="button" class="ghost-btn" id="aidebate-done-btn">Back home</button>
       </div>
     </div>
@@ -954,20 +1057,21 @@
       <img class="agent-lab-visual" src="imgs/classroom/evidence-lab.webp" alt="Illustration of research papers being examined with a magnifying glass" width="1254" height="1254" loading="lazy" decoding="async">
       <div class="agent-badge-row">
         <span class="rank-badge">Evidence Lab</span>
-        <span class="agent-loop-pill">Research desk · source-aware reasoning</span>
+        <span class="agent-loop-pill">Compare evidence from multiple sources</span>
       </div>
 
       <h2 class="agent-card-title">Claim to investigate</h2>
       <p class="agent-card-desc">Explore a claim, compare sources on both sides, and inspect the evidence behind an AI-generated assessment.</p>
 
-      <div class="agent-method-row" aria-label="Investigation method">
-        <span><b>01</b> Break the claim down</span>
-        <span><b>02</b> Compare the evidence</span>
-        <span><b>03</b> Explain the uncertainty</span>
-      </div>
+      <ol class="agent-method-row" aria-label="How an investigation works">
+        <li>Break the claim into questions</li>
+        <li>Compare evidence on both sides</li>
+        <li>Explain what remains uncertain</li>
+      </ol>
 
       <div class="agent-input-group">
-        <input type="text" id="agent-claim-input" class="agent-text-input" placeholder="e.g. Social media should be banned for people under 18." value="Social media should be banned for people under 18.">
+        <label class="agent-claim-label" for="agent-claim-input">Claim or question to investigate</label>
+        <input type="text" id="agent-claim-input" class="agent-text-input" placeholder="e.g. Should social media be restricted for teens?" autocomplete="off">
         <button type="button" class="cta-btn" id="agent-start-btn">Investigate this claim</button>
       </div>
 
@@ -980,8 +1084,8 @@
           <button type="button" class="preset-chip" data-claim="Universal Basic Income reduces poverty without reducing workforce participation.">Universal Basic Income</button>
         </div>
 
-        <div class="agent-demo-mode-select">
-          <label class="agent-label" for="agent-demo-mode-select">Watch it handle trouble:</label>
+        <div class="agent-demo-mode-select" hidden>
+          <label class="agent-label" for="agent-demo-mode-select">Demo scenarios:</label>
           <select id="agent-demo-mode-select" class="agent-select">
             <option value="normal">Normal run</option>
             <option value="search_failure">Demo: search fails, agent recovers</option>
@@ -991,6 +1095,11 @@
         </div>
       </div>
     </div>
+
+    <article class="glass-card agent-sample-preview" id="agent-sample-preview" aria-label="Example investigation result">
+      <div class="agent-sample-copy"><span class="agent-sample-kicker">Example result · preview</span><h3>What an investigation can show</h3><p>This example is illustrative; it is not live research or a verdict.</p><span class="agent-sample-claim">“Should cities make public transport free?”</span></div>
+      <div class="agent-sample-columns"><div><strong>Questions to test</strong><span>Who would benefit most?</span><span>How could cities replace fare income?</span></div><div><strong>What to compare</strong><span>Ridership and access data</span><span>Costs, service quality, and trade-offs</span></div></div>
+    </article>
 
     <!-- Active Investigation Workspace -->
     <div class="agent-workspace hidden" id="agent-workspace">
@@ -1083,9 +1192,9 @@
               <p class="evidence-section-note">Read the finding first, then open the source to inspect the full context.</p>
             </div>
             <div class="evidence-filter-bar">
-              <button type="button" class="filter-tab active" data-filter="all">All</button>
-              <button type="button" class="filter-tab" data-filter="supporting">Supporting</button>
-              <button type="button" class="filter-tab" data-filter="opposing">Opposing</button>
+              <button type="button" class="filter-tab active" data-filter="all" aria-pressed="true">All</button>
+              <button type="button" class="filter-tab" data-filter="supporting" aria-pressed="false">Supporting</button>
+              <button type="button" class="filter-tab" data-filter="opposing" aria-pressed="false">Opposing</button>
             </div>
           </div>
           <div class="evidence-grid" id="agent-evidence-grid">
@@ -1139,6 +1248,18 @@
   </div>
 </section>
 
+<!-- ============ STUDY ============ -->
+<section class="screen" data-screen="study" id="screen-study" aria-labelledby="study-screen-title">
+  <header class="subbar">
+    <span class="study-brand-mark" aria-hidden="true">V</span>
+    <h1 class="subbar-title" id="study-screen-title">Study</h1>
+    <span class="subbar-spacer"></span>
+  </header>
+  <main class="study-wrap" id="study-root" tabindex="-1">
+    <p class="study-loading" role="status">Loading your study plan…</p>
+  </main>
+</section>
+
 <!-- ============ CLASSROOM ============ -->
 <section class="screen" data-screen="classroom" id="screen-classroom">
   <header class="subbar">
@@ -1150,144 +1271,9 @@
     <span class="subbar-spacer"></span>
   </header>
 
-  <div class="classroom-wrap">
-    <div class="classroom-intro" id="classroom-intro">
-      <span class="rank-badge">Club workspace</span>
-      <h2>Practise together, improve together.</h2>
-      <p>Create a private cohort for your club or class, then invite students with a simple code.</p>
-    </div>
-
-    <div class="classroom-actions" id="classroom-actions">
-      <button type="button" class="cta-btn" id="classroom-create-btn">Create a cohort</button>
-      <button type="button" class="ghost-btn" id="classroom-org-btn">Create an organisation</button>
-      <button type="button" class="ghost-btn" id="classroom-join-btn">Join with a code</button>
-    </div>
-
-    <form class="glass-card classroom-form hidden" id="classroom-org-form">
-      <div class="classroom-form-head">
-        <div><span class="classroom-eyebrow">Club workspace</span><h3>Create an organisation</h3></div>
-        <button type="button" class="icon-btn classroom-close-btn" data-close-form="org" aria-label="Close organisation form">×</button>
-      </div>
-      <label class="classroom-field"><span>Organisation name</span>
-        <input id="classroom-org-name-input" type="text" maxlength="120" placeholder="e.g. Veritas MUN Society" required>
-      </label>
-      <button type="submit" class="cta-btn w-full" id="classroom-org-submit">Create organisation</button>
-    </form>
-
-    <form class="glass-card classroom-form hidden" id="classroom-create-form">
-      <div class="classroom-form-head">
-        <div>
-          <span class="classroom-eyebrow">New cohort</span>
-          <h3>Create a cohort</h3>
-        </div>
-        <button type="button" class="icon-btn classroom-close-btn" data-close-form="create" aria-label="Close create form">×</button>
-      </div>
-      <label class="classroom-field">
-        <span>Classroom name</span>
-        <input id="classroom-name-input" type="text" maxlength="80" placeholder="e.g. MUN Beginners — Autumn 2026" required>
-      </label>
-      <label class="classroom-field">
-        <span>Short description <em>optional</em></span>
-        <textarea id="classroom-description-input" maxlength="240" rows="3" placeholder="What will this cohort practise?"></textarea>
-      </label>
-      <label class="classroom-field"><span>Organisation <em>optional</em></span>
-        <select id="classroom-org-input"><option value="">No organisation</option></select>
-      </label>
-      <button type="submit" class="cta-btn w-full" id="classroom-create-submit">Create cohort</button>
-    </form>
-
-    <form class="glass-card classroom-form hidden" id="classroom-join-form">
-      <div class="classroom-form-head">
-        <div>
-          <span class="classroom-eyebrow">Student access</span>
-          <h3>Join a classroom</h3>
-        </div>
-        <button type="button" class="icon-btn classroom-close-btn" data-close-form="join" aria-label="Close join form">×</button>
-      </div>
-      <label class="classroom-field">
-        <span>Invite code</span>
-        <input id="classroom-code-input" type="text" maxlength="8" placeholder="AB12CD34" autocomplete="off" autocapitalize="characters" required>
-      </label>
-      <p class="classroom-form-hint">Ask your coach for the eight-character code.</p>
-      <button type="submit" class="cta-btn w-full" id="classroom-join-submit">Join classroom</button>
-    </form>
-
-    <div class="classroom-list-section" id="classroom-list-section">
-      <div class="classroom-section-head">
-        <h3 class="section-heading">Your classrooms</h3>
-        <span class="classroom-count" id="classroom-count">0</span>
-      </div>
-      <div class="classroom-list" id="classroom-list">
-        <div class="classroom-empty" id="classroom-empty">
-          <div class="classroom-empty-mark">+</div>
-          <strong>No classrooms yet</strong>
-          <span>Create one for your club, or join with a coach's code.</span>
-        </div>
-      </div>
-    </div>
-
-    <div class="glass-card classroom-detail hidden" id="classroom-detail">
-      <div class="classroom-detail-head">
-        <button type="button" class="back-btn" id="classroom-detail-back">← All classrooms</button>
-        <span class="classroom-role" id="classroom-detail-role">Coach</span>
-      </div>
-      <div class="classroom-detail-title-row">
-        <div>
-          <span class="classroom-eyebrow">Private cohort</span>
-          <h2 id="classroom-detail-name">Classroom</h2>
-          <p id="classroom-detail-description">—</p>
-        </div>
-        <div class="classroom-invite-box">
-          <span>Invite code</span>
-          <strong id="classroom-detail-code">--------</strong>
-          <button type="button" class="ghost-btn" id="classroom-copy-code">Copy code</button>
-        </div>
-      </div>
-      <div class="classroom-members-head">
-        <h3 class="section-heading">Members</h3>
-        <span id="classroom-member-count">0 members</span>
-      </div>
-      <div class="classroom-members" id="classroom-members"></div>
-
-      <div class="classroom-detail-actions" id="classroom-detail-actions">
-        <button type="button" class="cta-btn" id="classroom-invite-btn">Invite students</button>
-        <button type="button" class="ghost-btn" id="classroom-assignment-btn">New assignment</button>
-        <button type="button" class="ghost-btn danger-btn" id="classroom-archive-btn">Archive cohort</button>
-      </div>
-
-      <form class="classroom-form classroom-inline-form hidden" id="classroom-invite-form">
-        <div class="classroom-form-head"><div><span class="classroom-eyebrow">Invite</span><h3>Invite a student</h3></div>
-          <button type="button" class="icon-btn classroom-close-btn" data-close-form="invite" aria-label="Close invite form">×</button></div>
-        <label class="classroom-field"><span>Email <em>optional</em></span>
-          <input id="classroom-invite-email" type="email" placeholder="student@example.com"></label>
-        <p class="classroom-form-hint">Generate a private link. If an email is provided, your email app will open a ready-to-send invitation.</p>
-        <button type="submit" class="cta-btn w-full" id="classroom-invite-submit">Generate invite</button>
-      </form>
-
-      <form class="classroom-form classroom-inline-form hidden" id="classroom-assignment-form">
-        <div class="classroom-form-head"><div><span class="classroom-eyebrow">Coach tools</span><h3>Create an assignment</h3></div>
-          <button type="button" class="icon-btn classroom-close-btn" data-close-form="assignment" aria-label="Close assignment form">×</button></div>
-        <label class="classroom-field"><span>Type</span><select id="classroom-assignment-kind"><option value="debate">Debate</option><option value="drill">Skill drill</option><option value="position_paper">Position paper</option></select></label>
-        <label class="classroom-field"><span>Title</span><input id="classroom-assignment-title" maxlength="120" placeholder="e.g. Opening statement drill" required></label>
-        <label class="classroom-field"><span>Instructions</span><textarea id="classroom-assignment-instructions" maxlength="8000" rows="4" placeholder="What should students submit?"></textarea></label>
-        <div class="classroom-field-grid"><label class="classroom-field"><span>Deadline <em>optional</em></span><input id="classroom-assignment-due" type="datetime-local"></label><label class="classroom-field"><span>Attempts</span><input id="classroom-assignment-attempts" type="number" min="1" max="10" value="1"></label></div>
-        <button type="submit" class="cta-btn w-full" id="classroom-assignment-submit">Create assignment</button>
-      </form>
-
-      <div class="classroom-assignments-head"><h3 class="section-heading">Assignments</h3><span id="classroom-assignment-count">0</span></div>
-      <div class="classroom-assignments" id="classroom-assignments"></div>
-
-      <form class="classroom-form classroom-inline-form hidden" id="classroom-submission-form">
-        <div class="classroom-form-head"><div><span class="classroom-eyebrow">Student work</span><h3 id="classroom-submission-title">Submit work</h3></div>
-          <button type="button" class="icon-btn classroom-close-btn" data-close-form="submission" aria-label="Close submission form">×</button></div>
-        <p class="classroom-form-hint" id="classroom-submission-instructions"></p>
-        <textarea id="classroom-submission-content" maxlength="30000" rows="8" placeholder="Write your response here…" required></textarea>
-        <button type="submit" class="cta-btn w-full" id="classroom-submission-submit">Submit work</button>
-      </form>
-      <div class="classroom-submissions hidden" id="classroom-submissions"></div>
-    </div>
-  </div>
-</section>
+    <div class="classroom-wrap">
+    <div class="cw-skeleton" role="status">Loading your classrooms…</div>
+  </div></section>
 
 <!-- ============ AUTH ============ -->
 <section class="screen" data-screen="auth" id="screen-auth">
@@ -1302,6 +1288,7 @@
     </div>
 
     <div class="glass-card auth-card">
+      <p class="auth-context" id="auth-context">Sign in to sync your progress and unlock Veritas features. You can also continue exploring as a guest.</p>
       <div class="auth-tabs">
         <button type="button" class="auth-tab active" id="auth-tab-login">Log In</button>
         <button type="button" class="auth-tab" id="auth-tab-signup">Sign Up</button>
@@ -1357,6 +1344,7 @@
 
         <button type="button" class="cta-btn w-full" id="auth-reset-submit-btn">Set New Password</button>
       </div>
+      <button type="button" class="auth-link auth-continue-guest" id="auth-continue-guest-btn">Continue exploring as a guest</button>
     </div>
   </div>
 </section>

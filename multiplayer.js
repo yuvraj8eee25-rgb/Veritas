@@ -3,6 +3,8 @@
    Loaded after app.js + supabase-config.js.
    Talks to app.js only through the window.DA bridge.
    ========================================================= */
+import { SpeechPractice, appendRecording } from "./src/features/speech-practice.js";
+import { trainingSettings } from "./src/features/training-settings.js";
 (function () {
 "use strict";
 
@@ -74,9 +76,16 @@ const DEFAULT_CATEGORY_COLOR = { bg: "rgba(136,135,128,0.20)", text: "#c2c0b6" }
 
 let allHotTopics = [];       // last loaded topic list, unfiltered
 let activeCategory = "All";  // currently selected tab
+let topicSearchQuery = "";
+let browseForAiDebate = false;
 
 const MAX_TURNS_PER_PLAYER = 3;
-const TURN_SECONDS = 30;
+const TURN_SECONDS = 180;
+const speech = new SpeechPractice(document.getElementById("debate-composer"), document.getElementById("debate-input"), "live");
+let assignedPractice = null;
+let privateRoom = null;
+let privatePoll = null;
+let joiningPrivate = false;
 const INACTIVITY_PASSES_TO_END = 2;
 const WAIT_MESSAGES = [
   "Opponent is drafting their best angle…",
@@ -106,6 +115,11 @@ function sb() { return window.mpSupabase.client; }
 function rowToDebateData(row) {
   return {
     topic: row.topic,
+    practiceMode: row.practice_mode || "written",
+    turnSeconds: row.turn_seconds || TURN_SECONDS,
+    speechSeconds: row.speech_seconds || 90,
+    assignmentId: row.assignment_id || null,
+    isPrivate: !!row.is_private,
     players: row.players,
     playerOrder: row.player_order,
     turnIndex: row.turn_index,
@@ -155,7 +169,7 @@ function syncServerClock(data) {
 function turnDeadline(data) {
   const anchor = data.lastTurnAt || data.createdAt;
   if (!anchor) return null;
-  return anchor + TURN_SECONDS * 1000;
+  return anchor + (data.turnSeconds || TURN_SECONDS) * 1000;
 }
 
 function fmtClock(seconds) {
@@ -177,7 +191,7 @@ function thinkTimes(data) {
   let prev = data.createdAt || (turns[0] && turns[0].ts) || null;
   turns.forEach((t) => {
     if (typeof t.ts === "number" && prev) {
-      const spent = Math.max(0, Math.min(TURN_SECONDS * 1000, t.ts - prev)) / 1000;
+      const spent = Math.max(0, Math.min((data.turnSeconds || TURN_SECONDS) * 1000, t.ts - prev)) / 1000;
       used[t.uid] = (used[t.uid] || 0) + spent;
     }
     if (typeof t.ts === "number") prev = t.ts;
@@ -194,7 +208,7 @@ function turnSpent(data, index) {
     ? turns[index - 1].ts
     : data.createdAt;
   if (!prev) return null;
-  return Math.max(0, Math.min(TURN_SECONDS, (t.ts - prev) / 1000));
+  return Math.max(0, Math.min(data.turnSeconds || TURN_SECONDS, (t.ts - prev) / 1000));
 }
 
 /* ---------------------------------------------------------
@@ -204,13 +218,26 @@ function turnSpent(data, index) {
 async function openLobby() {
   document.getElementById("mp-browse-state").classList.remove("hidden");
   document.getElementById("mp-searching-state").classList.add("hidden");
-  selectedTopic = null;
+  selectedTopic = assignedPractice?.settings.topic || null;
+  topicSearchQuery = "";
+  const searchInput = document.getElementById("mp-topic-search");
+  if (searchInput) searchInput.value = "";
   document.getElementById("mp-selected-card").classList.add("hidden");
-  document.getElementById("mp-online-note").textContent = "Hot topics usually match in under 20 seconds.";
+  document.getElementById("mp-topic-state").textContent = "No topic selected · you can still join an open match.";
+  updateQueueInfo();
+  document.getElementById("mp-online-note").textContent = "Choose matching practice settings or invite a partner to a private room.";
+  applyTrainingContext();
+  setTopicBrowserOpen(false);
   await window.mpSupabase.ready;
   const user = await window.VeritasApi.currentUser();
   myUid = user && user.id;
-  loadHotTopics();
+  await loadHotTopics();
+  if (!browseForAiDebate) await restorePrivateRoom();
+  if (browseForAiDebate) {
+    setTopicBrowserOpen(true);
+    scrollTopicBrowserIntoView();
+    document.getElementById("mp-topic-search")?.focus({ preventScroll: true });
+  }
 }
 
 async function loadHotTopics() {
@@ -224,48 +251,49 @@ async function loadHotTopics() {
     allHotTopics = topics;
     activeCategory = "All";
     renderCategoryTabs();
+    renderHotTopics(getQuickPickTopics(), "mp-featured-topics");
     renderHotTopics(filterByActiveCategory());
   } catch (e) {
     console.error("Failed to load hot topics, using fallback:", e);
     allHotTopics = FALLBACK_TOPICS;
     activeCategory = "All";
     renderCategoryTabs();
+    renderHotTopics(getQuickPickTopics(), "mp-featured-topics");
     renderHotTopics(filterByActiveCategory());
   }
 }
 
 function filterByActiveCategory() {
-  if (activeCategory === "All") return allHotTopics;
-  return allHotTopics.filter((t) => (t.tag || "Topic") === activeCategory);
-}
-
-/* Deterministic pseudo-stats (pro % and player count) derived from the topic
-   text, so the split bar looks alive even before real vote data exists.
-   Swap this out once turns/votes are tracked per topic. */
-function hashString(str) {
-  let h = 0;
-  for (let i = 0; i < str.length; i++) {
-    h = (h * 31 + str.charCodeAt(i)) | 0;
-  }
-  return Math.abs(h);
-}
-
-function pseudoStats(text) {
-  const h = hashString(text);
-  const pro = 25 + (h % 51); // 25–75
-  const players = 300 + (h % 2800);
-  return { pro, players };
+  const query = topicSearchQuery.trim().toLocaleLowerCase();
+  return allHotTopics.filter((t) => {
+    const matchesCategory = activeCategory === "All" || (t.tag || "Topic") === activeCategory;
+    const matchesSearch = !query || `${t.text} ${t.tag || ""}`.toLocaleLowerCase().includes(query);
+    return matchesCategory && matchesSearch;
+  });
 }
 
 function categoryColor(tag) {
   return CATEGORY_COLORS[tag] || DEFAULT_CATEGORY_COLOR;
 }
 
-const CATEGORY_ICONS = {
-  All: "🔥", Tech: "💻", Economics: "📊", Policy: "🏛️", Ethics: "⚖️",
-  Society: "🌐", Science: "🔬", Environment: "🌱", Education: "🎓",
-  Work: "💼", Sports: "🏅", Culture: "🎭"
+const CATEGORY_ICON_PATHS = {
+  All: '<path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/>',
+  Tech: '<rect x="5" y="5" width="14" height="14" rx="2"/><path d="M9 9h6v6H9zM9 2v3m6-3v3M9 19v3m6-3v3M2 9h3m-3 6h3m14-6h3m-3 6h3"/>',
+  Economics: '<path d="M4 19V5m0 14h17M8 15l4-4 3 2 5-6"/><path d="M16 7h4v4"/>',
+  Policy: '<path d="m3 9 9-5 9 5M5 10h14M6 10v8m4-8v8m4-8v8m4-8v8M4 20h16"/>',
+  Ethics: '<path d="M12 4v15m-6 1h12M5 7h14M7 7l-4 7h8L7 7Zm10 0-4 7h8l-4-7Z"/>',
+  Society: '<circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M3 20c.4-3.5 2.4-5.5 6-5.5s5.6 2 6 5.5m0-5c3.7-.7 5.9 1 6.5 4"/>',
+  Science: '<path d="M9 3h6m-5 0v6l-5.5 9.2A1.2 1.2 0 0 0 5.5 20h13a1.2 1.2 0 0 0 1-1.8L14 9V3M8 15h8"/>',
+  Environment: '<path d="M19 4C9 4 4 8 4 14a6 6 0 0 0 6 6c6 0 9-6 9-16Z"/><path d="M5 19c3-4 6-6 11-9"/>',
+  Education: '<path d="m3 8 9-5 9 5-9 5-9-5Zm3 2v6c3.5 3 8.5 3 12 0v-6M21 8v7"/>',
+  Work: '<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m-13 5h18m-11-1v3h4v-3"/>',
+  Sports: '<path d="M8 21h8m-4-4v4M7 4h10v4a5 5 0 0 1-10 0V4Zm0 2H4v2a4 4 0 0 0 4 4m9-6h3v2a4 4 0 0 1-4 4"/>',
+  Culture: '<path d="M4 5h16v11H9l-5 4V5Z"/><path d="M8 9h8m-8 4h5"/>'
 };
+function categoryIcon(category) {
+  const path = CATEGORY_ICON_PATHS[category] || '<circle cx="12" cy="12" r="8"/><path d="M8 12h8"/>';
+  return `<svg class="mp-category-icon" viewBox="0 0 24 24" aria-hidden="true">${path}</svg>`;
+}
 
 function getOrCreateTabsEl() {
   let tabsEl = document.getElementById("mp-category-tabs");
@@ -299,7 +327,8 @@ function renderCategoryTabs() {
     const tab = document.createElement("button");
     tab.type = "button";
     tab.className = "mp-tab" + (isActive ? " active" : "");
-    tab.innerHTML = `<span>${CATEGORY_ICONS[cat] || "📌"}</span><span>${escapeHtml(cat)}</span>`;
+    tab.setAttribute("aria-pressed", String(isActive));
+    tab.innerHTML = `${categoryIcon(cat)}<span>${escapeHtml(cat)}</span>`;
     tab.addEventListener("click", () => {
       window.DA.playClick();
       activeCategory = cat;
@@ -313,8 +342,8 @@ function renderCategoryTabs() {
 const ICON_NEWS = '<svg width="10" height="10" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>';
 const ICON_LINK = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M10 14L20 4M20 4H14M20 4V10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 13V19A1 1 0 0117 20H5A1 1 0 014 19V7A1 1 0 015 6H11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
-function renderHotTopics(topics) {
-  const listEl = document.getElementById("mp-hot-topics");
+function renderHotTopics(topics, targetId = "mp-hot-topics") {
+  const listEl = document.getElementById(targetId);
   listEl.innerHTML = "";
   if (!topics.length) {
     const empty = document.createElement("div");
@@ -326,13 +355,17 @@ function renderHotTopics(topics) {
   topics.forEach((t) => {
     const tag = t.tag || "Topic";
     const color = categoryColor(tag);
-    const { pro, players } = pseudoStats(t.text);
-    const con = 100 - pro;
     const hasNews = typeof t.newsUrl === "string" && t.newsUrl.length > 0;
 
+    const card = document.createElement("article");
+    card.className = "hot-topic-card";
     const btn = document.createElement("button");
     btn.className = "hot-topic-item";
     btn.type = "button";
+    btn.dataset.topic = t.text;
+    const isSelected = selectedTopic === t.text;
+    btn.classList.toggle("selected", isSelected);
+    btn.setAttribute("aria-pressed", String(isSelected));
     btn.innerHTML = `
       <div class="hot-topic-body">
         <div class="hot-topic-head">
@@ -340,44 +373,69 @@ function renderHotTopics(topics) {
             ${escapeHtml(tag.toUpperCase())}
           </span>
           ${hasNews ? `<span class="hot-topic-news-badge" title="Based on a real news story">${ICON_NEWS} LIVE</span>` : ""}
-          <span class="hot-topic-count">${players.toLocaleString()} debating</span>
         </div>
         <div class="hot-topic-title">${escapeHtml(t.text)}</div>
-        <div class="hot-topic-bar-row">
-          <span class="hot-topic-pct pro">${pro}%</span>
-          <div class="hot-topic-bar-track">
-            <div class="hot-topic-bar-fill" style="width:${pro}%;"></div>
-          </div>
-          <span class="hot-topic-pct con">${con}%</span>
-        </div>
-        <div class="hot-topic-bar-labels"><span>PRO</span><span>CON</span></div>
-        ${hasNews ? `
-          <a class="hot-topic-source" href="${escapeHtml(t.newsUrl)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();">
-            ${ICON_LINK} Inspired by ${escapeHtml(t.newsSource || "a news story")}
-          </a>` : ""}
+      <span class="hot-topic-action">${isSelected ? "Selected" : ""}</span>
       </div>
     `;
-    btn.addEventListener("click", () => selectTopic(t.text, btn));
-    listEl.appendChild(btn);
+    btn.addEventListener("click", () => selectTopic(t.text));
+    card.appendChild(btn);
+    if (hasNews) {
+      const source = document.createElement("a");
+      source.className = "hot-topic-source";
+      source.href = t.newsUrl;
+      source.target = "_blank";
+      source.rel = "noopener noreferrer";
+      source.innerHTML = `${ICON_LINK} Inspired by ${escapeHtml(t.newsSource || "a news story")}`;
+      card.appendChild(source);
+    }
+    listEl.appendChild(card);
   });
 }
 
-function selectTopic(text, btnEl) {
+function getQuickPickTopics() {
+  const picks = [];
+  const seenTags = new Set();
+  for (const topic of allHotTopics) {
+    const tag = topic.tag || "Topic";
+    if (seenTags.has(tag)) continue;
+    seenTags.add(tag);
+    picks.push(topic);
+    if (picks.length === 3) break;
+  }
+  if (picks.length < 3) {
+    for (const topic of allHotTopics) {
+      if (picks.includes(topic)) continue;
+      picks.push(topic);
+      if (picks.length === 3) break;
+    }
+  }
+  return picks;
+}
+
+function selectTopic(text) {
   window.DA.playClick();
-  document.querySelectorAll(".hot-topic-item").forEach((el) => {
-    el.classList.remove("selected");
-  });
-  if (selectedTopic === text) {
-    selectedTopic = null;
-    document.getElementById("mp-selected-card").classList.add("hidden");
-    document.getElementById("mp-online-note").textContent = "Hot topics usually match in under 20 seconds.";
+  if (browseForAiDebate) {
+    const input = document.getElementById("aidebate-topic-input");
+    if (input) input.value = text;
+    browseForAiDebate = false;
+    window.DA.showScreen("ai-debate");
+    input?.focus({ preventScroll: true });
     return;
   }
   selectedTopic = text;
-  btnEl.classList.add("selected");
   document.getElementById("mp-selected-text").textContent = text;
   document.getElementById("mp-selected-card").classList.remove("hidden");
-  document.getElementById("mp-online-note").textContent = "Smart pick — this topic gets attention.";
+  document.getElementById("mp-topic-state").textContent = `Selected topic: ${text}`;
+  updateQueueInfo();
+  document.querySelectorAll(".hot-topic-item").forEach((el) => {
+    const isSelected = el.dataset.topic === selectedTopic;
+    el.classList.toggle("selected", isSelected);
+    el.setAttribute("aria-pressed", String(isSelected));
+    const action = el.querySelector(".hot-topic-action");
+    if (action) action.textContent = isSelected ? "Selected ✓" : "";
+  });
+  setTopicBrowserOpen(false);
 }
 
 document.getElementById("mp-clear-topic").addEventListener("click", () => {
@@ -385,21 +443,138 @@ document.getElementById("mp-clear-topic").addEventListener("click", () => {
   document.getElementById("mp-selected-card").classList.add("hidden");
   document.querySelectorAll(".hot-topic-item").forEach((el) => {
     el.classList.remove("selected");
+    el.setAttribute("aria-pressed", "false");
+    const action = el.querySelector(".hot-topic-action");
+    if (action) action.textContent = "";
   });
-  document.getElementById("mp-online-note").textContent = "All set — random topic will keep the match fresh.";
+  document.getElementById("mp-topic-state").textContent = "No topic selected · you can still join an open match.";
+  updateQueueInfo();
 });
 
-document.getElementById("mp-toggle-topics-btn").addEventListener("click", () => {
-  const tabsEl = document.getElementById("mp-category-tabs");
-  const listEl = document.getElementById("mp-hot-topics");
-  const hintEl = document.getElementById("mp-topics-collapse-hint");
-  const btn = document.getElementById("mp-toggle-topics-btn");
-  const hidden = listEl.classList.toggle("hidden");
-  tabsEl.classList.toggle("hidden", hidden);
-  hintEl.textContent = hidden ? "Tap to expand the curated debate topics." : "Topics are visible. Choose one and start your match.";
-  btn.textContent = hidden ? `View topics (${allHotTopics.length || 0})` : "Hide topics";
-  btn.setAttribute("aria-expanded", String(!hidden));
+document.getElementById("mp-change-topic").addEventListener("click", () => {
+  setTopicBrowserOpen(true);
+  scrollTopicBrowserIntoView();
 });
+
+function setTopicBrowserOpen(open) {
+  const browserEl = document.getElementById("mp-topic-browser");
+  const btn = document.getElementById("mp-toggle-topics-btn");
+  browserEl.classList.toggle("hidden", !open);
+  btn.textContent = open ? "Hide topic browser" : "Browse all topics";
+  btn.setAttribute("aria-expanded", String(open));
+}
+
+document.getElementById("mp-toggle-topics-btn").addEventListener("click", () => {
+  const isOpen = !document.getElementById("mp-topic-browser").classList.contains("hidden");
+  setTopicBrowserOpen(!isOpen);
+  if (!isOpen) scrollTopicBrowserIntoView();
+});
+
+function scrollTopicBrowserIntoView() {
+  const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  document.getElementById("mp-topic-browser").scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
+}
+
+function updateQueueInfo() {
+  if (assignedPractice) selectedTopic = assignedPractice.settings.topic;
+  const label = document.getElementById("mp-queue-type");
+  if (!label) return;
+  label.textContent = selectedTopic
+    ? "Topic-specific match · you’ll be matched with someone on this prompt"
+    : "Open match · the queue will choose a topic";
+}
+
+const mpBackButton = document.getElementById("mp-back-btn");
+mpBackButton?.addEventListener("click", () => {
+  if (browseForAiDebate) {
+    browseForAiDebate = false;
+    window.DA.showScreen("ai-debate");
+  } else {
+    window.DA.showScreen("home");
+  }
+});
+
+window.mpBrowseTopicsForAi = () => {
+  browseForAiDebate = true;
+  window.DA.showScreen("multiplayer");
+};
+
+document.addEventListener("click", (event) => {
+  const nav = event.target.closest?.("[data-nav]");
+  if (browseForAiDebate && nav && nav.dataset.nav !== "multiplayer") {
+    browseForAiDebate = false;
+  }
+}, true);
+
+document.getElementById("mp-topic-search")?.addEventListener("input", (event) => {
+  topicSearchQuery = event.currentTarget.value;
+  renderHotTopics(filterByActiveCategory());
+});
+
+
+function practiceSettings() {
+  if (assignedPractice) return assignedPractice.settings;
+  return trainingSettings({ mode: document.getElementById('mp-practice-mode').value, speech_seconds: Number(document.getElementById('mp-speech-seconds').value), turns: Number(document.getElementById('mp-turns').value) });
+}
+function applyTrainingContext() {
+  const settings = practiceSettings();
+  ['mode', 'speech-seconds', 'turns'].forEach((suffix, i) => { const el = document.getElementById(`mp-${suffix === 'mode' ? 'practice-mode' : suffix}`); el.value = String([settings.mode, settings.speech_seconds, settings.turns][i]); el.disabled = !!assignedPractice; });
+  document.getElementById('mp-find-match-btn').classList.toggle('hidden', assignedPractice?.kind === 'private_debate');
+  document.getElementById('mp-private-panel').classList.toggle('hidden', browseForAiDebate || assignedPractice?.kind === 'live_debate');
+  document.getElementById('mp-private-topic').value = assignedPractice?.settings.topic || selectedTopic || '';
+  document.getElementById('mp-private-topic').readOnly = !!assignedPractice;
+  document.getElementById('mp-private-context').textContent = assignedPractice ? `Assigned motion: ${assignedPractice.settings.topic}. Both partners must open this assignment before joining.` : 'Invite a partner with the room code. Private practice does not change global Elo.';
+}
+window.mpStartAssignedDebate = async assignment => {
+  clearInterval(privatePoll); privatePoll = null; privateRoom = null; browseForAiDebate = false;
+  await cancelSearch(); assignedPractice = { id: assignment.id, kind: assignment.kind, settings: trainingSettings({ ...assignment.activity_settings, topic: assignment.activity_settings?.topic || assignment.title }) };
+  window.DA.showScreen('multiplayer');
+};
+window.mpClearAssignedDebate = () => { assignedPractice = null; applyTrainingContext(); };
+async function restorePrivateRoom() {
+  if (!myUid) return;
+  const key = `veritas:private-room:${myUid}`;
+  let saved; try { saved = JSON.parse(sessionStorage.getItem(key) || 'null'); } catch { sessionStorage.removeItem(key); return; }
+  if (!saved || (saved.assignmentId || null) !== (assignedPractice?.id || null)) return;
+  try {
+    const room = await window.VeritasApi.tableQuery('private_debate_rooms', q => q.select('*').eq('id', saved.id).maybeSingle(), { timeoutMs: 10000 });
+    if (!room || room.closed || (!room.debate_id && Date.parse(room.expires_at) < Date.now())) { sessionStorage.removeItem(key); return; }
+    privateRoom = room; document.getElementById('mp-private-code').value = room.code;
+    if (room.debate_id) {
+      const debate = await window.VeritasApi.tableQuery('debates', q => q.select('status').eq('id', room.debate_id).maybeSingle());
+      if (debate?.status === 'active') { enterDebateRoom(room.debate_id); return; }
+      sessionStorage.removeItem(key); privateRoom = null; return;
+    }
+    document.getElementById('mp-private-status').textContent = `Room ${room.code}. Waiting for your partner to join…`;
+    clearInterval(privatePoll); privatePoll = setInterval(checkPrivateRoom, 2000);
+  } catch { document.getElementById('mp-private-status').textContent = 'Could not restore your room. Enter its code to rejoin.'; document.getElementById('mp-private-code').value = saved.code || ''; }
+}
+async function checkPrivateRoom() {
+  if (!privateRoom || privateRoom.debate_id) return;
+  try {
+    const room = await window.VeritasApi.tableQuery('private_debate_rooms', q => q.select('*').eq('id', privateRoom.id).single(), { timeoutMs: 10000 });
+    if (room?.debate_id) { privateRoom = room; enterDebateRoom(room.debate_id); }
+    else if (room?.closed || Date.parse(room?.expires_at) < Date.now()) { clearInterval(privatePoll); privatePoll = null; document.getElementById('mp-private-status').textContent = 'Room expired or closed. Create another room.'; }
+  } catch { document.getElementById('mp-private-status').textContent = 'Connection lost. Your room code is still available; retry joining.'; }
+}
+async function openPrivateRoom(join) {
+  if (joiningPrivate) return;
+  joiningPrivate = true; const status = document.getElementById('mp-private-status');
+  try {
+    await cancelSearch(); await window.mpSupabase.ready; const user = await window.VeritasApi.currentUser(); if (!user) throw Error('Sign in first.'); myUid = user.id;
+    if (privateRoom && !privateRoom.debate_id && !join) await window.VeritasApi.rpc('close_private_debate_room', { p_room_id: privateRoom.id });
+    const room = await window.VeritasApi.rpc(join ? 'join_private_debate_room' : 'create_private_debate_room', join ? { p_code: document.getElementById('mp-private-code').value.trim(), p_assignment_id: assignedPractice?.id || null } : { p_assignment_id: assignedPractice?.id || null, p_topic: document.getElementById('mp-private-topic').value.trim(), p_settings: practiceSettings() });
+    privateRoom = room; sessionStorage.setItem(`veritas:private-room:${myUid}`, JSON.stringify({ id: room.id, code: room.code, assignmentId: room.assignment_id }));
+    document.getElementById('mp-private-code').value = room.code; status.textContent = `Room ${room.code}. Waiting for your partner to join…`;
+    if (room.debate_id) enterDebateRoom(room.debate_id);
+    else { clearInterval(privatePoll); privatePoll = setInterval(checkPrivateRoom, 2000); await checkPrivateRoom(); }
+  } catch (error) { status.textContent = error.message || 'Could not open the private room.'; }
+  finally { joiningPrivate = false; }
+}
+document.getElementById('mp-private-create').onclick = () => openPrivateRoom(false);
+document.getElementById('mp-private-join').onclick = () => openPrivateRoom(true);
+document.getElementById('mp-private-copy').onclick = async () => { try { await navigator.clipboard.writeText(document.getElementById('mp-private-code').value); window.DA.toast('Room code copied.'); } catch { window.DA.toast('Select the room code and copy it.'); } };
+document.addEventListener('click', event => { if (event.target.closest?.('[data-nav], #debate-exit-btn, #debate-done-btn')) { speech.reset(); } });
 
 /* ---------------------------------------------------------
    MATCHMAKING
@@ -409,6 +584,8 @@ document.getElementById("mp-find-match-btn").addEventListener("click", startSear
 document.getElementById("mp-cancel-search-btn").addEventListener("click", cancelSearch);
 
 async function startSearch() {
+  if (assignedPractice?.kind === "private_debate") { window.DA.toast("Create or join the assignment’s private room."); return; }
+  if (inQueue) return;
   window.DA.playClick();
   await window.mpSupabase.ready;
   const user = await window.VeritasApi.currentUser();
@@ -440,12 +617,7 @@ async function startSearch() {
     return;
   }
   try {
-    await window.VeritasApi.tableQuery("match_queue", query => query.insert({
-      uid: myUid,
-      topic: selectedTopic || null,
-      status: "waiting",
-      debate_id: null
-    }), { timeoutMs: 10000 });
+    await window.VeritasApi.rpc("join_training_queue", { p_topic: selectedTopic || null, p_settings: practiceSettings() }, { timeoutMs: 10000 });
   } catch {
     inQueue = false; stopSearchClock();
     document.getElementById("mp-searching-state").classList.add("hidden");
@@ -521,7 +693,8 @@ async function attemptMatch() {
     // transaction loop). Both clients learn about the result via their own
     // match_queue row's realtime subscription above, so nothing else is needed here.
     const fallback = FALLBACK_TOPICS[Math.floor(Math.random() * FALLBACK_TOPICS.length)].text;
-    await window.VeritasApi.rpc("attempt_match", { p_fallback_topic: fallback }, { timeoutMs: 10000, retrySafe: true, retries: 1 });
+    const debateId = await window.VeritasApi.rpc("attempt_match", { p_fallback_topic: fallback }, { timeoutMs: 10000, retrySafe: true, retries: 1 });
+    if (debateId && inQueue) { stopPolling(); if (queueChannel) { window.VeritasApi.removeRealtimeChannel(queueChannel); queueChannel = null; } enterDebateRoom(debateId); }
   } catch (e) {
     // Transient conflict, or nobody else waiting yet — just retry on next poll.
   }
@@ -532,6 +705,10 @@ async function attemptMatch() {
    --------------------------------------------------------- */
 
 function enterDebateRoom(debateId) {
+  if (currentDebateId === debateId && debateChannel) return;
+  if (debateChannel) window.VeritasApi.removeRealtimeChannel(debateChannel);
+  clearInterval(privatePoll); privatePoll = null;
+  speech.reset(); currentDebateData = null;
   inQueue = false;
   stopSearchClock();
   currentDebateId = debateId;
@@ -549,7 +726,8 @@ function enterDebateRoom(debateId) {
 
   window.DA.showScreen("debate-room");
   document.getElementById("debate-ended-panel").classList.add("hidden");
-  document.getElementById("debate-composer").classList.remove("hidden");
+  document.getElementById("debate-composer").classList.add("hidden");
+  document.getElementById("debate-live-status").textContent = "Loading practice room…";
   syncedTurnCount = -1;
   lastTimedTurnIndex = null;
   const resignEl = document.getElementById("debate-resign-btn");
@@ -560,8 +738,11 @@ function enterDebateRoom(debateId) {
   updateWordCount();
 
   window.VeritasApi.tableQuery("debates", query => query.select("*").eq("id", debateId).single(), { timeoutMs: 10000, retrySafe: true, retries: 1 }).then(data => {
+    if (currentDebateId !== debateId) return;
     if (data) {
       currentDebateData = rowToDebateData(data);
+      speech.configure(currentDebateData.practiceMode, currentDebateData.speechSeconds);
+      updateWordCount();
       renderDebateRoom();
 
       // Fetch the opponent's display_name and elo_rating from the profiles table.
@@ -573,6 +754,7 @@ function enterDebateRoom(debateId) {
           .eq("uid", theirUid)
           .maybeSingle(), { timeoutMs: 10000, retrySafe: true, retries: 1 })
           .then(p => {
+            if (currentDebateId !== debateId) return;
             if (p) {
               if (p.display_name) opponentName = p.display_name;
               if (p.elo_rating !== undefined && p.elo_rating !== null) opponentElo = p.elo_rating;
@@ -582,13 +764,14 @@ function enterDebateRoom(debateId) {
           .catch((e) => console.warn("Could not fetch opponent name and ELO:", e));
       }
     }
-  });
+  }).catch(error => { if (currentDebateId === debateId) { document.getElementById("debate-live-status").textContent = "Could not load this room. Return to the lobby and rejoin using the room code."; window.DA.toast(error.message); } });
 
   debateChannel = window.VeritasApi.realtimeChannel(`debate-${debateId}`)
     .on(
       "postgres_changes",
       { event: "UPDATE", schema: "public", table: "debates", filter: `id=eq.${debateId}` },
       (payload) => {
+        if (currentDebateId !== debateId) return;
         currentDebateData = rowToDebateData(payload.new);
         syncServerClock(currentDebateData);
         renderDebateRoom();
@@ -603,6 +786,7 @@ function initial(name) {
 }
 
 function renderDebateRoom() {
+  if (!currentDebateData) return;
   const data = currentDebateData || { topic: "Unknown topic", turns: [], maxTurnsPerPlayer: MAX_TURNS_PER_PLAYER, playerOrder: [] };
   const turns = Array.isArray(data.turns) ? data.turns : [];
   const myName = window.DA.getCachedProfile().displayName || "You";
@@ -655,6 +839,7 @@ function renderDebateRoom() {
     bubble.id = `debate-turn-${i}`;
     if (!previousTurns.has(bubble.id)) bubble.classList.add("new-message");
     bubble.innerHTML = `<div class="debate-bubble-meta">${meta}</div><div>${escapeHtml(t.text)}</div>`;
+    if (t.audioPath) appendRecording(bubble, t.audioPath);
     wrap.appendChild(bubble);
   });
   wrap.scrollTop = wrap.scrollHeight;
@@ -702,6 +887,7 @@ function renderDebateRoom() {
       const input = document.getElementById("debate-input");
       if (input) input.focus();
     }
+    speech.reset();
     beginTurnTimer();
   }
 }
@@ -752,7 +938,7 @@ function paintClocks(data, activeUid) {
       const face = document.getElementById(timeId);
       if (!row || !face) return;
       const isActive = activeUid !== null && uid === activeUid;
-      face.textContent = isActive ? fmtClock(remaining) : fmtClock(TURN_SECONDS);
+      face.textContent = isActive ? fmtClock(remaining) : fmtClock(data.turnSeconds || TURN_SECONDS);
       row.classList.toggle("running", isActive);
       row.classList.toggle("urgent", isActive && remaining <= 8);
       row.classList.toggle("idle", !isActive);
@@ -775,15 +961,19 @@ async function sendTurn() {
     return;
   }
   sending = true;
+  const expectedTurn = currentDebateData?.turnIndex;
+  const debateId = currentDebateId;
   window.DA.playClick();
   input.disabled = true;
   if (btn) { btn.disabled = true; btn.textContent = "Sending…"; }
   try {
-    await window.VeritasApi.rpc("submit_turn", { p_debate_id: currentDebateId, p_text: text }, { timeoutMs: 15000 });
+    const audioPath = await speech.save({ debateId, assignmentId: currentDebateData?.assignmentId || assignedPractice?.id || null });
+    await window.VeritasApi.rpc("submit_training_turn", { p_debate_id: debateId, p_text: text, p_audio_path: audioPath, p_expected_turn: expectedTurn }, { timeoutMs: 15000 });
+    speech.reset();
     input.value = "";
     updateWordCount();
   } catch (e) {
-    window.DA.toast("Couldn't send — try again.");
+    window.DA.toast(e.message || "Couldn't send — try again.");
   }
   input.disabled = false;
   if (btn) { btn.disabled = false; btn.textContent = "Send Argument"; }
@@ -795,7 +985,7 @@ function updateWordCount() {
   const out = document.getElementById("debate-word-count");
   if (!input || !out) return;
   const words = input.value.trim() ? input.value.trim().split(/\s+/).length : 0;
-  const left = 600 - input.value.length;
+  const left = input.maxLength - input.value.length;
   out.textContent = `${words} word${words === 1 ? "" : "s"} · ${left} left`;
   out.classList.toggle("low", left < 60);
 }
@@ -834,7 +1024,8 @@ function tickTurnTimer() {
     stopTurnTimer();
     // Only the player who actually ran out asks the server to record the pass,
     // so two open tabs can't both fire it.
-    if (activeUid === myUid) submitTimeoutTurn();
+    speech.reset();
+    submitTimeoutTurn();
   }
 }
 
@@ -873,17 +1064,8 @@ async function resignMatch() {
   if (btn) { btn.disabled = true; btn.textContent = "Resigning…"; }
   stopTurnTimer();
   try {
-    const total = currentDebateData.maxTurnsPerPlayer * 2;
-    // Pass repeatedly until the debate closes. submit_timeout_turn() rejects a
-    // pass that isn't the caller's turn, so this only ever burns our own turns
-    // and the opponent's realtime subscription sees each one land.
-    for (let i = currentDebateData.turns.length; i < total; i++) {
-      const activeUid = currentDebateData.playerOrder[currentDebateData.turnIndex % 2];
-      if (activeUid !== myUid) break;
-      await window.VeritasApi.rpc("submit_timeout_turn", { p_debate_id: currentDebateId }, { timeoutMs: 10000 });
-      await new Promise((r) => window.setTimeout(r, 120));
-      if (!currentDebateData || currentDebateData.status !== "active") break;
-    }
+    speech.reset();
+    await window.VeritasApi.rpc('resign_training_debate', { p_debate_id: currentDebateId }, { timeoutMs: 15000 });
     window.DA.toast("Match resigned.");
   } catch (e) {
     window.DA.toast("Couldn't resign — check your connection.");
@@ -992,10 +1174,13 @@ function heuristicVerdict(data) {
 function showDebateEnded() {
   const panel = document.getElementById("debate-ended-panel");
   const firstShow = panel.classList.contains("hidden");
+  document.getElementById("debate-rematch-btn").textContent = currentDebateData?.isPrivate ? "New private room" : "Rematch";
   if (firstShow) {
-    window.classroomActivityComplete?.('live_debate', {
+    if (currentDebateData?.isPrivate && myUid) sessionStorage.removeItem(`veritas:private-room:${myUid}`);
+    window.classroomActivityComplete?.(currentDebateData?.isPrivate ? 'private_debate' : 'live_debate', {
       id: currentDebateId,
-      transcript: (currentDebateData?.turns || []).map(t => ({ uid: t.uid, text: t.text }))
+      transcript: (currentDebateData?.turns || []).map(t => ({ uid: t.uid, text: t.text, audioPath: t.audioPath || null })),
+      assignmentId: currentDebateData?.assignmentId || assignedPractice?.id || null
     });
     panel.classList.remove("hidden");
     window.DA.awardXp(60);
@@ -1020,7 +1205,7 @@ function renderRefereeVerdict() {
   if (!referee.pending && !xpBonusAwarded && currentDebateData && currentDebateData.aiVerdict) {
     xpBonusAwarded = true;
     if (currentDebateData.aiVerdict.winnerUid === myUid) {
-      window.DA.awardXp(40);
+      window.DA.awardXp(40, { trackActivity: false, trackRun: false });
       window.DA.toast("+40 XP win bonus!");
     }
   }
@@ -1034,7 +1219,7 @@ function renderRefereeVerdict() {
   // If the verdict is complete, fetch the updated ELO from the server and show the delta
   const eloChangeEl = document.getElementById("debate-elo-change");
   if (eloChangeEl) {
-    if (!referee.pending) {
+    if (!referee.pending && !currentDebateData?.isPrivate) {
       window.DA.fetchProfile().then(() => {
         const newElo = window.DA.getCachedProfile().eloRating;
         if (newElo !== null) {
@@ -1075,6 +1260,8 @@ if (rematchBtn) rematchBtn.addEventListener("click", () => {
   // Keep the topic so a rematch is a rematch, then drop straight back into
   // the queue rather than making the player walk home and start over.
   const topic = currentDebateData && currentDebateData.topic;
+  const previous = currentDebateData;
+  speech.reset();
   window.DA.playClick();
   stopTurnTimer();
   lastTimedTurnIndex = null;
@@ -1090,7 +1277,15 @@ if (rematchBtn) rematchBtn.addEventListener("click", () => {
       if (txt) txt.textContent = topic;
       if (sel) sel.classList.remove("hidden");
     }
-    startSearch();
+    if (previous?.isPrivate) {
+      document.getElementById('mp-private-topic').value = topic || '';
+      if (!assignedPractice) {
+        document.getElementById('mp-practice-mode').value = previous.practiceMode;
+        document.getElementById('mp-speech-seconds').value = String(previous.speechSeconds);
+        document.getElementById('mp-turns').value = String(previous.maxTurnsPerPlayer);
+      }
+      openPrivateRoom(false);
+    } else startSearch();
   });
 });
 

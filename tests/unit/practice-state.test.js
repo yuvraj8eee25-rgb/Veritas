@@ -7,11 +7,12 @@ function memoryStorage(initial = {}) {
 }
 
 describe("local practice progress", () => {
-  it("keeps historical progress and fills fields introduced later", () => {
+  it("keeps historical rewards and separates legacy skill points", () => {
     const storage = memoryStorage({ [STORAGE_KEY]: JSON.stringify({ totalXp: 120, skills: { logic: 7 }, achievements: ["first-win"] }) });
     const state = loadProgress(storage);
     expect(state.totalXp).toBe(120);
-    expect(state.skills).toEqual({ ...defaultState().skills, logic: 7 });
+    expect(state.skills).toEqual(defaultState().skills);
+    expect(state.legacySkills).toEqual({ logic: 7 });
     expect(state.achievements).toEqual(["first-win"]);
   });
   it("recovers from malformed and incompatible saved data", () => {

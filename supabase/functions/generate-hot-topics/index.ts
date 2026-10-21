@@ -1,5 +1,5 @@
 // =========================================================
-import { withCors } from "../_shared/http.ts";
+import { requireSharedSecret, withCors } from "../_shared/http.ts";
 
 // VERITAS — generate-hot-topics (Supabase Edge Function)
 //
@@ -29,7 +29,6 @@ import { withCors } from "../_shared/http.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const GEMINI_MODEL = "gemini-3.1-flash-lite";
-const CRON_SECRET = Deno.env.get("CRON_SECRET");
 const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
 const NEWSAPI_KEY = Deno.env.get("NEWSAPI_KEY");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -174,9 +173,8 @@ function todayKeyUTC(): string {
 }
 
 Deno.serve(withCors(async (req) => {
-  if (CRON_SECRET && req.headers.get("x-cron-secret") !== CRON_SECRET) {
-    return new Response("Unauthorized", { status: 401 });
-  }
+  const unauthorized = requireSharedSecret(req, "CRON_SECRET", "x-cron-secret");
+  if (unauthorized) return unauthorized;
 
   try {
     let headlines: Headline[] | null = null;

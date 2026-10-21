@@ -1,0 +1,162 @@
+{
+  "f1": {
+    "mode": "fallacy",
+    "difficulty": "easy",
+    "answer": 0
+  },
+  "f2": {
+    "mode": "fallacy",
+    "difficulty": "easy",
+    "answer": 1
+  },
+  "f3": {
+    "mode": "fallacy",
+    "difficulty": "easy",
+    "answer": 0
+  },
+  "f4": {
+    "mode": "fallacy",
+    "difficulty": "medium",
+    "answer": 0
+  },
+  "f5": {
+    "mode": "fallacy",
+    "difficulty": "medium",
+    "answer": 0
+  },
+  "f6": {
+    "mode": "fallacy",
+    "difficulty": "medium",
+    "answer": 0
+  },
+  "f7": {
+    "mode": "fallacy",
+    "difficulty": "hard",
+    "answer": 0
+  },
+  "f8": {
+    "mode": "fallacy",
+    "difficulty": "hard",
+    "answer": 0
+  },
+  "f9": {
+    "mode": "fallacy",
+    "difficulty": "hard",
+    "answer": 0
+  },
+  "r1": {
+    "mode": "rebuttal",
+    "difficulty": "easy",
+    "answer": 0
+  },
+  "r2": {
+    "mode": "rebuttal",
+    "difficulty": "easy",
+    "answer": 0
+  },
+  "r3": {
+    "mode": "rebuttal",
+    "difficulty": "medium",
+    "answer": 0
+  },
+  "r4": {
+    "mode": "rebuttal",
+    "difficulty": "medium",
+    "answer": 0
+  },
+  "r5": {
+    "mode": "rebuttal",
+    "difficulty": "hard",
+    "answer": 0
+  },
+  "r6": {
+    "mode": "rebuttal",
+    "difficulty": "hard",
+    "answer": 0
+  },
+  "r7": {
+    "mode": "rebuttal",
+    "difficulty": "hard",
+    "answer": 0
+  },
+  "s1": {
+    "mode": "speed",
+    "difficulty": "easy",
+    "answer": false
+  },
+  "s2": {
+    "mode": "speed",
+    "difficulty": "easy",
+    "answer": false
+  },
+  "s3": {
+    "mode": "speed",
+    "difficulty": "easy",
+    "answer": true
+  },
+  "s4": {
+    "mode": "speed",
+    "difficulty": "medium",
+    "answer": false
+  },
+  "s5": {
+    "mode": "speed",
+    "difficulty": "medium",
+    "answer": true
+  },
+  "s6": {
+    "mode": "speed",
+    "difficulty": "medium",
+    "answer": false
+  },
+  "s7": {
+    "mode": "speed",
+    "difficulty": "hard",
+    "answer": false
+  },
+  "s8": {
+    "mode": "speed",
+    "difficulty": "hard",
+    "answer": true
+  },
+  "s9": {
+    "mode": "speed",
+    "difficulty": "hard",
+    "answer": false
+  },
+  "st1": {
+    "mode": "steelman",
+    "difficulty": "easy",
+    "answer": 0
+  },
+  "st2": {
+    "mode": "steelman",
+    "difficulty": "easy",
+    "answer": 0
+  },
+  "st3": {
+    "mode": "steelman",
+    "difficulty": "medium",
+    "answer": 0
+  },
+  "st4": {
+    "mode": "steelman",
+    "difficulty": "medium",
+    "answer": 0
+  },
+  "st5": {
+    "mode": "steelman",
+    "difficulty": "hard",
+    "answer": 0
+  },
+  "st6": {
+    "mode": "steelman",
+    "difficulty": "hard",
+    "answer": 0
+  },
+  "st7": {
+    "mode": "steelman",
+    "difficulty": "hard",
+    "answer": 0
+  }
+}

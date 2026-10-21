@@ -41,6 +41,21 @@ export function requestId(request: Request): string {
   return request.headers.get("x-request-id")?.slice(0, 80) || crypto.randomUUID();
 }
 
+export function requireSharedSecret(request: Request, envName: string, headerName: string): Response | null {
+  const secret = Deno.env.get(envName);
+  if (!secret) {
+    console.error(JSON.stringify({ event: "shared_secret_not_configured", envName }));
+    return new Response(JSON.stringify({ error: "Request protection is not configured." }), {
+      status: 503,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+  if (request.headers.get(headerName) !== secret) {
+    return new Response("Unauthorized", { status: 401 });
+  }
+  return null;
+}
+
 export async function guardUserRequest(request: Request, action: string, limit: number, windowSeconds: number): Promise<Response | null> {
   const url = Deno.env.get("SUPABASE_URL");
   const anon = Deno.env.get("SUPABASE_ANON_KEY");

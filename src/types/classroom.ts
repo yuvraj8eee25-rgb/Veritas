@@ -1,6 +1,6 @@
 /** Data contracts for the Classroom service responses and UI state. */
 export type ClassroomRole = "coach" | "student";
-export type AssignmentKind = "debate" | "drill" | "position_paper";
+export type AssignmentKind = "debate" | "drill" | "position_paper" | "ai_debate" | "live_debate" | "private_debate" | "written_debate";
 
 export interface ClassroomSummary {
   id: string;
@@ -19,6 +19,7 @@ export interface ClassroomAssignment {
   status: "draft" | "published";
   due_at: string | null;
   max_score: number;
+  activity_settings?: { topic?: string; mode?: "written" | "speech"; speech_seconds?: number; turns?: number; drill_mode?: string; difficulty?: string };
 }
 
 export interface ClassroomState {

@@ -8,7 +8,7 @@ function appShellWorker() {
       const bundled = Object.values(bundle)
         .filter(file => file.type === "chunk" || (file.type === "asset" && /\.(css|svg|webp|png|woff2?)$/i.test(file.fileName)))
         .map(file => `/${file.fileName}`);
-      const shell = ["/", "/index.html", "/manifest.webmanifest", "/icons/veritas.svg", "/icons/veritas-192.png", "/icons/veritas-512.png", ...bundled];
+      const shell = ["/", "/index.html", "/manifest.webmanifest", "/icons/veritas.svg", "/icons/veritas-192.png", "/icons/veritas-512.png", "/demo/index.html", "/demo/demo.css", "/demo/demo.js", ...bundled];
       const sw = `const CACHE_NAME = "veritas-shell-${process.env.npm_package_version || "1"}";\nconst SHELL = ${JSON.stringify([...new Set(shell)])};\n` +
         `const PRIVATE = /\\/(?:rest\\/v1|auth\\/v1|functions\\/v1|realtime\\/v1|storage\\/v1)(?:\\/|$)/;\n` +
         `self.addEventListener("install", event => event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(SHELL))));\n` +

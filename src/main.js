@@ -9,3 +9,4 @@ import "./features/debates.js";
 import "./features/profile.js";
 import "./features/evidence-lab.js";
 import "./features/classroom.js";
+import "./features/study.js";

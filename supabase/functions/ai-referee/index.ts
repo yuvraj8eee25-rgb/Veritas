@@ -1,5 +1,5 @@
 // =========================================================
-import { withCors } from "../_shared/http.ts";
+import { requireSharedSecret, withCors } from "../_shared/http.ts";
 
 // VERITAS — ai-referee (Supabase Edge Function)
 //
@@ -38,7 +38,6 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 // name before swapping it (same lesson as generate-hot-topics).
 const GEMINI_MODEL = "gemini-3.1-flash-lite";
 
-const AI_REFEREE_SECRET = Deno.env.get("AI_REFEREE_SECRET");
 const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -57,6 +56,7 @@ interface DebateRow {
   turns: Turn[];
   status: string;
   ai_verdict: unknown;
+  conceded_uid?: string;
 }
 
 interface TurnFeedback {
@@ -147,6 +147,8 @@ async function fetchVerdictFromGemini(debate: DebateRow): Promise<Verdict> {
   if (parsed.winner === "A") winnerUid = uidA;
   else if (parsed.winner === "B") winnerUid = uidB;
 
+  if (debate.conceded_uid) winnerUid = debate.player_order.find(uid => uid !== debate.conceded_uid) || null;
+
   const turnFeedback: TurnFeedback[] = Array.isArray(parsed.turnFeedback)
     ? parsed.turnFeedback
         .filter((f: any) => f && typeof f.turn === "number")
@@ -177,9 +179,8 @@ async function fetchVerdictFromGemini(debate: DebateRow): Promise<Verdict> {
    --------------------------------------------------------- */
 
 Deno.serve(withCors(async (req) => {
-  if (AI_REFEREE_SECRET && req.headers.get("x-referee-secret") !== AI_REFEREE_SECRET) {
-    return new Response("Unauthorized", { status: 401 });
-  }
+  const unauthorized = requireSharedSecret(req, "AI_REFEREE_SECRET", "x-referee-secret");
+  if (unauthorized) return unauthorized;
 
   let debateId: string | undefined;
   try {
@@ -201,7 +202,7 @@ Deno.serve(withCors(async (req) => {
   try {
     const { data: debate, error: fetchError } = await supabase
       .from("debates")
-      .select("id, topic, players, player_order, turns, status, ai_verdict")
+      .select("id, topic, players, player_order, turns, status, ai_verdict, conceded_uid")
       .eq("id", debateId)
       .single();
 
@@ -221,13 +222,13 @@ Deno.serve(withCors(async (req) => {
         headers: { "Content-Type": "application/json" },
       });
     }
-    if (!Array.isArray(debate.turns) || debate.turns.length === 0) {
+    if ((!Array.isArray(debate.turns) || debate.turns.length === 0) && !debate.conceded_uid) {
       return new Response(JSON.stringify({ ok: true, skipped: "no turns to score" }), {
         headers: { "Content-Type": "application/json" },
       });
     }
 
-    const verdict = await fetchVerdictFromGemini(debate as DebateRow);
+    const verdict = debate.conceded_uid && !debate.turns.length ? { scores: Object.fromEntries(debate.players.map((uid: string) => [uid, 0])), winnerUid: debate.players.find((uid: string) => uid !== debate.conceded_uid) || null, summary: 'The match ended by concession. No arguments were submitted.', turnFeedback: [], model: 'concession' } : await fetchVerdictFromGemini(debate as DebateRow);
 
     const { error: updateError } = await supabase
       .from("debates")

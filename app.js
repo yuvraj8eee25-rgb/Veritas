@@ -303,7 +303,8 @@ const RANKS = [
   { name: "Logic Tactician", min: 1600 },
   { name: "Master Orator", min: 2800 },
   { name: "Grandmaster of Rhetoric", min: 4500 }
-];
+];
+
 // Applies the rank-tier-N class (0-5, low-to-high, see the RANK TIERS block
 // in styles.css) to a rank display element and strips any previous tier
 // class off it first, since these elements get re-rendered in place.
@@ -384,8 +385,65 @@ function rankForXp(xp) {
 const screens = {};
 document.querySelectorAll(".screen").forEach(s => { screens[s.dataset.screen] = s; });
 let activeScreen = null;
+let isAuthenticated = false;
+let pendingAuthDestination = null;
+const AUTH_REQUIRED_SCREENS = new Set(["ai-debate-room", "multiplayer", "debate-room", "classroom"]);
+const AUTH_RETURN_SCREEN = { "ai-debate-room": "ai-debate", "debate-room": "multiplayer" };
+
+function setGuestUi() {
+  document.getElementById("guest-banner")?.classList.toggle("hidden", isAuthenticated);
+  const signOut = document.getElementById("profile-signout-btn");
+  const signIn = document.getElementById("profile-signin-btn");
+  if (signOut) signOut.hidden = !isAuthenticated;
+  if (signIn) signIn.hidden = isAuthenticated;
+}
+
+function showAuthGate(feature, destination) {
+  pendingAuthDestination = AUTH_RETURN_SCREEN[destination] || destination;
+  const context = document.getElementById("auth-context");
+  if (context) context.textContent = `Sign in or create a free account to use ${feature}. You can keep exploring Veritas as a guest.`;
+  enterAuthMode("login");
+  showScreen("auth");
+}
+
+function requireSignIn(feature, destination = "home") {
+  if (isAuthenticated) return true;
+  showAuthGate(feature, destination);
+  return false;
+}
+
+// A pointer-following accent gives cards a little depth without changing the
+// layout or moving controls. Leave touch and reduced-motion interfaces still.
+const pointerGlowEnabled = window.matchMedia?.("(hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference)").matches;
+if (pointerGlowEnabled) {
+  let pointedSurface = null;
+  document.addEventListener("pointermove", event => {
+    if (event.pointerType !== "mouse") return;
+    const target = event.target instanceof Element
+      ? event.target.closest(".mode-card, .debate-card, .cw-assignment-card, .cw-cohort-card, .daily-strip")
+      : null;
+    if (pointedSurface && pointedSurface !== target) pointedSurface.classList.remove("pointer-aware");
+    pointedSurface = target;
+    if (!target) return;
+    const bounds = target.getBoundingClientRect();
+    target.style.setProperty("--pointer-x", `${((event.clientX - bounds.left) / bounds.width) * 100}%`);
+    target.style.setProperty("--pointer-y", `${((event.clientY - bounds.top) / bounds.height) * 100}%`);
+    target.classList.add("pointer-aware");
+  }, { passive: true });
+  document.addEventListener("pointerout", event => {
+    if (pointedSurface && !pointedSurface.contains(event.relatedTarget)) {
+      pointedSurface.classList.remove("pointer-aware");
+      pointedSurface = null;
+    }
+  }, { passive: true });
+}
 
 function showScreen(name) {
+  if (AUTH_REQUIRED_SCREENS.has(name) && !isAuthenticated) {
+    const labels = { "ai-debate-room": "AI debates", multiplayer: "Live 1v1 matchmaking", "debate-room": "Live 1v1 matchmaking", classroom: "Classroom" };
+    showAuthGate(labels[name] || "this feature", name);
+    return;
+  }
   const next = screens[name];
   if (!next) return;
   if (name === activeScreen) return; // already here — preserve the current view
@@ -400,7 +458,7 @@ function showScreen(name) {
         prev.classList.remove("active", "exit");
       }
       prev._exitTimer = null;
-    }, 150); // matches .screen.exit's 0.12s animation (+ small buffer), not an arbitrary value
+    }, 150); // matches .screen.exit's 0.14s animation (+ small buffer), not an arbitrary value
   }
 
   if (next._exitTimer) {
@@ -413,9 +471,17 @@ function showScreen(name) {
   next.classList.add("enter");
 
   activeScreen = name;
-  document.querySelectorAll(".sidebar-link, .topbar-actions [data-nav]").forEach(el => {
+  if (name === "auth" && !pendingAuthDestination) {
+    const context = document.getElementById("auth-context");
+    if (context) context.textContent = "Sign in to sync your progress and unlock Veritas features. You can also continue exploring as a guest.";
+  }
+  setGuestUi();
+  document.querySelectorAll(".sidebar-link, .topbar-actions [data-nav], .mobile-tabbar [data-nav]").forEach(el => {
     el.classList.toggle("active", el.dataset.nav === name);
+    if (el.dataset.nav === name) el.setAttribute("aria-current", "page");
+    else el.removeAttribute("aria-current");
   });
+  document.querySelector(".mobile-more")?.removeAttribute("open");
   onScreenShown(name);
 }
 
@@ -428,6 +494,7 @@ document.querySelectorAll("[data-nav]").forEach(el => {
 
 function onScreenShown(name) {
   if (name === "home") renderHome();
+  if (name === "study") window.VeritasStudy?.render();
   if (name === "profile") {
     renderProfile();
     if (window.avatarRenderProfile) window.avatarRenderProfile();
@@ -673,6 +740,7 @@ function tickUp(el, from, to, duration = 900) {
    --------------------------------------------------------- */
 
 function renderHome() {
+  state.skills = masteryScores(state.assessments);
   const { current: currentRank, next } = rankForXp(state.totalXp);
 
   const hour = new Date().getHours();
@@ -684,22 +752,28 @@ function renderHome() {
   const homeRankEl = document.getElementById("home-rank");
   homeRankEl.textContent = currentRank.name;
   paintRankTier(homeRankEl, currentRank);
-  document.getElementById("sidebar-xp-mini").textContent = state.totalXp.toLocaleString() + " XP";
   const xpEl = document.getElementById("home-xp-value");
   tickUp(xpEl, 0, state.totalXp, 700);
   const pct = next ? Math.min(100, ((state.totalXp - currentRank.min) / (next.min - currentRank.min)) * 100) : 100;
   document.getElementById("home-xp-fill").style.width = pct + "%";
+  const xpBar = document.getElementById("home-xp-bar");
+  if (xpBar) {
+    xpBar.setAttribute("aria-valuenow", String(Math.round(pct)));
+    xpBar.setAttribute("aria-valuetext", next
+      ? `${state.totalXp - currentRank.min} of ${next.min - currentRank.min} XP toward ${next.name}`
+      : "Maximum rank reached");
+  }
   document.getElementById("home-xp-next").textContent = next
     ? `${next.min - state.totalXp} XP to ${next.name}`
     : "Max rank reached";
   document.getElementById("home-streak").textContent = state.streak;
 
   document.getElementById("home-stat-debates").textContent = state.totalRuns.toLocaleString();
-  document.getElementById("home-stat-streak").textContent = state.streak;
 
   // ELO + win-rate from server profile (may still be null on first load)
   const ratingEl = document.getElementById("home-stat-rating");
   const winrateEl = document.getElementById("home-stat-winrate");
+  const winrateNote = document.getElementById("home-stat-winrate-note");
   if (ratingEl) {
     ratingEl.textContent = cachedProfile.eloRating !== null
       ? cachedProfile.eloRating.toLocaleString()
@@ -709,12 +783,15 @@ function renderHome() {
     const { wins, losses, ties } = cachedProfile;
     const total = (wins || 0) + (losses || 0) + (ties || 0);
     winrateEl.classList.remove("positive", "negative");
+    winrateEl.classList.toggle("not-rated", total === 0);
     if (total > 0) {
       const pct = Math.round(((wins || 0) / total) * 100);
       winrateEl.textContent = pct + "%";
       winrateEl.classList.add(pct >= 50 ? "positive" : "negative");
+      if (winrateNote) winrateNote.textContent = "Across rated Live 1v1 debates";
     } else {
       winrateEl.textContent = "—";
+      if (winrateNote) winrateNote.textContent = "Complete a rated Live 1v1 to see your win rate";
     }
   }
 
@@ -740,8 +817,101 @@ function renderHome() {
     grid.appendChild(card);
   });
 
+  // Keep the practice list in its familiar order. Surface a frequently used
+  // drill separately so the dashboard can adapt without moving navigation.
+  const highlight = document.getElementById("home-practice-highlight");
+  if (highlight) {
+    const favorite = Object.entries(state.modeStats)
+      .filter(([key, stats]) => MODE_META[key] && stats?.plays >= 3)
+      .sort((a, b) => (b[1].plays - a[1].plays)
+        || String(b[1].lastPlayedAt || "").localeCompare(String(a[1].lastPlayedAt || "")))[0];
+    if (favorite) {
+      const [key, stats] = favorite;
+      const mode = MODE_META[key];
+      const playCount = Math.max(0, Math.floor(Number(stats.plays) || 0));
+      const bestPct = Math.max(0, Math.min(100, Math.round(Number(stats.bestPct) || 0)));
+      highlight.innerHTML = `
+        <article class="practice-highlight">
+          <div class="practice-highlight-copy">
+            <span class="classroom-eyebrow">YOUR GO-TO DRILL</span>
+            <h3></h3>
+            <p></p>
+          </div>
+          <button type="button" class="ghost-btn practice-highlight-action">Run again <span aria-hidden="true">↗</span></button>
+          <details class="practice-highlight-note">
+            <summary>Why am I seeing this?</summary>
+            <p>This is the practice drill you’ve completed most often. Your drill list below stays in the same order.</p>
+          </details>
+        </article>`;
+      highlight.querySelector("h3").textContent = mode.name;
+      highlight.querySelector(".practice-highlight-copy p").textContent = `${playCount} completed run${playCount === 1 ? "" : "s"} · Best score ${bestPct}%`;
+      highlight.querySelector(".practice-highlight-action")?.addEventListener("click", () => {
+        playClick();
+        openModeSelect(key);
+      });
+    } else {
+      highlight.innerHTML = "";
+    }
+  }
+
   updateDailyCountdownAll();
+  renderHomeCoach();
   renderRecentActivity();
+}
+
+function renderHomeCoach() {
+  const list = document.getElementById("home-skill-list");
+  if (!list) return;
+
+  const skillModes = [
+    { key: "logic", label: "Evidence & logic", mode: "fallacy" },
+    { key: "strategy", label: "Rebuttals", mode: "rebuttal" },
+    { key: "rhetoric", label: "Steelman", mode: "steelman" },
+    { key: "speed", label: "Quick thinking", mode: "speed" }
+  ];
+  const nextSkill = skillModes
+    .map(item => ({ ...item, value: Math.max(0, Math.min(100, Number(state.skills?.[item.key]) || 0)) }))
+    .sort((a, b) => a.value - b.value)[0];
+  const mode = MODE_META[nextSkill.mode];
+  const heroNextStep = document.getElementById("home-hero-next-step");
+  if (heroNextStep) {
+    heroNextStep.replaceChildren(document.createTextNode(`Next up: ${mode.name}`));
+    const arrow = document.createElement("span");
+    arrow.setAttribute("aria-hidden", "true");
+    arrow.textContent = " ↗";
+    heroNextStep.appendChild(arrow);
+    heroNextStep.onclick = () => {
+      playClick();
+      openModeSelect(nextSkill.mode);
+    };
+  }
+
+  list.replaceChildren();
+  skillModes.forEach(({ key, label }) => {
+    const value = Math.max(0, Math.min(100, Number(state.skills?.[key]) || 0));
+    const row = document.createElement("div");
+    row.className = "coach-skill-row";
+    const meta = document.createElement("div");
+    meta.className = "coach-skill-meta";
+    const name = document.createElement("span");
+    name.textContent = label;
+    const score = document.createElement("span");
+    score.textContent = Object.values(state.assessments).some(r => r.skill === key) ? `${value}%` : "Not assessed";
+    meta.append(name, score);
+    const track = document.createElement("div");
+    track.className = "coach-skill-track";
+    track.setAttribute("role", "progressbar");
+    track.setAttribute("aria-label", label);
+    track.setAttribute("aria-valuemin", "0");
+    track.setAttribute("aria-valuemax", "100");
+    track.setAttribute("aria-valuenow", String(value));
+    track.setAttribute("aria-valuetext", `${value}% drill mastery estimate from fresh assessments at different difficulties`);
+    const fill = document.createElement("span");
+    fill.style.width = `${value}%`;
+    track.appendChild(fill);
+    row.append(meta, track);
+    list.appendChild(row);
+  });
 }
 
 function formatActivityDate(dateStr) {
@@ -754,6 +924,34 @@ function formatActivityDate(dateStr) {
 function renderRecentActivity() {
   const list = document.getElementById("home-activity-list");
   if (!list) return;
+  const recentModes = Object.entries(state.modeStats || {})
+    .filter(([key, stats]) => MODE_META[key] && stats?.lastPlayedAt)
+    .sort((a, b) => String(b[1].lastPlayedAt).localeCompare(String(a[1].lastPlayedAt)))
+    .slice(0, 5);
+
+  if (recentModes.length) {
+    list.replaceChildren();
+    recentModes.forEach(([key, stats]) => {
+      const date = new Date(stats.lastPlayedAt);
+      const dateLabel = Number.isNaN(date.getTime())
+        ? "Recent"
+        : date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+      const row = document.createElement("div");
+      row.className = "activity-row";
+      const dateEl = document.createElement("span");
+      dateEl.className = "activity-row-date";
+      dateEl.textContent = dateLabel;
+      const desc = document.createElement("span");
+      desc.className = "activity-row-desc";
+      const plays = Math.max(0, Math.floor(Number(stats.plays) || 0));
+      const score = Math.max(0, Math.min(100, Math.round(Number(stats.bestPct) || 0)));
+      desc.textContent = `${MODE_META[key].name} · ${plays} run${plays === 1 ? "" : "s"} · Best ${score}%`;
+      row.append(dateEl, desc);
+      list.appendChild(row);
+    });
+    return;
+  }
+
   const days = Object.keys(state.activity)
     .filter(day => state.activity[day] > 0)
     .sort((a, b) => b.localeCompare(a))
@@ -795,6 +993,7 @@ function renderRecentActivity() {
 
 let modeKey = null;
 let modeDifficulty = "all";
+let summaryRecommendedDifficulty = "all";
 
 function openModeSelect(selectedKey) {
   const mode = MODE_META[selectedKey];
@@ -864,10 +1063,11 @@ function startGame(modeKey, difficulty) {
   const attemptKey = `${modeKey}-${difficulty}`;
   const attempt = (playAttemptCounts[attemptKey] = (playAttemptCounts[attemptKey] || 0) + 1);
   pool = seededShuffle(pool, `${todayStr()}-${modeKey}-${difficulty}-${attempt}`);
-  pool = pool.slice(0, Math.min(8, pool.length));
+  pool = prioritizeAssessment(pool, mode.skill, state.assessments).slice(0, Math.min(8, pool.length));
 
   gameCtx = {
-    modeKey, mode, questions: pool,
+    modeKey, mode, difficulty, questions: pool,
+    answers: [],
     index: 0, correctCount: 0,
     streakCur: 0, streakBest: 0,
     score: 0,
@@ -950,11 +1150,12 @@ function renderQuestion() {
   } else {
     optionsGrid.classList.remove("tf-grid");
     const letters = ["A", "B", "C", "D"];
-    q.options.forEach((opt, i) => {
+    shuffleArray(q.options.map((opt, originalIndex) => ({ opt, originalIndex }))).forEach(({ opt, originalIndex }, i) => {
       const btn = document.createElement("button");
       btn.className = "option-btn";
       btn.innerHTML = `<span class="option-letter">${letters[i]}</span><span>${opt}</span>`;
-      btn.addEventListener("click", () => selectAnswer(i));
+      btn.dataset.answer = String(originalIndex);
+      btn.addEventListener("click", () => selectAnswer(originalIndex));
       optionsGrid.appendChild(btn);
     });
   }
@@ -1002,12 +1203,20 @@ function selectAnswer(answer, timedOut = false) {
     correctIdx = q.answer ? 0 : 1;
   } else {
     isCorrect = !timedOut && answer === q.correct;
-    correctIdx = q.correct;
+    correctIdx = buttons.findIndex(b => Number(b.dataset.answer) === q.correct);
   }
+
+  gameCtx.answers.push({
+    id: q.id, answer, timedOut,
+    prompt: q.prompt,
+    difficulty: q.difficulty,
+    correct: isCorrect,
+    tip: q.tip || ""
+  });
 
   buttons.forEach((b, i) => {
     if (i === correctIdx) b.classList.add("correct");
-    else if (!timedOut && i === answer) b.classList.add("incorrect");
+    else if (!timedOut && (mode.type === "tf" ? i === (answer ? 0 : 1) : Number(b.dataset.answer) === answer)) b.classList.add("incorrect");
     else b.classList.add("dim");
   });
 
@@ -1090,13 +1299,17 @@ function finishGame() {
   const newStats = {
     bestPct: Math.max(prevStats.bestPct, accuracy),
     plays: prevStats.plays + 1,
-    bestScore: Math.max(prevStats.bestScore, gameCtx.score)
+    bestScore: Math.max(prevStats.bestScore, gameCtx.score),
+    lastPlayedAt: new Date().toISOString()
   };
   state.modeStats[gameCtx.modeKey] = newStats;
 
   // skill bump
-  const skillGain = Math.round((accuracy / 100) * 8) + 2;
-  state.skills[mode.skill] = Math.min(100, (state.skills[mode.skill] || 0) + skillGain);
+  const previousMastery = state.skills[mode.skill] || 0;
+  const assessment = recordAssessment(state.assessments, mode.skill, gameCtx.answers);
+  state.assessments = assessment.records;
+  state.skills = assessment.scores;
+  const skillGain = state.skills[mode.skill] - previousMastery;
 
   const baseXp = Math.round(mode.xp * (correctCount / total));
   const accuracyBonus = accuracy >= 80 ? Math.round(mode.xp * 0.25) : accuracy >= 50 ? Math.round(mode.xp * 0.1) : 0;
@@ -1130,7 +1343,8 @@ function finishGame() {
     window.setTimeout(() => { playLevelUp(); toast("Rank up: " + newRank.name + "!"); }, 500);
   }
 
-  renderSummary({ correctCount, total, accuracy, streakBest, mode, baseXp, accuracyBonus, streakBonus, totalXpGain });
+  window.classroomActivityComplete?.("drill", { modeKey: gameCtx.modeKey, difficulty: gameCtx.difficulty, answers: gameCtx.answers, correct: correctCount, total, accuracy, mastery: state.skills[mode.skill], assessed: assessment.assessed });
+  renderSummary({ assessed: assessment.assessed, correctCount, total, accuracy, streakBest, mode, modeKey: gameCtx.modeKey, difficulty: gameCtx.difficulty, answers: gameCtx.answers, skillGain, baseXp, accuracyBonus, streakBonus, totalXpGain });
   showScreen("summary");
 }
 
@@ -1139,10 +1353,11 @@ function finishGame() {
    --------------------------------------------------------- */
 
 function renderSummary(data) {
-  const { correctCount, total, accuracy, streakBest, mode, baseXp, accuracyBonus, streakBonus, totalXpGain } = data;
+  const { correctCount, total, accuracy, streakBest, mode, modeKey: completedMode, difficulty, answers = [], assessed = 0, skillGain, baseXp, accuracyBonus, streakBonus, totalXpGain } = data;
 
   document.getElementById("summary-eyebrow").textContent = accuracy >= 80 ? "Excellent Run" : accuracy >= 50 ? "Run Complete" : "Keep Practicing";
   document.getElementById("summary-mode-name").textContent = mode.name;
+  document.getElementById("summary-mode-name").dataset.modeKey = completedMode || "";
   document.getElementById("summary-correct").textContent = `${correctCount}/${total}`;
   document.getElementById("summary-accuracy").textContent = `${accuracy}%`;
   document.getElementById("summary-streak-best").textContent = streakBest;
@@ -1151,6 +1366,31 @@ function renderSummary(data) {
   document.getElementById("xp-line-accuracy").querySelector("span:last-child").textContent = "+" + accuracyBonus;
   document.getElementById("xp-line-streak").querySelector("span:last-child").textContent = "+" + streakBonus;
   document.getElementById("xp-line-total").querySelector("span:last-child").textContent = "+" + totalXpGain;
+
+  const hardestCorrect = answers.filter(answer => answer.correct)
+    .sort((a, b) => ({ easy: 1, medium: 2, hard: 3 }[b.difficulty] || 0) - ({ easy: 1, medium: 2, hard: 3 }[a.difficulty] || 0))[0];
+  const hardestMiss = answers.filter(answer => !answer.correct)
+    .sort((a, b) => ({ easy: 1, medium: 2, hard: 3 }[b.difficulty] || 0) - ({ easy: 1, medium: 2, hard: 3 }[a.difficulty] || 0))[0];
+  document.getElementById("summary-strength-copy").textContent = hardestCorrect
+    ? `You got ${correctCount} of ${total} right, including a ${hardestCorrect.difficulty} question.`
+    : `You completed all ${total} questions. The explanations are a useful starting point for your next run.`;
+  document.getElementById("summary-improve-copy").textContent = hardestMiss
+    ? `Start with this one you missed: ${hardestMiss.prompt}`
+    : "Every answer was correct. Take a harder set to keep stretching this skill.";
+  document.getElementById("summary-improve-tip").textContent = hardestMiss?.tip || "Your answers were correct throughout this run.";
+
+  const difficultyOrder = ["all", "easy", "medium", "hard"];
+  const currentDifficulty = Math.max(0, difficultyOrder.indexOf(difficulty));
+  const recommendedIndex = accuracy >= 80
+    ? Math.min(3, currentDifficulty + (currentDifficulty < 2 ? 2 - currentDifficulty : 1))
+    : difficulty === "hard" ? 2 : 1;
+  summaryRecommendedDifficulty = difficultyOrder[recommendedIndex];
+  document.getElementById("summary-retry-btn").textContent = hardestMiss
+    ? `Practice ${mode.name} · ${summaryRecommendedDifficulty}`
+    : `Try ${summaryRecommendedDifficulty} questions`;
+  document.getElementById("summary-retry-btn").disabled = !completedMode;
+  const skillLabels = { logic: "Evidence & logic", strategy: "Rebuttals", rhetoric: "Steelman", speed: "Quick thinking" };
+  document.getElementById("summary-strength-detail").textContent = `${skillLabels[mode.skill] || mode.name}: ${state.skills[mode.skill]}% drill mastery (${skillGain > 0 ? "+" : ""}${skillGain}). ${assessed} fresh checks; immediate retries earn XP only.`;
 
   const values = SKILL_KEYS.map(k => state.skills[k] || 0);
   drawRadar(document.getElementById("radar-canvas"), values);
@@ -1162,6 +1402,8 @@ document.getElementById("summary-retry-btn").addEventListener("click", () => {
     window.DA.toast("No mode selected for retry.");
     return;
   }
+  modeKey = document.getElementById("summary-mode-name").dataset.modeKey || modeKey;
+  modeDifficulty = summaryRecommendedDifficulty;
   startGame(modeKey, modeDifficulty);
 });
 document.getElementById("summary-home-btn").addEventListener("click", () => {
@@ -1186,10 +1428,11 @@ function renderProfileWeek() {
   const previous = days.slice(0, 7).reduce((sum, day) => sum + day.count, 0);
   const peak = Math.max(1, ...recent.map(day => day.count));
   chart.innerHTML = recent.map(({date, count}) => `<div class="profile-day"><span>${count}</span><div class="profile-day-track"><div style="height:${count / peak * 100}%"></div></div><span>${date.toLocaleDateString(undefined, {weekday:'short', timeZone:'UTC'})}</span></div>`).join('');
-  document.getElementById("profile-week-summary").textContent = total ? `${total} activities · ${recent.filter(day => day.count > 0).length} active days · ${total === previous ? 'same as' : Math.abs(total - previous) + (total > previous ? ' more than' : ' fewer than')} the previous seven days.` : 'Your next completed activity starts this week’s chart.';
+  document.getElementById("profile-week-summary").textContent = total ? `${total} sessions · ${recent.filter(day => day.count > 0).length} active days · ${total === previous ? 'same as' : Math.abs(total - previous) + (total > previous ? ' more than' : ' fewer than')} the previous seven days.` : 'Your next completed session starts this week’s chart.';
 }
 
 function renderProfile() {
+  state.skills = masteryScores(state.assessments);
   renderProfileWeek();
   const nameEl = document.getElementById("profile-display-name");
   if (nameEl) nameEl.textContent = cachedProfile.displayName || "Debater";
@@ -1207,9 +1450,9 @@ function renderProfile() {
       const wl = cachedProfile.wins !== null
         ? ` · ${cachedProfile.wins}W ${cachedProfile.losses}L ${cachedProfile.ties}T`
         : "";
-      eloEl.textContent = `Debate ELO: ${cachedProfile.eloRating}${wl}`;
+      eloEl.textContent = `Live rating: ${cachedProfile.eloRating}${wl}`;
     } else {
-      eloEl.textContent = "Debate ELO: — (play a multiplayer match to earn one)";
+      eloEl.textContent = "Live rating: — (play a multiplayer match to earn one)";
     }
   }
 
@@ -1268,8 +1511,8 @@ function renderProfile() {
   const radarNote = document.getElementById("profile-radar-note");
   if (radarNote) {
     radarNote.textContent = values.some(v => v > 0)
-      ? "Strongest axis leads; the shape fills out as you practise each mode."
-      : "Win practice rounds to push each axis outward.";
+      ? "Drill performance estimate: distinct questions, difficulty and delayed reviews. XP counts participation."
+      : "Complete fresh drill questions to establish a performance estimate. Unmeasured skills remain unassessed.";
   }
 
   /* --- Practice focus: same skill values as the radar, ranked weakest-first
@@ -1277,13 +1520,13 @@ function renderProfile() {
   const bars = document.getElementById("profile-skill-bars");
   if (bars) {
     bars.innerHTML = SKILL_KEYS
-      .map((k, i) => ({ label: SKILL_LABELS[i], val: state.skills[k] || 0 }))
+      .map((k, i) => ({ label: SKILL_LABELS[i], val: state.skills[k] || 0, assessed: Object.values(state.assessments).some(r => r.skill === k) }))
       .sort((a, b) => a.val - b.val)
       .map(sk => `
         <li class="skill-bar-row">
           <span class="skill-bar-name">${sk.label}</span>
-          <span class="skill-bar-track"><span class="skill-bar-fill" style="width:${Math.max(2, Math.min(100, sk.val))}%"></span></span>
-          <span class="skill-bar-val">${Math.round(sk.val)}</span>
+          <span class="skill-bar-track"><span class="skill-bar-fill" style="width:${Math.max(0, Math.min(100, sk.val))}%"></span></span>
+          <span class="skill-bar-val">${sk.assessed ? Math.round(sk.val) + "%" : "Unassessed"}</span>
         </li>`)
       .join("");
   }
@@ -1335,29 +1578,32 @@ document.getElementById("reset-progress-btn").addEventListener("click", () => {
 
 /* ---------------------------------------------------------
    13. LEADERBOARD
-   XP tabs: mock data + player's own local XP (unchanged behaviour).
-   Debate ELO tab: real data from the profiles table.
+   XP view uses local XP plus clearly-labelled sample opponents.
+   Live debate rating uses real data from the profiles table.
    --------------------------------------------------------- */
 
-const MOCK_LB_NAMES = ["Aria K.", "Devon P.", "Lena W.", "Mika T.", "Sam R.", "Priya N.", "Jonas L.", "Talia M.", "Eli B.", "Nadia F."];
+const SAMPLE_XP_NAMES = ["Aria K.", "Devon P.", "Lena W.", "Mika T.", "Sam R.", "Priya N.", "Jonas L.", "Talia M.", "Eli B.", "Nadia F."];
 
 // Which tab is currently active (data-lb attribute value)
-let activeLbTab = "weekly";
+let activeLbTab = "xp";
 
 async function renderLeaderboard() {
   const list = document.getElementById("lb-list");
+  const caption = document.getElementById("lb-caption");
   list.innerHTML = "";
 
   if (activeLbTab === "elo") {
+    caption.textContent = "Live debate rating reflects results from completed multiplayer matches.";
     await renderEloLeaderboard(list);
   } else {
+    caption.textContent = "Your XP is your real total from this device. Other names and scores here are sample standings.";
     renderXpLeaderboard(list);
   }
 }
 
 function renderXpLeaderboard(list) {
   const rng = mulberry32(42);
-  const mockScores = MOCK_LB_NAMES.map(n => ({ name: n, score: Math.floor(400 + rng() * 3200) }));
+  const mockScores = SAMPLE_XP_NAMES.map(n => ({ name: n, score: Math.floor(400 + rng() * 3200) }));
   mockScores.push({ name: cachedProfile.displayName || "You", score: state.totalXp, self: true });
   mockScores.sort((a, b) => b.score - a.score);
 
@@ -1384,7 +1630,7 @@ async function renderEloLeaderboard(list) {
   const loadEl = document.createElement("div");
   loadEl.className = "lb-row";
   loadEl.style.opacity = "0.5";
-  loadEl.innerHTML = `<span style="font-size:0.85rem;padding:1rem 0">Loading ELO rankings…</span>`;
+  loadEl.innerHTML = `<span style="font-size:0.85rem;padding:1rem 0">Loading live ratings…</span>`;
   list.appendChild(loadEl);
 
   try {
@@ -1399,7 +1645,7 @@ async function renderEloLeaderboard(list) {
 
     list.innerHTML = "";
     if (!data || !data.length) {
-      list.innerHTML = `<p style="padding:1.5rem;opacity:0.5;font-size:0.9rem">No ELO data yet — complete a multiplayer debate to appear here.</p>`;
+      list.innerHTML = `<p style="padding:1.5rem;opacity:0.5;font-size:0.9rem">No live ratings yet — complete a multiplayer debate to appear here.</p>`;
       return;
     }
 
@@ -1418,13 +1664,13 @@ async function renderEloLeaderboard(list) {
           <div class="lb-name">${name}${isSelf ? " (you)" : ""}</div>
           <div class="lb-sub">${record}</div>
         </span>
-        <span class="lb-score">${(row.elo_rating || 1200).toLocaleString()} ELO</span>
+        <span class="lb-score">${(row.elo_rating || 1200).toLocaleString()} rating</span>
       `;
       list.appendChild(el);
     });
   } catch (e) {
-    console.error("ELO leaderboard fetch failed:", e);
-    list.innerHTML = `<p style="padding:1.5rem;opacity:0.5;font-size:0.9rem">Couldn't load ELO rankings — check your connection.</p>`;
+    console.error("Live rating leaderboard fetch failed:", e);
+    list.innerHTML = `<p style="padding:1.5rem;opacity:0.5;font-size:0.9rem">Couldn't load live ratings — check your connection.</p>`;
   }
 }
 
@@ -1441,7 +1687,7 @@ document.querySelectorAll(".lb-tab").forEach(tab => {
   tab.addEventListener("click", () => {
     document.querySelectorAll(".lb-tab").forEach(t => t.classList.remove("active"));
     tab.classList.add("active");
-    activeLbTab = tab.dataset.lb || "weekly";
+    activeLbTab = tab.dataset.lb || "xp";
     playClick();
     const list = document.getElementById("lb-list");
     list.classList.add("is-loading");
@@ -1493,6 +1739,8 @@ function updateDailyCountdownAll() {
   const done = isDailyDone();
   document.getElementById("daily-title").textContent = done ? "Challenge Complete" : mode.name + " Sprint";
   document.getElementById("daily-desc").textContent = done ? "Come back tomorrow for a new challenge" : "3\u00D7 XP multiplier \u00B7 4 questions";
+  const cta = document.getElementById("daily-cta-label");
+  if (cta) cta.innerHTML = done ? 'Done for today <span aria-hidden="true">✓</span>' : 'Start challenge <span aria-hidden="true">→</span>';
   tickCountdown();
 }
 
@@ -1528,7 +1776,7 @@ document.getElementById("daily-start-btn").addEventListener("click", () => {
   let pool = seededShuffle(mode.data.slice(), `daily-${todayStr()}-${modeKey}`).slice(0, 4);
 
   gameCtx = {
-    modeKey, mode, questions: pool,
+    modeKey, mode, difficulty: "all", questions: pool, answers: [],
     index: 0, correctCount: 0,
     streakCur: 0, streakBest: 0,
     score: 0,
@@ -1585,6 +1833,9 @@ function enterAuthMode(mode) {
   const tabSignup = document.getElementById("auth-tab-signup");
   const submitBtn = document.getElementById("auth-submit-btn");
   if (!loginForm || !forgotForm || !resetForm) return;
+
+  const guestButton = document.getElementById("auth-continue-guest-btn");
+  if (guestButton) guestButton.hidden = mode === "forgot" || mode === "reset";
 
   [tabs, loginForm, forgotForm, resetForm].forEach(el => el && el.classList.add("hidden"));
 
@@ -1668,6 +1919,8 @@ function setupAuthEventListeners() {
       if (authMode === "login") {
         const { error } = await window.mpSupabase.signIn(email, password);
         if (error) throw error;
+        isAuthenticated = true;
+        setGuestUi();
         showAlert("Logged in successfully!", "success");
         // Clear forms
         emailInput.value = "";
@@ -1675,22 +1928,28 @@ function setupAuthEventListeners() {
         // Wait a brief moment to show success, then redirect
         window.setTimeout(() => {
           hideAlert();
-          showScreen("home");
+          const destination = pendingAuthDestination || "home";
+          pendingAuthDestination = null;
+          showScreen(destination);
           fetchProfileFromServer();
         }, 800);
       } else {
         const { error } = await window.mpSupabase.signUp(email, password);
         if (error) throw error;
-        
+
         // Check if auto-signed in immediately (no confirmation email required setting)
         const session = await window.mpSupabase.getSession();
         if (session && session.user) {
+          isAuthenticated = true;
+          setGuestUi();
           showAlert("Account created successfully!", "success");
           emailInput.value = "";
           passwordInput.value = "";
           window.setTimeout(() => {
             hideAlert();
-            showScreen("home");
+            const destination = pendingAuthDestination || "home";
+            pendingAuthDestination = null;
+            showScreen(destination);
             fetchProfileFromServer();
           }, 800);
         } else {
@@ -1848,6 +2107,9 @@ function setupAuthEventListeners() {
         playClick();
         try {
           await window.mpSupabase.signOut();
+          isAuthenticated = false;
+          pendingAuthDestination = null;
+          setGuestUi();
           // Reset cached profiles
           cachedProfile.eloRating = null;
           cachedProfile.wins = null;
@@ -1856,10 +2118,9 @@ function setupAuthEventListeners() {
           cachedProfile.displayName = null;
           cachedProfile.avatarFileId = null;
           if (window.avatarRenderProfile) window.avatarRenderProfile();
-          
-          // Redirect to auth
-          showScreen("auth");
-          enterAuthMode("login");
+
+          // Return to the public guest experience after signing out.
+          showScreen("home");
         } catch (e) {
           console.error("Sign out failed:", e);
           toast("Sign out failed.");
@@ -1867,6 +2128,22 @@ function setupAuthEventListeners() {
       }
     });
   }
+
+  document.getElementById("auth-continue-guest-btn")?.addEventListener("click", () => {
+    playClick();
+    pendingAuthDestination = null;
+    showScreen("home");
+  });
+  document.querySelectorAll("[data-open-auth]").forEach(button => {
+    button.addEventListener("click", () => {
+      playClick();
+      pendingAuthDestination = null;
+      const context = document.getElementById("auth-context");
+      if (context) context.textContent = "Sign in to sync your progress and unlock Veritas features. You can also continue exploring as a guest.";
+      enterAuthMode(button.dataset.authMode || "login");
+      showScreen("auth");
+    });
+  });
 }
 
 /* ---------------------------------------------------------
@@ -1985,6 +2262,8 @@ function init() {
       if (window.mpSupabase) {
         const session = await window.mpSupabase.getSession();
         if (session && session.user) {
+          isAuthenticated = true;
+          setGuestUi();
           if (window.mpSupabase.isPasswordRecovery) {
             // Signed in via a "reset password" email link, not a normal
             // login — collect a new password before letting them into the app.
@@ -1996,15 +2275,21 @@ function init() {
             fetchProfileFromServer();
           }
         } else {
-          // User is not authenticated, show Auth screen
-          showScreen("auth");
+          // Guests can explore public practice and learning screens.
+          isAuthenticated = false;
+          setGuestUi();
+          showScreen("home");
         }
       } else {
+        isAuthenticated = false;
+        setGuestUi();
         showScreen("home");
       }
     } catch (e) {
       console.error("Session check failed:", e);
-      showScreen("auth");
+      isAuthenticated = false;
+      setGuestUi();
+      showScreen("home");
     }
   }, 1900);
 }
@@ -2021,9 +2306,9 @@ window.DA = {
   showScreen: showScreen,
   playClick: playClick,
   awardXp: function (amount, opts) {
-    opts = opts || {};
+    opts = opts && typeof opts === "object" ? opts : {};
     state.totalXp += amount;
-    state.totalRuns += 1;
+    if (opts.trackRun !== false) state.totalRuns += 1;
     if (opts.trackActivity !== false) {
       const key = todayStr();
       state.activity[key] = (state.activity[key] || 0) + 1;
@@ -2035,7 +2320,13 @@ window.DA = {
   getCachedProfile: function () {
     return cachedProfile;
   },
+  startAssignedDrill: function (settings) {
+    modeKey = MODE_META[settings.drill_mode] ? settings.drill_mode : "fallacy";
+    modeDifficulty = settings.difficulty || "all";
+    startGame(modeKey, modeDifficulty);
+  },
   fetchProfile: fetchProfileFromServer,
+  requireSignIn: requireSignIn,
   pushProfile: function () {
     return typeof pushProfileToServer === "function" ? pushProfileToServer() : Promise.resolve();
   }
@@ -2102,6 +2393,8 @@ async function pushProfileToServer() {
       streak:       state.streak,
       totalRuns:    state.totalRuns,
       skills:       state.skills,
+      masteryVersion: 2,
+      assessments: state.assessments,
       modeStats:    state.modeStats,
       avatarFileId: cachedProfile.avatarFileId || null
     };
@@ -2131,4 +2424,5 @@ if (window.mpSupabase) {
 }
 
 })();
+import { recordAssessment, prioritizeAssessment, masteryScores } from "./src/features/mastery.js";
 import { loadProgress, saveProgress } from "./src/features/practice-state.js";

@@ -1082,7 +1082,7 @@ function updateUIOnTrace(state, event) {
         stepCard.className = "trace-step-card completed";
         const statusPill = stepCard.querySelector(".trace-status-pill");
         if (statusPill) {
-          statusPill.textContent = "VERIFIED";
+          statusPill.textContent = event.tool === "final_verification" ? "VERIFIED" : "COMPLETE";
           statusPill.className = "trace-status-pill completed";
         }
         const outputBox = stepCard.querySelector(".trace-output-box");
@@ -1262,6 +1262,7 @@ async function startInvestigationUI() {
     if (window.DA && window.DA.toast) window.DA.toast("Enter a claim or proposition first.");
     return;
   }
+  if (!window.DA.requireSignIn("the Evidence Lab", "investigation")) return;
 
   const demoSelect = document.getElementById("agent-demo-mode-select");
   const demoMode = demoSelect ? demoSelect.value : "normal";
@@ -1269,10 +1270,11 @@ async function startInvestigationUI() {
   if (window.DA && window.DA.playClick) window.DA.playClick();
 
   isRunning = true;
+  document.getElementById("agent-sample-preview")?.classList.add("hidden");
   const btn = document.getElementById("agent-start-btn");
   if (btn) {
     btn.disabled = true;
-    btn.textContent = "Auditing Literature...";
+    btn.textContent = "Investigating sources…";
   }
 
   // Reset UI elements
@@ -1302,12 +1304,14 @@ async function startInvestigationUI() {
     isRunning = false;
     if (btn) {
       btn.disabled = false;
-      btn.textContent = "Launch Analytical Audit";
+      btn.textContent = "Investigate this claim";
     }
   }
 }
 
 function initAgentEventListeners() {
+  const demoControls = document.querySelector(".agent-demo-mode-select");
+  if (demoControls) demoControls.hidden = new URLSearchParams(location.search).get("dev") !== "1";
   const verdictCard = document.getElementById("agent-verdict-card");
   const outputHeader = document.querySelector(".agent-output-panel .agent-panel-header");
   if (verdictCard && outputHeader) outputHeader.after(verdictCard);
@@ -1357,10 +1361,15 @@ function initAgentEventListeners() {
   document.querySelectorAll(".filter-tab").forEach(tab => {
     tab.addEventListener("click", (e) => {
       if (window.DA && window.DA.playClick) window.DA.playClick();
-      document.querySelectorAll(".filter-tab").forEach(t => t.classList.remove("active"));
-      e.target.classList.add("active");
-      
-      const filter = e.target.getAttribute("data-filter");
+      const selectedTab = e.target.closest(".filter-tab");
+      if (!selectedTab) return;
+      document.querySelectorAll(".filter-tab").forEach(t => {
+        const selected = t === selectedTab;
+        t.classList.toggle("active", selected);
+        t.setAttribute("aria-pressed", String(selected));
+      });
+
+      const filter = selectedTab.getAttribute("data-filter");
       const grid = document.getElementById("agent-evidence-grid");
       if (grid) {
         grid.classList.remove("show-supporting-only", "show-opposing-only");

@@ -1,5 +1,5 @@
 // =========================================================
-import { withCors } from "../_shared/http.ts";
+import { requireSharedSecret, withCors } from "../_shared/http.ts";
 
 // VERITAS — cleanup-stale-debates (Supabase Edge Function)
 //
@@ -30,7 +30,6 @@ import { withCors } from "../_shared/http.ts";
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-const CRON_SECRET = Deno.env.get("CRON_SECRET");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
@@ -40,9 +39,8 @@ const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const STALE_MINUTES = 10;
 
 Deno.serve(withCors(async (req) => {
-  if (CRON_SECRET && req.headers.get("x-cron-secret") !== CRON_SECRET) {
-    return new Response("Unauthorized", { status: 401 });
-  }
+  const unauthorized = requireSharedSecret(req, "CRON_SECRET", "x-cron-secret");
+  if (unauthorized) return unauthorized;
 
   try {
     const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);

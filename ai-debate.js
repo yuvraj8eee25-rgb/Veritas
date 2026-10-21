@@ -15,6 +15,8 @@
      renders it into #aidebate-devil-feedback; the drill is
      one-shot (button + textarea lock after a successful score).
    ========================================================= */
+import { SpeechPractice, appendRecording } from "./src/features/speech-practice.js";
+import { trainingSettings } from "./src/features/training-settings.js";
 (function () {
 "use strict";
 
@@ -43,7 +45,10 @@ const RANDOM_TOPICS = [
   "Should facial recognition be banned from public spaces?"
 ];
 
-const MAX_USER_TURNS = 3;
+let MAX_USER_TURNS = 3;
+let practiceMode = "written";
+let speechSeconds = 90;
+const speech = new SpeechPractice(document.getElementById("aidebate-composer"), document.getElementById("aidebate-input"), "ai");
 
 const BOTS = {
   sparring: { name: "Sparring Partner", rating: "~1000" },
@@ -51,10 +56,49 @@ const BOTS = {
   champion: { name: "The Champion",     rating: "~1800" }
 };
 
+
+let assignedSettings = null;
+let debateGeneration = 0;
+function pinAssignmentControls() {
+  ['aidebate-practice-mode','aidebate-speech-seconds','aidebate-turns','aidebate-random-btn','aidebate-browse-topics-btn'].forEach(id => { const el = document.getElementById(id); if (el) el.disabled = !!assignedSettings; });
+  document.querySelectorAll('#aidebate-time-row button').forEach(el => { el.disabled = !!assignedSettings || practiceMode === 'speech'; });
+}
+window.aiStartAssignedDebate = settings => {
+  assignedSettings = trainingSettings(settings);
+  practiceMode = assignedSettings.mode; speechSeconds = assignedSettings.speech_seconds;
+  MAX_USER_TURNS = assignedSettings.turns; turnSeconds = assignedSettings.turn_seconds;
+  document.getElementById('aidebate-practice-mode').value = practiceMode;
+  document.getElementById('aidebate-speech-seconds').value = String(speechSeconds);
+  document.getElementById('aidebate-turns').value = String(MAX_USER_TURNS);
+  window.DA.showScreen('ai-debate');
+  document.getElementById('aidebate-topic-input').value = assignedSettings.topic;
+  document.getElementById('aidebate-topic-input').readOnly = true;
+  pinAssignmentControls();
+  setTimeControl(turnSeconds);
+  updateSetupSummary();
+};
+window.aiClearAssignedDebate = () => { assignedSettings = null; document.getElementById('aidebate-topic-input').readOnly = false; pinAssignmentControls(); };
+function updatePracticeOptions() {
+  if (assignedSettings) {
+    document.getElementById('aidebate-practice-mode').value = assignedSettings.mode;
+    document.getElementById('aidebate-speech-seconds').value = String(assignedSettings.speech_seconds);
+    document.getElementById('aidebate-turns').value = String(assignedSettings.turns);
+  }
+  practiceMode = document.getElementById('aidebate-practice-mode').value;
+  speechSeconds = Number(document.getElementById('aidebate-speech-seconds').value);
+  MAX_USER_TURNS = Number(document.getElementById('aidebate-turns').value);
+  if (practiceMode === 'speech') turnSeconds = speechSeconds + 180;
+  else if (assignedSettings) turnSeconds = assignedSettings.turn_seconds;
+  else if (turnSeconds > 180) turnSeconds = 180;
+  pinAssignmentControls();
+  updateSetupSummary();
+}
+['aidebate-practice-mode', 'aidebate-speech-seconds', 'aidebate-turns'].forEach(id => document.getElementById(id).addEventListener('change', updatePracticeOptions));
+
 let currentTopic = null;
 let currentStance = "for";  // "for" | "against" — which side the PLAYER argues
 let currentBot = "rival";   // opponent strength, sent to the edge function
-let turnSeconds = 90;       // 0 = unlimited
+let turnSeconds = 180;       // 0 = unlimited
 let transcript = [];        // [{ speaker, text, ts, spent }]
 let userTurnsSoFar = 0;
 let awaitingAi = false;
@@ -85,21 +129,43 @@ function escapeHtml(str) {
    --------------------------------------------------------- */
 
 function openAiDebateLobby() {
-  document.getElementById("aidebate-topic-input").value = "";
+  document.getElementById("aidebate-topic-input").value = assignedSettings?.topic || "";
   setStance("for");
   setBot(currentBot);
   setTimeControl(turnSeconds);
+  updateSetupSummary();
 }
 
 function pickRandomTopic() {
   const topic = RANDOM_TOPICS[Math.floor(Math.random() * RANDOM_TOPICS.length)];
   document.getElementById("aidebate-topic-input").value = topic;
+  updateSetupSummary();
+}
+
+function updateSetupSummary() {
+  const summary = document.getElementById("aidebate-setup-summary");
+  if (!summary) return;
+  const bot = BOTS[currentBot]?.name || "The Rival";
+  const side = currentStance === "for" ? "For" : "Against";
+  const pace = turnSeconds === 0 ? "No timer" : `${turnSeconds}s`;
+  summary.textContent = `${bot} · ${side} · ${MAX_USER_TURNS} turns · ${practiceMode === "speech" ? `${speechSeconds}s recorded speech + 3 min preparation/transcript review` : pace}`;
+}
+
+function recommendedBotForRating() {
+  const rating = window.DA?.getCachedProfile?.()?.eloRating;
+  if (rating == null || !Number.isFinite(Number(rating))) return "rival";
+  if (Number(rating) < 1200) return "sparring";
+  if (Number(rating) >= 1650) return "champion";
+  return "rival";
 }
 
 function setStance(stance) {
   currentStance = stance;
   document.getElementById("aidebate-stance-for").classList.toggle("active", stance === "for");
+  document.getElementById("aidebate-stance-for").setAttribute("aria-pressed", String(stance === "for"));
   document.getElementById("aidebate-stance-against").classList.toggle("active", stance === "against");
+  document.getElementById("aidebate-stance-against").setAttribute("aria-pressed", String(stance === "against"));
+  updateSetupSummary();
 }
 
 function setBot(level) {
@@ -108,14 +174,23 @@ function setBot(level) {
   document.querySelectorAll("#aidebate-bot-row .bot-card").forEach((el) => {
     el.classList.toggle("active", el.dataset.level === level);
     el.setAttribute("aria-pressed", String(el.dataset.level === level));
+    const badge = el.querySelector(".bot-recommended");
+    if (badge) {
+      const isRecommended = el.dataset.level === recommendedBotForRating();
+      badge.hidden = !isRecommended || el.dataset.level === level;
+      badge.textContent = isRecommended ? "Recommended for your rating" : "";
+    }
   });
+  updateSetupSummary();
 }
 
 function setTimeControl(seconds) {
-  turnSeconds = seconds;
+  turnSeconds = assignedSettings ? assignedSettings.turn_seconds : practiceMode === "speech" ? speechSeconds + 180 : seconds;
   document.querySelectorAll("#aidebate-time-row .aidebate-stance-btn").forEach((el) => {
     el.classList.toggle("active", Number(el.dataset.seconds) === seconds);
+    el.setAttribute("aria-pressed", String(Number(el.dataset.seconds) === seconds));
   });
+  updateSetupSummary();
 }
 
 function startAiDebate() {
@@ -124,9 +199,14 @@ function startAiDebate() {
     window.DA.toast("Type a topic or tap Surprise me first.");
     return;
   }
+  if (!window.DA.requireSignIn("AI debates", "ai-debate")) return;
   window.DA.playClick();
 
-  currentTopic = topic;
+  debateGeneration++;
+  currentTopic = assignedSettings?.topic || topic;
+  document.getElementById("aidebate-topic-input").value = currentTopic;
+  speech.reset();
+  speech.configure(practiceMode, speechSeconds);
   transcript = [];
   userTurnsSoFar = 0;
   awaitingAi = false;
@@ -154,7 +234,7 @@ function startAiDebate() {
   document.getElementById("aidebate-devil-feedback").innerHTML = "";
   document.getElementById("aidebate-devil-input").value = "";
 
-  document.getElementById("aidebate-topic-label").textContent = topic;
+  document.getElementById("aidebate-topic-label").textContent = currentTopic;
   const stanceLabel = document.getElementById("aidebate-stance-label");
   stanceLabel.textContent = currentStance === "for" ? "FOR" : "AGAINST";
   stanceLabel.className = "debate-turn-pill mine";
@@ -190,6 +270,11 @@ function beginPlayerClock() {
     }
   }, 250);
 }
+
+document.addEventListener("click", event => {
+  if (event.target.closest?.("[data-nav], #aidebate-exit-btn, #aidebate-done-btn")) speech.reset();
+  if (event.target.closest?.('[data-nav]') && currentTopic && !debateOver) { debateGeneration++; stopClock(); awaitingAi = false; currentTopic = null; }
+});
 
 function stopClock() {
   if (clockTimer) { clearInterval(clockTimer); clockTimer = null; }
@@ -229,7 +314,7 @@ function updateAiWordCount() {
   const out = document.getElementById("aidebate-word-count");
   if (!input || !out) return;
   const words = input.value.trim() ? input.value.trim().split(/\s+/).length : 0;
-  const left = 600 - input.value.length;
+  const left = input.maxLength - input.value.length;
   out.textContent = `${words} word${words === 1 ? "" : "s"} · ${left} left`;
   out.classList.toggle("low", left < 60);
 }
@@ -267,6 +352,7 @@ function renderTranscript() {
     bubble.id = `aidebate-turn-${i}`;
     if (!previousTurns.has(bubble.id)) bubble.classList.add("new-message");
     bubble.innerHTML = `<div class="debate-bubble-meta">${meta}</div><div>${escapeHtml(t.text)}</div>`;
+    if (t.audioPath) appendRecording(bubble, t.audioPath);
     wrap.appendChild(bubble);
   });
   wrap.scrollTop = wrap.scrollHeight;
@@ -327,8 +413,9 @@ function setWaiting(isWaiting) {
   updateScoreboard();
 }
 
+let sendingSpeech = false;
 async function sendUserTurn() {
-  if (awaitingAi || debateOver) return;
+  if (awaitingAi || debateOver || sendingSpeech) return;
   const input = document.getElementById("aidebate-input");
   const text = input.value.trim();
   if (!text) return;
@@ -336,35 +423,48 @@ async function sendUserTurn() {
     window.DA.toast("Make it an argument — at least a sentence.");
     return;
   }
+  sendingSpeech = true;
+  const expectedTurn = userTurnsSoFar, generation = debateGeneration;
+  const button = document.getElementById("aidebate-send-btn"); button.disabled = true;
   window.DA.playClick();
   input.value = "";
   updateAiWordCount();
-  commitUserTurn(text);
-  await runAiTurn();
+  try {
+    const audioPath = await speech.save({ assignmentId: window.classroomActiveActivity?.()?.assignment || null });
+    if (generation !== debateGeneration || debateOver || awaitingAi || userTurnsSoFar !== expectedTurn) return;
+    commitUserTurn(text, audioPath);
+    speech.reset();
+    await runAiTurn();
+  } catch (error) { if (generation === debateGeneration) { input.value = text; updateAiWordCount(); window.DA.toast(error.message); } }
+  finally { sendingSpeech = false; button.disabled = false; }
 }
 
 // A timed-out turn is recorded as a pass rather than silently skipped, so the
 // referee sees what actually happened and the transcript stays honest.
 async function passUserTurn() {
   if (awaitingAi || debateOver) return;
+  speech.reset();
+  document.getElementById("aidebate-input").value = ""; updateAiWordCount();
   commitUserTurn("⏳ (out of time — no argument made this turn)");
   await runAiTurn();
 }
 
-function commitUserTurn(text) {
+function commitUserTurn(text, audioPath = null) {
   const spent = turnStartedAt ? (Date.now() - turnStartedAt) / 1000 : 0;
   timeUsed.user += spent;
-  transcript.push({ speaker: "user", text, ts: Date.now(), spent });
+  transcript.push({ speaker: "user", text, audioPath, ts: Date.now(), spent });
   userTurnsSoFar += 1;
   renderTranscript();
   updateScoreboard();
 }
 
 async function runAiTurn() {
+  const generation = debateGeneration;
   const last = userTurnsSoFar >= MAX_USER_TURNS;
   setWaiting(true);
   turnStartedAt = Date.now();
-  await fetchAiReply();
+  await fetchAiReply(generation);
+  if (generation !== debateGeneration) return;
   setWaiting(false);
   if (last) {
     stopClock();
@@ -383,7 +483,7 @@ function pushAiTurn(text) {
   transcript.push({ speaker: "ai", text, ts: Date.now(), spent });
 }
 
-async function fetchAiReply() {
+async function fetchAiReply(generation) {
   try {
     const data = await window.VeritasApi.edge("ai-debate", {
         action: "opponent",
@@ -392,10 +492,12 @@ async function fetchAiReply() {
         aiStance: currentStance === "for" ? "against" : "for",
         difficulty: currentBot
     }, { timeoutMs: 30000 });
+    if (generation !== debateGeneration) return;
     if (!validateDebateReply(data)) throw new Error("The AI response did not match the expected format.");
     const text = data.text;
     pushAiTurn(text);
   } catch (e) {
+    if (generation !== debateGeneration) return;
     console.warn("AI opponent reply failed.");
     pushAiTurn("(The AI opponent couldn't respond — network hiccup. Continue when ready.)");
     window.DA.toast("Couldn't reach the AI opponent — try your next turn.");
@@ -407,9 +509,12 @@ function leaveAiDebate() {
   if (!debateOver && transcript.length) {
     if (!window.confirm("Leave now? This debate won't be scored.")) return;
   }
+  debateGeneration++;
   stopClock();          // the interval used to keep running after you left,
   awaitingAi = false;   // and awaitingAi could stay stuck true.
   currentTopic = null;
+  speech.reset();
+  speech.configure(practiceMode, speechSeconds);
   transcript = [];
   userTurnsSoFar = 0;
   debateOver = false;
@@ -443,7 +548,9 @@ async function concedeAiDebate() {
 let lastDevilsAdvocate = null;
 
 async function finishAiDebate() {
+  const generation = debateGeneration;
   debateOver = true;
+  speech.reset();
   stopClock();
   paintAiClocks();
   renderTranscript();
@@ -463,9 +570,11 @@ async function finishAiDebate() {
         topic: currentTopic,
         transcript: transcript.map((t) => ({ speaker: t.speaker, text: t.text }))
     }, { timeoutMs: 45000 });
+    if (generation !== debateGeneration) return;
     if (!validateRefereeResult(data)) throw new Error("malformed referee response");
     verdict = data.verdict;
   } catch (e) {
+    if (generation !== debateGeneration) return;
     console.warn("AI referee failed; using a local estimate.");
     verdict = localHeuristicVerdict();
     usedFallback = true;
@@ -477,7 +586,8 @@ async function finishAiDebate() {
   renderVerdict(verdict, usedFallback);
   window.classroomActivityComplete?.('ai_debate', {
     topic: currentTopic,
-    transcript: transcript.map(t => ({ speaker: t.speaker, text: t.text })),
+    transcript: transcript.map(t => ({ speaker: t.speaker, text: t.text, audioPath: t.audioPath || null })),
+    mode: practiceMode, speechSeconds,
     verdict, estimated: usedFallback
   });
 }
@@ -489,10 +599,29 @@ function renderVerdict(verdict, usedFallback) {
 
   const titleEl = document.getElementById("aidebate-ended-title");
   const subEl = document.getElementById("aidebate-ended-sub");
+  const endedPanel = document.getElementById("aidebate-ended-panel");
+  endedPanel.dataset.outcome = winner === "debater" ? "win" : winner === "ai" ? "loss" : "tie";
   if (winner === "debater") titleEl.textContent = "You won the debate";
   else if (winner === "ai") titleEl.textContent = "The AI opponent won";
   else titleEl.textContent = "It's a tie";
-  subEl.textContent = `You: ${debaterScore} · AI opponent: ${aiScore}`;
+  subEl.replaceChildren();
+  const score = (label, value, side) => {
+    const chip = document.createElement("span");
+    chip.className = `aidebate-score-chip ${side}`;
+    const name = document.createElement("span");
+    name.className = "aidebate-score-name";
+    name.textContent = label;
+    const points = document.createElement("strong");
+    points.textContent = String(Math.max(0, Math.min(100, Math.round(Number(value) || 0))));
+    chip.append(name, points);
+    return chip;
+  };
+  subEl.classList.add("aidebate-scoreline");
+  subEl.append(score("You", debaterScore, "you"));
+  const versus = document.createElement("span");
+  versus.className = "aidebate-score-versus";
+  versus.textContent = "VS";
+  subEl.append(versus, score("AI opponent", aiScore, "opponent"));
 
   document.getElementById("aidebate-referee-comment").textContent =
     summary + (usedFallback ? " (Rough estimate — the AI referee was unreachable.)" : "");
@@ -636,6 +765,28 @@ document.getElementById("aidebate-random-btn").addEventListener("click", () => {
   pickRandomTopic();
 });
 
+document.getElementById("aidebate-random-side-btn")?.addEventListener("click", () => {
+  window.DA.playClick();
+  setStance(Math.random() < 0.5 ? "for" : "against");
+});
+
+document.getElementById("aidebate-browse-topics-btn")?.addEventListener("click", () => {
+  window.DA.playClick();
+  if (typeof window.mpBrowseTopicsForAi === "function") window.mpBrowseTopicsForAi();
+  else window.DA.toast("The topic browser is not available right now.");
+});
+
+document.querySelectorAll(".aidebate-topic-suggestion").forEach((button) => {
+  button.addEventListener("click", () => {
+    const input = document.getElementById("aidebate-topic-input");
+    input.value = button.dataset.topic || "";
+    input.focus();
+    updateSetupSummary();
+  });
+});
+
+document.getElementById("aidebate-topic-input").addEventListener("input", updateSetupSummary);
+
 document.getElementById("aidebate-stance-for").addEventListener("click", () => {
   window.DA.playClick();
   setStance("for");
@@ -692,6 +843,8 @@ document.getElementById("aidebate-practise-feedback-btn").addEventListener("clic
   input.scrollIntoView({ block: "center", behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
   input.focus({ preventScroll: true });
 });
+
+updateSetupSummary();
 
 })();
 import { validateDebateReply, validateDrillResult, validateRefereeResult } from "./src/features/ai-contracts.js";

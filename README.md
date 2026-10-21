@@ -1,3 +1,5 @@
+> **Training update:** See [TRAINING-UPDATES.md](TRAINING-UPDATES.md) for the mastery, assignment, private-room and recorded speech changes, activation steps and verification limits.
+
 # Veritas — Agentic AI Investigation Platform
 
 > **Tech Zephyr 4.0 — Agentic AI Hackathon MVP** at **IIT Bhubaneswar**
@@ -162,8 +164,7 @@ stack traces. It is disabled if the variable is empty.
 
 ## Storage, migrations and production setup
 
-Apply SQL migrations `0001` through `0013` in order to a test Supabase project
-first. Migrations `0010` and `0011` are additive and provide private avatar
+Apply SQL migrations `0001` through `0015` in order to a test Supabase project first. Migration `0014` validates Classroom rubric scores; migration `0015` adds training and speech practice. Migrations `0010` and `0011` are additive and provide private avatar
 and Classroom attachment buckets, access policies, registration/authorization
 RPCs and rate quotas. Migration `0012` narrows retryable attachment replacement
 to current cohort members and restricts profile progress columns to the
