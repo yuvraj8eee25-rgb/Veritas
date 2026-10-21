@@ -79,6 +79,13 @@ function clip(value: unknown, max: number): string {
   return String(value ?? "").replace(/\s+/g, " ").trim().slice(0, max);
 }
 
+class GeminiRequestError extends Error {
+  constructor(readonly status: number, readonly providerMessage: string) {
+    super(`Gemini request failed with status ${status}`);
+    this.name = "GeminiRequestError";
+  }
+}
+
 async function callGemini(prompt: string, maxTokens: number): Promise<string> {
   const response = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
@@ -100,7 +107,14 @@ async function callGemini(prompt: string, maxTokens: number): Promise<string> {
     },
   );
   if (!response.ok) {
-    throw new Error(`Gemini request failed with status ${response.status}`);
+    let providerMessage = "";
+    try {
+      const payload = await response.json();
+      providerMessage = clip(payload?.error?.message, 400);
+    } catch {
+      // Keep the status even if the provider returned a non-JSON error page.
+    }
+    throw new GeminiRequestError(response.status, providerMessage);
   }
   const payload = await response.json();
   const raw: string = payload?.candidates?.[0]?.content?.parts?.[0]?.text || "";
@@ -327,7 +341,16 @@ Deno.serve(withCors(async (req) => {
     if (body?.action === "summarize") return await handleSummarize(body);
     return json({ ok: false, error: "Unknown action" }, 400);
   } catch (err) {
-    console.error(JSON.stringify({ event: "assessment_failed", name: err instanceof Error ? err.name : "Error" }));
+    console.error(JSON.stringify({
+      event: "assessment_failed",
+      action: clip(body?.action, 32),
+      name: err instanceof Error ? err.name : "Error",
+      ...(err instanceof GeminiRequestError ? {
+        provider: "gemini",
+        providerStatus: err.status,
+        providerMessage: err.providerMessage,
+      } : {}),
+    }));
     return json({ ok: false, error: "Assessment request failed" }, 500);
   }
 }));
