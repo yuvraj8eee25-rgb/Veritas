@@ -85,12 +85,16 @@ async function callGemini(prompt: string, maxTokens: number): Promise<string> {
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      signal: AbortSignal.timeout(25000),
+      // Evidence excerpts can take longer than a short chat prompt. Keep the
+      // server timeout below Supabase's request idle limit, while allowing a
+      // slower Gemini response to finish instead of silently falling back.
+      signal: AbortSignal.timeout(60000),
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
           temperature: 0.1,
           maxOutputTokens: maxTokens,
+          thinkingConfig: { thinkingLevel: "minimal" },
         },
       }),
     },

@@ -35,7 +35,7 @@ const LLMProvider = {
 
     try {
       if (!window.VeritasApi?.isConfigured) return null;
-      const data = await window.VeritasApi.edge("assess-evidence", Object.assign({ action: action }, payload), { timeoutMs: 30000 });
+      const data = await window.VeritasApi.edge("assess-evidence", Object.assign({ action: action }, payload), { timeoutMs: 70000 });
       if (!validateEvidenceResult(action, data)) {
         console.warn("[LLM] assess-evidence \"" + action + "\" returned no usable result.");
         return null;
