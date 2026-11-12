@@ -1,0 +1,12 @@
+{
+  "name": "Veritas Debate Practice",
+  "short_name": "Veritas",
+  "description": "Practice clear arguments and check evidence.",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#080d18",
+  "theme_color": "#080d18",
+  "icons": [
+    { "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

@@ -1,62 +1,21 @@
 # Veritas
 
-A modern web application built with TanStack Start, React, and TypeScript.
+Veritas is a debate practice platform. The current app is in [`veritas-react/`](veritas-react/), and the original Vite app and shared code are in [`app/`](app/). Keep both directories in the checkout: the Next.js app imports shared code from `app/`.
 
-## Getting Started
+## Run the current app
 
-### Prerequisites
-You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
-
-### Installation & Development
+Use Node.js 22. From the repository root:
 
 ```sh
-git clone <this-repository-url>
-cd veritas
-npm i
+cd veritas-react
+cp .env.example .env.local
+```
+
+Fill in `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` in `.env.local`. Then run:
+
+```sh
+npm ci
 npm run dev
 ```
 
-The development server will start at `http://localhost:3000`
-
-## Available Scripts
-
-- `npm run dev` — Start development server
-- `npm run build` — Build for production
-- `npm run build:dev` — Build in development mode
-- `npm run preview` — Preview production build locally
-- `npm run lint` — Run ESLint
-- `npm run format` — Format code with Prettier
-
-## Tech Stack
-
-- **Framework**: TanStack Start
-- **Language**: TypeScript
-- **UI**: React + Tailwind CSS
-- **UI Components**: shadcn/ui
-- **Routing**: TanStack Router
-- **State Management**: TanStack React Query
-- **Forms**: React Hook Form
-- **AI Integration**: Vercel AI SDK
-- **Backend**: Firebase
-
-## Project Structure
-
-```
-src/
-├── components/     # React components
-├── routes/         # Application routes
-├── hooks/          # Custom React hooks
-├── lib/            # Utility functions
-└── styles/         # Global styles
-```
-
-## Development Notes
-
-- Keep the main branch in a working state
-- Write meaningful commit messages
-- Follow the ESLint and Prettier configurations
-- Use TypeScript for type safety
-
-## License
-
-This project is private.
+Open [http://localhost:3000](http://localhost:3000). See the [Next.js app guide](veritas-react/README.md) for feature and backend details, or the [original app guide](app/README.md) for the Vite setup.

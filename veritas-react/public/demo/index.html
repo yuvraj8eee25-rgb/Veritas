@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#080d18" />
+    <meta name="description" content="Try the Veritas college debate club practice workflow." />
+    <title>Club practice preview · Veritas</title>
+    <link rel="stylesheet" href="./demo.css" />
+    <script src="./demo.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to demo</a>
+    <header class="masthead">
+      <a class="brand" href="/" aria-label="Veritas home"><span class="brand-mark" aria-hidden="true">V</span><span>VERITAS</span></a>
+      <div class="demo-status"><span class="status-dot"></span> INTERACTIVE PREVIEW <span class="status-divider">·</span> SAMPLE CONTENT</div>
+      <button class="reset-button" id="reset-demo" type="button">Reset demo <span aria-hidden="true">↻</span></button>
+    </header>
+
+    <main id="main" class="page-shell">
+      <section class="intro">
+        <p class="eyebrow">CLUB PRACTICE <span>·</span> STUDENT TO COACH</p>
+        <h1>Make a case.<br /><em>Learn from the other side.</em></h1>
+        <p class="intro-copy">A guided practice session helps a student shape a claim, use a source carefully, and answer a fair challenge. A coach can then see what to work on next.</p>
+      </section>
+
+      <div class="view-bar">
+        <div class="view-switch" role="group" aria-label="Choose a demo view">
+          <button type="button" class="view-tab is-active" data-view="student" aria-pressed="true">Student practice</button>
+          <button type="button" class="view-tab" data-view="coach" aria-pressed="false">Coach overview</button>
+        </div>
+        <p class="privacy-note"><span aria-hidden="true">◈</span> This preview runs in your browser. No account or server data.</p>
+      </div>
+
+      <section id="student-view" class="view-panel" aria-label="Student practice">
+        <div class="session-heading">
+          <div><p class="eyebrow subtle">CAMPUS DEBATE SOCIETY <span>·</span> WEEKLY SKILLS SESSION</p><h2>Should platforms label AI-generated political ads?</h2></div>
+          <span class="session-chip">PRACTICE MOTION</span>
+        </div>
+        <div class="progress-track" aria-label="Practice progress">
+          <div class="progress-step is-current" data-progress="1" aria-current="step"><span>01</span><b>Build your case</b></div>
+          <div class="progress-line"></div>
+          <div class="progress-step" data-progress="2"><span>02</span><b>Answer a challenge</b></div>
+          <div class="progress-line"></div>
+          <div class="progress-step" data-progress="3"><span>03</span><b>Review your draft</b></div>
+        </div>
+
+        <div id="step-1" class="step-panel">
+          <div class="step-intro"><span class="step-number">01</span><div><p class="eyebrow">BUILD A TESTABLE CASE</p><h3 tabindex="-1">Start with what your source can support.</h3><p class="muted">Use the sample case or edit it. The checklist checks that parts are present; it does not verify the facts for you.</p></div></div>
+          <div class="source-card">
+            <div class="source-icon" aria-hidden="true">↗</div>
+            <div><span class="source-label">SAMPLE SOURCE · U.S. NATIONAL INSTITUTE OF STANDARDS AND TECHNOLOGY</span><a href="https://www.nist.gov/publications/reducing-risks-posed-synthetic-content-overview-technical-approaches-digital-content" target="_blank" rel="noopener noreferrer">Reducing Risks Posed by Synthetic Content <span aria-hidden="true">↗</span></a><p>NIST’s 2024 report reviews ways to track content origin, label synthetic media, and detect it. It also describes limitations in these techniques.</p></div>
+          </div>
+          <form id="case-form" class="case-form">
+            <label>My claim<textarea id="claim" rows="3" required minlength="12">Platforms should label AI-generated political ads so voters can tell when media is synthetic and check where it came from.</textarea><small>What do you want the audience to accept?</small></label>
+            <label>Evidence from the source<textarea id="evidence" rows="3" required minlength="12">NIST reviews provenance tracking and labeling approaches for synthetic content, while noting that detection and authentication methods have limits.</textarea><small>Describe the evidence in your own words. Avoid making it say more than it does.</small></label>
+            <label>Why this evidence supports my claim<textarea id="reasoning" rows="3" required minlength="12">Because the report describes practical ways to communicate content origin, it gives a basis for discussing labels. It does not show that labels alone prevent deception.</textarea><small>Explain the link between the evidence and your claim, including any limit.</small></label>
+            <div class="form-actions"><span class="sample-label"><span aria-hidden="true">✳</span> Editable sample draft</span><button class="primary-button" type="submit">Continue to the challenge <span aria-hidden="true">→</span></button></div>
+          </form>
+        </div>
+
+        <div id="step-2" class="step-panel" hidden>
+          <div class="step-intro"><span class="step-number">02</span><div><p class="eyebrow">TEST YOUR REASONING</p><h3 tabindex="-1">Take the strongest concern seriously.</h3><p class="muted">This example counterargument is fixed for the preview; it is not a live AI response.</p></div></div>
+          <blockquote class="challenge-card"><span class="source-label">A FAIR COUNTERARGUMENT</span><p>“Labels can be removed or missing, and detection is imperfect. A label could give people false confidence that an unlabeled post is authentic.”</p><footer>What your argument should answer: the limits of labels, not just their potential value.</footer></blockquote>
+          <form id="response-form" class="case-form">
+            <label>My response<textarea id="response" rows="5" required minlength="20">That concern is real: a label should not be treated as proof that content is authentic. A policy should show the disclosed source or provenance where available, explain uncertainty, and avoid implying that unlabeled media is genuine.</textarea><small>Respond to the concern directly. Add a qualification where the evidence calls for one.</small></label>
+            <fieldset class="self-check"><legend>Before you continue, check your response</legend><label><input id="check-concern" type="checkbox" checked /> I answered the main concern, not a weaker version.</label><label><input id="check-limit" type="checkbox" checked /> I did not claim the source proves more than it does.</label></fieldset>
+            <div class="form-actions"><button class="secondary-button" type="button" data-back="1">Back to my case</button><button class="primary-button" type="submit">Review my draft <span aria-hidden="true">→</span></button></div>
+          </form>
+        </div>
+
+        <div id="step-3" class="step-panel" hidden>
+          <div class="step-intro"><span class="step-number complete-mark" aria-hidden="true">✓</span><div><p class="eyebrow">YOUR PRACTICE REVIEW</p><h3 id="review-heading" tabindex="-1">A more careful case is taking shape.</h3><p class="muted">This is a structure check and reflection prompt, not an AI fact-check or a grade.</p></div></div>
+          <div class="review-summary"><div><span class="summary-label">DRAFT STRUCTURE</span><strong id="structure-count">3 of 3 parts present</strong></div><span class="summary-icon" aria-hidden="true">✓</span></div>
+          <div class="review-list">
+            <div class="review-row" data-review="claim"><span class="review-check" aria-hidden="true">✓</span><div><strong>Clear claim</strong><p>A specific position the audience can agree or disagree with.</p></div><span class="review-state">IN DRAFT</span></div>
+            <div class="review-row" data-review="evidence"><span class="review-check" aria-hidden="true">✓</span><div><strong>Source-based evidence</strong><p>A named source and a relevant point from it.</p></div><span class="review-state">IN DRAFT</span></div>
+            <div class="review-row" data-review="reasoning"><span class="review-check" aria-hidden="true">✓</span><div><strong>Reasoning and limits</strong><p>An explanation of the connection and what the source does not establish.</p></div><span class="review-state">IN DRAFT</span></div>
+          </div>
+          <div class="self-result"><strong>Counterargument self-check</strong><span id="fairness-count">2 of 2 checks selected</span><p>Your reflection helps guide practice; it is not an automatic fairness score.</p></div>
+          <div class="coach-prompt"><span class="eyebrow">NEXT COACHING PROMPT</span><p>What evidence would show whether content labels actually change how people judge political media?</p><a href="https://www.nist.gov/publications/reducing-risks-posed-synthetic-content-overview-technical-approaches-digital-content" target="_blank" rel="noopener noreferrer">Revisit the NIST source and its limits ↗</a></div>
+          <div class="form-actions"><button class="secondary-button" type="button" data-back="2">Revise my response</button><button class="primary-button" type="button" data-open-coach>Open coach overview <span aria-hidden="true">→</span></button></div>
+        </div>
+        <p class="live-message" id="student-message" role="status" aria-live="polite"></p>
+      </section>
+
+      <section id="coach-view" class="view-panel" aria-label="Coach overview" hidden>
+        <div class="coach-heading"><div><p class="eyebrow subtle">SAMPLE WORKSPACE <span>·</span> CAMPUS DEBATE SOCIETY</p><h2>One session. A clear next step.</h2><p class="muted">This view updates from the student walkthrough in this browser.</p></div><span class="demo-data-tag">DEMO DATA</span></div>
+        <div class="coach-stats"><article><span>SESSION</span><strong>Weekly skills practice</strong><small>AI media &amp; public trust</small></article><article><span>WALKTHROUGH</span><strong id="coach-status">In progress</strong><small>One sample learner</small></article><article><span>STRUCTURE CHECK</span><strong id="coach-structure">Waiting for review</strong><small>Presence check, not a grade</small></article></div>
+        <div class="coach-columns">
+          <article class="coach-card student-work"><div class="card-heading"><div><p class="eyebrow">STUDENT CASE</p><h3>Walkthrough learner</h3></div><span class="sample-label">SAMPLE</span></div><p class="work-label">CLAIM</p><p id="coach-claim" class="work-copy">Complete the student walkthrough to see the draft here.</p><p class="work-label">RESPONSE TO COUNTERARGUMENT</p><p id="coach-response" class="work-copy">The student’s response will appear here.</p></article>
+          <article class="coach-card coach-next"><p class="eyebrow">SUGGESTED NEXT PRACTICE</p><h3 id="next-practice-title">Answer the strongest concern</h3><p id="next-practice-copy">Have the student name the trade-off and add one sentence about what evidence would help resolve it.</p><div class="coach-assign"><span>Suggested format</span><strong>Two-source comparison · 8 min</strong><button id="assign-drill" class="secondary-button" type="button">Assign in this demo <span aria-hidden="true">→</span></button><p id="coach-message" role="status" aria-live="polite"></p></div></article>
+        </div>
+        <form id="coach-note-form" class="coach-note-card"><label for="coach-note"><span class="eyebrow">COACH FEEDBACK</span><strong>Leave one useful next step</strong><textarea id="coach-note" rows="3" placeholder="For example: Compare one source that supports labels with one that explains their limits."></textarea></label><div class="form-actions"><span class="privacy-note">Saved only in this open preview.</span><button class="primary-button" type="submit">Save feedback <span aria-hidden="true">✓</span></button></div><p id="note-message" role="status" aria-live="polite"></p></form>
+      </section>
+
+      <footer class="page-footer"><span>VERITAS <span class="footer-slash">/</span> CLUB PRACTICE PREVIEW</span><span>Sample case and responses · no real learner data</span></footer>
+    </main>
+  </body>
+</html>

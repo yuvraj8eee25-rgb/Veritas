@@ -1,0 +1,83 @@
+VERITAS WEBSITE AUDIT
+Prepared: 29 September 2026
+Scope: Interface and front-end source review of the Veritas web app. Reviewed the supplied dashboard and Debate the AI screenshots, navigation and screen markup, the home dashboard, Classroom, Evidence Lab, and responsive/accessibility styles.
+
+SUMMARY
+Veritas has a clear product identity: a dark navy interface, periwinkle-violet actions, editorial headings, and a focused debate-learning purpose. The dashboard communicates practice progress well, and the app contains several useful trust details, such as labeling the leaderboard as sample data and the Evidence Lab preview as illustrative. The biggest opportunities are to make Evidence Lab language more precise, make the Classroom role selector truthful and accessible, and expose the current page to desktop screen-reader users.
+
+PRIORITY FINDINGS
+
+1. HIGH — Evidence Lab marks every completed step “VERIFIED”
+Location: agentic-investigation.js, around line 1085.
+The trace renderer changes every completed tool step to “VERIFIED.” Search, extraction, and analysis steps can finish without independently verifying the claim. For a learning product built around evidence quality, this overstates what happened and may teach students to treat a completed operation as a verified fact.
+Recommendation: Label ordinary completed steps “Complete” or “Results ready.” Reserve “Verified” for the final verification phase, and explain what was checked. Keep source-level confidence and limitations visible next to the verdict.
+
+2. HIGH — Classroom role tabs can point to an unavailable workspace
+Location: classroom.js, around line 58.
+The Student and Coach tabs are always rendered. When a person has classrooms for only one role, the render logic silently switches back to the available role, so choosing the other tab appears to do nothing. The controls also use tablist/tab semantics without the related tab-panel IDs or arrow-key navigation expected of tabs.
+Recommendation: Hide or disable roles the person does not have, with a clear “Join a classroom” or “Create a classroom” action. Either implement the complete keyboard tab pattern with linked panels, or use ordinary pressed-state buttons for this view switch.
+
+3. MEDIUM — Desktop navigation has no programmatic current-page state
+Location: app.js, around lines 441–447.
+Screen changes set the visual “active” class on sidebar and top-bar links, but `aria-current="page"` is only set on mobile-tab elements. Desktop screen-reader users may not know which destination is open.
+Recommendation: Set and clear `aria-current="page"` on the active sidebar/top-bar navigation item as well. Keep the mobile behavior consistent.
+
+4. MEDIUM — Dashboard puts most supporting context below a tall hero
+Location: index.html, around lines 145–195; styles.css, around lines 5510–5544. Also visible in the supplied dashboard screenshot.
+The large hero uses much of the first desktop viewport; the rating, win rate, debate count, and skill guidance start lower down. The hero copy and main action are strong, but returning users need to scroll before seeing their next useful progress details.
+Recommendation: Shorten the hero vertically and bring one compact “next step” or skill-progress cue closer to the primary action. Preserve the current clear headline and keep the detailed progress view lower on the page.
+
+5. MEDIUM — Classroom “empty” and “all caught up” states need a direct next action
+Location: classroom.js, around lines 54–58.
+The student view can show an all-caught-up message and an empty assignment list, while the cohort list provides the join/create actions elsewhere. A student who has completed all work should still have an obvious route back to practice or to another available classroom.
+Recommendation: Add a contextual next action to the empty state: open a practice debate, browse another classroom, or return to the classroom list. Make the action depend on whether the person has other classrooms or assignments.
+
+6. LOW — The home hero and other screens should keep accent use intentional
+Location: styles.css, around lines 37–40, 117–122, and 5480–5500.
+The dark navy and violet system is clear, and the AI debate screen maps its accent to violet. The global palette still includes several bright semantic colors for outcomes and status. Keep those colors tied to meaning (success, warning, error, live-match status) so they do not compete with the primary violet action color.
+Recommendation: Document the roles of the accent tokens and use the same role for the same meaning on every screen. Check selected, disabled, error, and success states for contrast on navy surfaces.
+
+WHAT IS WORKING WELL
+- The home headline and “Start a debate” action make the core task clear.
+- The dark navy and blue-purple dashboard treatment matches the preferred direction in the supplied screenshots.
+- Responsive breakpoints and reduced-motion rules are present in styles.css.
+- Debate setup exposes side, opponent, and pace choices; selected choices use pressed state.
+- The leaderboard says sample standings are sample data.
+- Evidence source cards include source domains, open-source links, and expandable retrieved excerpts; the example result is clearly labeled as illustrative.
+- Classroom assignment cards distinguish submitted, overdue, revision-requested, and feedback-ready work.
+
+SUGGESTED FIX ORDER
+1. Replace the generic “VERIFIED” trace status with wording that matches what each step actually did.
+2. Fix Classroom role availability and tab/button semantics.
+3. Add the current-page announcement to desktop navigation.
+4. Reduce the home hero height and bring a useful progress cue higher.
+5. Give Classroom empty states a clear next action.
+6. Do a final contrast and accent consistency pass across all screens.
+
+REVIEW LIMITS
+This audit is based on source inspection and the screenshots provided in the conversation. I could not start the local Vite preview in this environment: its configuration build failed when Node tried to spawn esbuild (EPERM). I therefore did not verify live interactions, actual mobile rendering, or logged-in Classroom states in a browser. No tests were run.
+
+IMPLEMENTATION UPDATE — 29 September 2026
+The source changes below are now in the working tree. The original findings above record the audit baseline; they should not be read as unresolved status.
+
+FIXED IN SOURCE
+- Evidence Lab trace steps now say COMPLETE for ordinary tools. Only the final_verification event says VERIFIED.
+- Classroom role selection is now a pressed-state button group, shown only when the user has both Student and Coach workspaces. When only one role is available, the unavailable role is not offered. Classroom empty and caught-up views now surface the next available action, including practice, joining/creating a classroom, and opening the classroom list where applicable.
+- The current screen now receives aria-current="page" across sidebar, top-bar, and mobile navigation; inactive links have the attribute cleared.
+- The home hero has less padding and a smaller display heading, with a contextual next-step drill action below its main buttons. A win-rate placeholder includes an explanation until the user has a rated Live 1v1 result.
+- Evidence filter chips can wrap, have a visible focus state, and retain pressed-state semantics. Multiplayer topic categories show their horizontal scrollbar instead of fading the chips at the edges. The selected multiplayer topic has a check mark and stronger violet styling.
+- The Classroom caught-up panel now pairs its status with a student practice action. Navigation labels use “Evidence Lab” consistently, including accessible names.
+- Design-token comments document violet for primary actions/selections, lavender for live-match emphasis, cyan for AI states, green for success, amber for warning/reward, and coral for errors. Live-match emphasis uses a separate lavender token, keeping the primary violet and coral error color distinct.
+
+ALREADY PRESENT AND RETAINED
+- The Debate the AI setup selections already use aria-pressed and selected-state visuals; the setup start dock is already sticky.
+- The home dashboard already has one streak display in the hero; the summary stats below contain rating, win rate, and debate count without a duplicate streak.
+- “Watch it handle trouble” is hidden unless the URL has ?dev=1.
+
+REMAINING REVIEW ITEMS
+- Run a contrast measurement and inspect selected, disabled, success, and error states across screens, especially after the palette change.
+- Verify the Classroom views with real Student-only, Coach-only, and mixed-role accounts; verify the narrow-screen layout and keyboard flow in a live browser.
+- Confirm the “Watch it handle trouble” flag is appropriate for the intended release configuration.
+
+REVIEW LIMITS
+The local Vite preview previously failed to start because Node could not spawn esbuild (EPERM). No live browser session or tests were run for this update. Findings above were checked against source, not confirmed against a running app. The changes therefore need a live visual/accessibility pass before treating responsive layout and contrast as verified.

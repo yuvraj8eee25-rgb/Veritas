@@ -1,0 +1,408 @@
+/* =========================================================
+   VERITAS — Fantasy Realm
+   ---------------------------------------------------------
+   Drop-in theme layer. Loads AFTER styles.css and overrides
+   the token layer, so all existing rules inherit it.
+
+   Palette: saddle brown (#8B4513), gold (#FFD700), slate blue
+   (#6A5ACD), orange red (#FF4500), khaki (#F0E68C) — each one
+   given its own job instead of one color repeated everywhere:
+
+     slate blue   — primary actions: buttons, active nav, the
+                    "arcane" side of the app (one of the two
+                    debate cards)
+     gold         — reward states only: XP, streak, rank #1,
+                    the "treasure" side of the app (the other
+                    debate card)
+     orange red   — danger/urgency: wrong answers, daily
+                    challenge, streak flame
+     khaki        — quiet informational accents spread through
+                    the UI (previously all rendered gold)
+     saddle brown — surfaces, and literally the #3 rank medal
+
+   The design carries its weight in three places: an ember
+   field drifting behind the app, a two-tone hero headline
+   (gold-to-blue, echoing two sides of an argument), and the
+   two debate cards — one torch-gold, one dusk-blue.
+   ========================================================= */
+
+:root {
+  /* Surfaces — aged leather and dark oak */
+  --bg-page: #140d08;
+  --bg-panel: #241708;
+  --bg-muted: #2f1e0e;
+  --bg-obsidian: #0d0904;
+
+  /* Accent — primary action color: slate blue, not gold */
+  --accent: #6a5acd;
+  --accent-rgb: 106, 90, 205;
+  --accent-soft: rgba(106, 90, 205, 0.14);
+  --accent-deep: #453a8f;
+  --accent-grad: linear-gradient(135deg, #9d8fe8 0%, #6a5acd 50%, #453a8f 100%);
+
+  /* Secondary accent — gold, reserved for reward states */
+  --electric: #ffd700;
+  --electric-grad: linear-gradient(135deg, #ffe680 0%, #ffd700 45%, #b8860b 100%);
+
+  /* Text — parchment */
+  --ink: #f5ecd7;
+  --ink-rgb: 245, 236, 215;
+  --ink-soft: #c9b696;
+  --ink-mute: #8a7659;
+
+  --line: rgba(240, 230, 140, 0.14);
+  --line-strong: rgba(106, 90, 205, 0.35);
+
+  /* Support — spread across the palette by role, not repeated */
+  --cyan: #d9c896;         /* quiet khaki, used widely for info/positive text */
+  --cyan-rgb: 217, 200, 150;
+  --green: #3f8f5b;        /* success — kept distinct from the 5-color set on purpose */
+  --green-rgb: 63, 143, 91;
+  --magenta: #ff4500;      /* orange red — danger / incorrect */
+  --magenta-rgb: 255, 69, 0;
+  --amber: #ffd700;        /* gold — rank #1, warnings, tags */
+  --amber-rgb: 255, 215, 0;
+  --violet: #6a5acd;       /* slate blue, used sparingly (time pills, spinner ring) */
+  --violet-rgb: 106, 90, 205;
+  --peach: #f0e68c;        /* khaki, literal, for the one urgent-pill callout */
+  --silver: #c9b696;       /* rank #2 */
+  --bronze: #8b4513;       /* rank #3 — literally saddle brown */
+
+  /* Elevation — warm, low, ember-lit rather than cool drop shadows */
+  --shadow-sm: 0 4px 12px rgba(13, 9, 4, 0.5);
+  --shadow-card: 0 18px 40px rgba(13, 9, 4, 0.6);
+  --shadow-overlay: 0 32px 70px rgba(13, 9, 4, 0.8);
+  --shadow-glow: 0 10px 28px rgba(106, 90, 205, 0.32);
+  --shadow-glow-gold: 0 10px 28px rgba(255, 215, 0, 0.35);
+
+  --radius: 10px;
+
+  --font-display: 'Cinzel', 'Georgia', serif;
+  --font-serif: 'Cinzel', 'Georgia', serif;
+  --font-body: 'EB Garamond', Georgia, 'Times New Roman', serif;
+
+  --ring: 0 0 0 2px var(--bg-page), 0 0 0 4px rgba(255, 215, 0, 0.5);
+}
+
+/* ---------------------------------------------------------
+   EMBER FIELD
+   One slow drift, 44s, behind everything — four corners, four
+   different palette colors, none of them dominant.
+   --------------------------------------------------------- */
+html { background: var(--bg-page); }
+
+body {
+  background: transparent;
+  position: relative;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: -25%;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(30% 30% at 18% 82%, rgba(255, 69, 0, 0.18) 0%, transparent 70%),
+    radial-gradient(28% 28% at 85% 88%, rgba(255, 215, 0, 0.14) 0%, transparent 70%),
+    radial-gradient(36% 36% at 78% 10%, rgba(106, 90, 205, 0.22) 0%, transparent 70%),
+    radial-gradient(32% 32% at 10% 12%, rgba(240, 230, 140, 0.10) 0%, transparent 70%);
+  filter: blur(24px);
+  animation: embers 44s ease-in-out infinite alternate;
+}
+
+@keyframes embers {
+  0%   { transform: translate3d(0, 0, 0) scale(1); }
+  50%  { transform: translate3d(-1.5%, -2%, 0) scale(1.06); }
+  100% { transform: translate3d(2%, 1.5%, 0) scale(1.02); }
+}
+
+/* ---------------------------------------------------------
+   TYPE
+   --------------------------------------------------------- */
+h1, h2, h3, h4 { letter-spacing: 0.01em; }
+
+/* Two-tone: gold to slate blue, echoing two sides of a debate
+   rather than one color washing across the whole headline. */
+.hero-title {
+  font-size: clamp(2.3rem, 6vw, 3.9rem);
+  line-height: 1.05;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  background: linear-gradient(100deg, #f0e68c 0%, #ffd700 28%, #efe9f7 50%, #9d8fe8 72%, #6a5acd 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  margin: 6px 0 22px;
+}
+
+.hero-greeting {
+  font-size: 0.86rem;
+  color: var(--ink-mute);
+  font-family: var(--font-body);
+  font-style: italic;
+}
+
+/* A section heading carries a short torch-lit rule instead of
+   an all-caps eyebrow. */
+.section-heading {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  font-size: 1.05rem;
+  font-family: var(--font-display);
+  letter-spacing: 0.02em;
+}
+
+.section-heading::before {
+  content: "";
+  width: 3px;
+  height: 17px;
+  border-radius: 999px;
+  background: var(--accent-grad);
+  flex: none;
+}
+
+/* ---------------------------------------------------------
+   SURFACES
+   --------------------------------------------------------- */
+.glass-card,
+.stat-chip,
+.question-card,
+.feedback-panel,
+.mode-card,
+.daily-strip {
+  border-radius: var(--radius-lg);
+  border-color: var(--line);
+}
+
+.glass-card {
+  background: linear-gradient(168deg, rgba(47, 30, 14, 0.94) 0%, rgba(20, 13, 8, 0.94) 100%);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.app-sidebar {
+  background: linear-gradient(180deg, rgba(36, 23, 8, 0.95) 0%, rgba(13, 9, 4, 0.96) 100%);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-right: 1px solid var(--line);
+  box-shadow: 18px 0 44px rgba(13, 9, 4, 0.5);
+}
+
+.sidebar-link { border-radius: var(--radius-md); }
+
+.sidebar-link.active,
+.sidebar-link[aria-current="page"] {
+  background: var(--accent-grad);
+  color: #fdfbf5;
+  box-shadow: var(--shadow-glow);
+}
+
+.sidebar-group-label {
+  color: var(--ink-mute);
+  font-size: 0.68rem;
+  font-weight: 600;
+  font-family: var(--font-display);
+  letter-spacing: 0.05em;
+}
+
+/* ---------------------------------------------------------
+   DEBATE CARDS — the front door of the app. One card reads as
+   a torch-lit treasure seal (gold), the other as a dusk-blue
+   arcane seal — the palette's two leads facing each other.
+   --------------------------------------------------------- */
+.debate-picks {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(268px, 1fr));
+  gap: 16px;
+}
+
+.debate-card {
+  position: relative;
+  overflow: hidden;
+  text-align: left;
+  padding: 26px 24px 22px;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(255, 215, 0, 0.3);
+  background: linear-gradient(158deg, rgba(66, 42, 15, 0.92) 0%, rgba(24, 15, 8, 0.96) 62%);
+  color: var(--ink);
+  font-family: var(--font-body);
+  cursor: pointer;
+  box-shadow: var(--shadow-card);
+  transition: transform 0.22s var(--ease-out), box-shadow 0.22s var(--ease-out);
+}
+
+/* A seal of light bleeding in from the corner. */
+.debate-card::before {
+  content: "";
+  position: absolute;
+  top: -55%;
+  right: -25%;
+  width: 78%;
+  height: 165%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 215, 0, 0.30) 0%, transparent 68%);
+  pointer-events: none;
+  opacity: 0.75;
+  transition: opacity 0.25s var(--ease-out);
+}
+
+.debate-card.alt {
+  border-color: var(--line-strong);
+  background: linear-gradient(158deg, rgba(38, 32, 74, 0.9) 0%, rgba(24, 15, 8, 0.96) 62%);
+}
+
+.debate-card.alt::before {
+  background: radial-gradient(circle, rgba(106, 90, 205, 0.42) 0%, transparent 68%);
+}
+
+.debate-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 22px 48px rgba(13, 9, 4, 0.65), var(--shadow-glow-gold);
+}
+
+.debate-card:hover::before { opacity: 1; }
+
+.debate-card.alt:hover {
+  box-shadow: 0 22px 48px rgba(13, 9, 4, 0.65), var(--shadow-glow);
+}
+
+.debate-card > * { position: relative; }
+
+.debate-card-kicker {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--ink-soft);
+  margin-bottom: 10px;
+}
+
+.debate-card h3 {
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin: 0 0 8px;
+}
+
+.debate-card p {
+  font-size: 0.86rem;
+  line-height: 1.55;
+  color: var(--ink-soft);
+  margin: 0 0 18px;
+  max-width: 44ch;
+}
+
+.debate-card-go {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: #2a1a04;
+  padding: 9px 17px;
+  border-radius: 999px;
+  background: var(--electric-grad);
+  box-shadow: var(--shadow-glow-gold);
+}
+
+.debate-card.alt .debate-card-go {
+  background: var(--accent-grad);
+  color: #fdfbf5;
+  box-shadow: var(--shadow-glow);
+}
+
+/* ---------------------------------------------------------
+   CONTROLS — primary actions are blue, not gold, so gold stays
+   legible as a "you earned something" signal elsewhere.
+   --------------------------------------------------------- */
+.cta-btn,
+.hero-btn-primary {
+  background: var(--accent-grad);
+  color: #fdfbf5;
+  box-shadow: var(--shadow-glow);
+  border-radius: var(--radius-md);
+  font-weight: 700;
+}
+
+.cta-btn:hover,
+.hero-btn-primary:hover { filter: brightness(1.08); box-shadow: 0 14px 34px rgba(106, 90, 205, 0.45); }
+.cta-btn:active,
+.hero-btn-primary:active { filter: brightness(0.94); box-shadow: 0 4px 12px rgba(106, 90, 205, 0.3); }
+
+.hero-btn-secondary {
+  border-color: var(--line-strong);
+  color: var(--ink);
+}
+
+.option-btn { border-radius: var(--radius-md); }
+
+.option-btn:hover:not(:disabled) {
+  border-color: var(--line-strong);
+  box-shadow: 0 6px 18px rgba(106, 90, 205, 0.2);
+}
+
+::selection { background: var(--accent); color: #fdfbf5; }
+
+/* ---------------------------------------------------------
+   PROGRESS + DATA — gold is spent here, on reward feedback,
+   which is why it doesn't feel diluted.
+   --------------------------------------------------------- */
+.xp-bar-fill,
+.game-progress-fill {
+  background: var(--electric-grad);
+  box-shadow: 0 0 12px rgba(255, 215, 0, 0.5);
+}
+
+.home-stat-val {
+  font-family: var(--font-display);
+  font-size: 1.45rem;
+  font-weight: 700;
+  background: linear-gradient(120deg, #fff3c4 0%, #d9b45c 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.streak-num {
+  background: linear-gradient(120deg, #ffd700 0%, #ff4500 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.daily-strip {
+  background: linear-gradient(100deg, rgba(255, 69, 0, 0.14) 0%, rgba(24, 15, 8, 0.92) 55%);
+  border: 1px solid rgba(255, 69, 0, 0.3);
+}
+
+.daily-strip-tag { color: #ff4500; }
+
+.pipeline-step.active {
+  border-color: var(--line-strong);
+  box-shadow: 0 0 0 1px rgba(106, 90, 205, 0.28), var(--shadow-glow);
+}
+
+/* ---------------------------------------------------------
+   ACCESSIBILITY FLOOR — gold focus ring, so it stays visible
+   against a mostly blue/brown interface.
+   --------------------------------------------------------- */
+:focus-visible {
+  outline: 2px solid var(--electric);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  body::before { animation: none !important; }
+}
+
+@media (max-width: 640px) {
+  .hero-title { font-size: clamp(2rem, 9vw, 2.7rem); }
+  .debate-card { padding: 22px 20px 20px; }
+  .debate-card h3 { font-size: 1.4rem; }
+}
