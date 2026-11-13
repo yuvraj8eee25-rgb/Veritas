@@ -23,10 +23,12 @@
 // =========================================================
 
 import { guardUserRequest, withCors } from "../_shared/http.ts";
-import { object, safeSourceUrl, terms, VERIFICATION_VERSION } from "../_shared/evidence-verification.ts";
+import { MAX_EXCERPT_LENGTH, object, safeSourceUrl, terms, VERIFICATION_VERSION } from "../_shared/evidence-verification.ts";
+import { searchOpenAlex } from "./openalex.ts";
 
 const EXA_API_KEY = Deno.env.get("EXA_API_KEY");
 const TAVILY_API_KEY = Deno.env.get("TAVILY_API_KEY");
+const OPENALEX_API_KEY = Deno.env.get("OPENALEX_API_KEY")?.trim();
 
 const MAX_QUERY_CHARS = 300;
 const NUM_RESULTS = 4;
@@ -47,15 +49,15 @@ function json(body: unknown, status = 200) {
 }
 
 function relevantExcerpt(raw: string, query: string) {
-  if (raw.length <= MAX_TEXT_CHARS) return raw;
+  if (raw.length <= MAX_EXCERPT_LENGTH) return raw;
   const keywords = terms(query);
   // Compare overlapping windows so relevant passages after navigation or a long introduction
   // have a chance to reach the assessor. Return a contiguous slice of the original text.
   const text = raw.slice(0, 100_000);
-  let best = text.slice(0, MAX_TEXT_CHARS);
+  let best = text.slice(0, MAX_EXCERPT_LENGTH);
   let bestScore = -1;
-  for (let offset = 0; offset < text.length; offset += 800) {
-    const window = text.slice(offset, offset + MAX_TEXT_CHARS);
+  for (let offset = 0; offset < text.length; offset += MAX_EXCERPT_LENGTH / 2) {
+    const window = text.slice(offset, offset + MAX_EXCERPT_LENGTH);
     const start = offset ? window.search(/\s/) + 1 : 0;
     const end = offset + window.length < text.length ? Math.max(window.lastIndexOf(" "), window.lastIndexOf("\n")) : window.length;
     const excerpt = window.slice(start, end > start ? end : window.length);
@@ -110,10 +112,12 @@ Deno.serve(withCors(async (req) => {
   let query = "";
   let verification = false;
   let useTavily = false;
+  let useOpenAlex = false;
   try {
     const body = await req.json();
     verification = body?.version === VERIFICATION_VERSION;
     useTavily = verification && body?.provider === "tavily" && Boolean(TAVILY_API_KEY);
+    useOpenAlex = verification && body?.provider === "openalex";
     query = String(body?.query ?? "").trim().slice(0, verification ? 560 : MAX_QUERY_CHARS);
   } catch {
     return json({ ok: false, error: "Invalid JSON body" }, 400);
@@ -121,6 +125,10 @@ Deno.serve(withCors(async (req) => {
   if (!query) return json({ ok: false, error: "query is required" }, 400);
 
   try {
+    if (useOpenAlex) {
+      const { body, status } = await searchOpenAlex(query, OPENALEX_API_KEY, relevantExcerpt);
+      return json(body, status);
+    }
     if (useTavily && TAVILY_API_KEY) return await searchTavily(query, TAVILY_API_KEY);
     if (!EXA_API_KEY) return json({ ok: false, error: "Search is not configured" }, 500);
     const res = await fetch("https://api.exa.ai/search", {
@@ -131,7 +139,7 @@ Deno.serve(withCors(async (req) => {
         query,
         numResults: NUM_RESULTS,
         contents: {
-          text: { maxCharacters: MAX_TEXT_CHARS },
+          text: { maxCharacters: verification ? 12_000 : MAX_TEXT_CHARS },
           ...(verification ? { extras: { links: 30 } } : {}),
         },
       }),
@@ -150,7 +158,7 @@ Deno.serve(withCors(async (req) => {
       ? payload.results.filter((r: unknown) => r && typeof r === "object").map((r: Record<string, unknown>) => ({
           title: r.title ?? null,
           url: r.url ?? null,
-          text: r.text ?? "",
+          text: verification && typeof r.text === "string" ? relevantExcerpt(r.text, query) : r.text ?? "",
           publishedDate: r.publishedDate ?? null,
           author: typeof r.author === "string" ? r.author.trim().slice(0, 200) || null : null,
           ...(verification ? { links: Array.isArray((r.extras as { links?: unknown })?.links)
@@ -160,8 +168,9 @@ Deno.serve(withCors(async (req) => {
 
     return json({ ok: true, ...(verification ? { provider: "exa" } : {}), results });
   } catch (err) {
-    const provider = useTavily ? "Tavily" : "Exa";
+    const provider = useOpenAlex ? "OpenAlex" : useTavily ? "Tavily" : "Exa";
     console.error(JSON.stringify({ event: "search_request_failed", provider, name: err instanceof Error ? err.name : "Error" }));
-    return json({ ok: false, error: `${provider} search request failed.` }, 502);
+    return json({ ok: false, error: err instanceof Error && err.name === "TimeoutError"
+      ? `${provider} search timed out.` : `${provider} search request failed.` }, 502);
   }
 }));

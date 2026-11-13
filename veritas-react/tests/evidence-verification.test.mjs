@@ -291,7 +291,7 @@ test("a stronger follow-up can enter a full batch; failed reassessment keeps the
     });
     const result = await fixture.run();
     const batches = fixture.calls.filter(call => call.body.action === "verify_passages");
-    assert.deepEqual(batches.map(call => call.body.sources.length), [12, 12]);
+    assert.deepEqual(batches.map(call => call.body.sources.length), [12, 1]);
     assert.ok(batches[1].body.sources.some(page => page.url === added.url));
     assert.ok(trace.length <= 10);
     assert.ok(result.snapshot.searches.length <= 5);
@@ -403,6 +403,58 @@ test("Edge verification audits the meaning and provenance of each quoted passage
     version, action: "verify_passages", claim, plan: plan(), sources: [page],
   }, async () => JSON.stringify({ assessments: [{ id: 17, findings: [] }] }));
   assert.equal(malformed.status, 502);
+});
+
+test("a malformed batch is split and only audited article summaries reach the result", async () => {
+  const sources = [makeHit("summary-a"), makeHit("summary-b", positive2), makeHit("summary-broken")];
+  const claimPlan = readPlan(plan(), claim);
+  const summary = "The article reports fewer cases of heat-related illness where urban trees were planted.";
+  const edge = await handleVerification({
+    version, action: "verify_passages", claim, plan: plan(), sources,
+  }, async prompt => {
+    if (prompt.startsWith("Verify proposed")) return JSON.stringify({
+      checks: [], summaryChecks: [{ id: 0, supported: true }, { id: 1, supported: false }],
+    });
+    const group = JSON.parse(prompt.split("SOURCE EXCERPTS: ")[1]);
+    if (group.some(page => page.url.endsWith("broken"))) return '{"assessments":[]}';
+    return JSON.stringify({ assessments: group.map(({ id }) => ({
+      id, findings: [], articleSummary: { text: summary, passageIndex: 0 },
+    })) });
+  });
+  assert.equal(edge.status, 200);
+  const result = await edge.json();
+  assert.deepEqual(result.unassessedIds, [sources[2].url]);
+  assert.equal(result.assessments[0].articleSummary.text, summary);
+  assert.equal(result.assessments[0].articleSummary.quote, positive);
+  assert.equal(result.assessments[1].articleSummary, undefined);
+  const pages = pageList(sources);
+  const snapshot = { claim, plan: claimPlan, pages, selected: pages, searches: [], calls: 2 };
+  const assessments = readAssessment(result, pages.slice(0, 2), claimPlan.targets);
+  const html = safeHtml({ state: "complete", snapshot, assessments, review: reviewEvidence(snapshot, assessments), caveats: [] });
+  assert.match(html, /Article summary/);
+  assert.match(html, /Read the passage behind this summary/);
+  assert.ok(html.includes(summary));
+  assert.match(html, /Unassessed/);
+});
+
+test("official text can directly answer a named provision without needing a duplicate record", () => {
+  const checked = "Article 19 of the Indian Constitution gives foreign nationals the right to assemble peacefully.";
+  const quote = "19. Protection of certain rights. All citizens shall have the right to assemble peaceably and without arms.";
+  const hit = { url: "https://www.indiacode.nic.in/constitution.pdf", title: "Constitution of India", text: quote };
+  const options = {
+    claim: checked,
+    plan: plan(checked, "assemble peacefully", { targets: [{
+      text: checked, outcome: "assemble peacefully", qualifiers: [{ kind: "population", text: "foreign nationals" }],
+    }] }),
+    findings: page => [makeFinding(page, {
+      stance: "contradicts", interpretation: "Article 19 names citizens as the holders of the assembly right.",
+      record: { type: "law", relation: "primary", url: page.url, proof: quote },
+    })],
+  };
+  const result = scored([hit], options);
+  assert.equal(result.review.status, "refuted");
+  assert.match(result.review.reason, /official text.*named provision/);
+  assert.equal(scored([{ ...hit, url: "https://unofficial.example/constitution.pdf" }], options).review.status, "insufficient");
 });
 
 test("reference snapshots abstain appropriately and all displayed factual findings carry usable citations", () => {

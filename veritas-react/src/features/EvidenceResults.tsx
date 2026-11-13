@@ -27,21 +27,46 @@ function dateLabel(value: string | null) {
 function OriginalPage({ page }: { page: Page }) {
   const url = safeSourceUrl(page.url);
   return url && <a className="workspace-text-action" href={url.href} target="_blank" rel="noopener noreferrer">
-    Open original page <ArrowUpRight size={15} aria-hidden="true" />
+    {page.paper ? url.href === page.paper.providerUrl ? "Open OpenAlex record"
+      : url.href === page.paper.doi ? "Open paper via DOI" : "Open paper page" : "Open original page"}
+    <ArrowUpRight size={15} aria-hidden="true" />
   </a>;
+}
+
+function PaperDetails({ page }: { page: Page }) {
+  const paper = page.paper;
+  if (!paper) return null;
+  const authors = paper.authors.slice(0, 4).join(", ") + (paper.authors.length > 4 ? ", et al." : "");
+  const details = [authors, paper.year].filter(Boolean).join(" · ");
+  return <>
+    {details && <p className="workspace-meta">{details}</p>}
+    {paper.authors.length > 4 && <details className="research-passage">
+      <summary>View author list</summary>
+      <p className="workspace-meta">{paper.authors.join(", ")}</p>
+    </details>}
+  </>;
+}
+
+function PaperRecord({ page }: { page: Page }) {
+  const record = safeSourceUrl(page.paper?.providerUrl);
+  return record && record.href !== page.url && <a className="workspace-text-action" href={record.href}
+    target="_blank" rel="noopener noreferrer">OpenAlex record <ArrowUpRight size={15} aria-hidden="true" /></a>;
 }
 
 function Citation({ item, number }: { item: CitedFinding; number: number }) {
   const { page, finding, recordId } = item;
   const recordUrl = recordId && finding.record ? safeSourceUrl(finding.record.url) : null;
   return <details className="research-passage">
-    <summary>Inspect passage [{number}] · {page.title}</summary>
-    <blockquote>{finding.quote}</blockquote>
+    <summary>{page.passage.scope === "abstract" ? "Inspect abstract excerpt" : "Inspect passage"} [{number}] · {page.paper?.title ?? page.title}</summary>
+    <PaperDetails page={page} />
     <p className="workspace-meta">
-      Retrieved excerpt · {dateLabel(page.date)} · {recordId && finding.record ? finding.record.type : "Source type or independence unverified"}
+      {page.passage.scope === "abstract" ? "Abstract excerpt" : page.paper ? "Retrieved web excerpt" : "Retrieved excerpt"}
+      {!page.paper && ` · ${dateLabel(page.date)}`} · {recordId && finding.record ? finding.record.type : "Source type or independence unverified"}
     </p>
+    <blockquote>{finding.quote}</blockquote>
     {finding.limitation && <p className="workspace-meta">Limit: {finding.limitation}</p>}
     <OriginalPage page={page} />
+    <PaperRecord page={page} />
     {recordUrl && finding.record?.relation === "secondary" && <a className="workspace-text-action"
       href={recordUrl.href} target="_blank" rel="noopener noreferrer">Open underlying record <ArrowUpRight size={15} aria-hidden="true" /></a>}
   </details>;
@@ -60,23 +85,41 @@ function FindingList({ findings, numbers }: { findings: CitedFinding[]; numbers:
 
 function SourceList({ result, numbers }: { result: Investigation; numbers: Map<string, number> }) {
   return <aside className="research-sources" aria-labelledby="research-sources-title">
-    <h3 id="research-sources-title">Retrieved pages · {result.snapshot.pages.length}</h3>
-    <p className="workspace-meta">The review uses retrieved excerpts. Open the original pages to check the full context.</p>
+    <h3 id="research-sources-title">Retrieved sources · {result.snapshot.pages.length}</h3>
+    <p className="workspace-meta">The review uses saved web and abstract excerpts. Open the linked sources to check the full context.</p>
     <ol>{result.snapshot.pages.map(page => {
-      const assessed = result.state === "complete" && result.assessments.some(entry => entry.id === page.id);
+      const assessment = result.state === "complete" ? result.assessments.find(entry => entry.id === page.id) : undefined;
       const findings = result.state === "complete" ? result.review.findings.filter(entry => entry.page.id === page.id) : [];
       const verified = findings.find(entry => entry.recordId && entry.finding.record);
       const number = numbers.get(page.id)!;
-      const label = !assessed ? "Unassessed" : verified ? `Linked to ${verified.finding.record?.type}` : "Independence unverified";
+      const isAbstract = page.passage.scope === "abstract";
+      const metadataOnly = page.passage.scope === "metadata only";
+      const label = metadataOnly ? "Metadata only · no usable abstract was retrieved"
+        : !assessment ? "Unassessed" : verified ? `Linked to ${verified.finding.record?.type}` : "Independence unverified";
       return <li key={page.id}>
         <span className="research-source-number">[{number}]</span>
-        <h4>{page.title}</h4>
-        <p className="workspace-meta">{safeSourceUrl(page.url)?.hostname} · {dateLabel(page.date)}</p>
-        {page.author && <p className="workspace-meta">By {page.author}</p>}
+        <h4>{page.paper?.title ?? page.title}</h4>
+        <PaperDetails page={page} />
+        {page.paper ? <p className="workspace-meta">{isAbstract ? "Abstract excerpt" : metadataOnly ? "Paper record" : "Retrieved web excerpt"}</p>
+          : <>
+            <p className="workspace-meta">{safeSourceUrl(page.url)?.hostname} · {dateLabel(page.date)}</p>
+            {page.author && <p className="workspace-meta">By {page.author}</p>}
+          </>}
         <p className="research-source-status">{label}</p>
+        {assessment && <div className="research-article-summary">
+          <strong>{isAbstract ? "Abstract summary" : "Article summary"}</strong>
+          {assessment.articleSummary ? <>
+            <p>{assessment.articleSummary.text}</p>
+            <details className="research-passage">
+              <summary>{isAbstract ? "Read the abstract passage behind this summary" : "Read the passage behind this summary"}</summary>
+              <blockquote>{assessment.articleSummary.quote}</blockquote>
+            </details>
+          </> : <p className="workspace-meta">A summary could not be verified from the retrieved excerpt.</p>}
+        </div>}
         <OriginalPage page={page} />
+        <PaperRecord page={page} />
         {page.passage.text && <details className="research-passage">
-          <summary>Full retrieved excerpt</summary>
+          <summary>{isAbstract ? "Read the saved abstract excerpt" : "Full retrieved excerpt"}</summary>
           <blockquote>{page.passage.text}</blockquote>
         </details>}
         {findings.length > 0 && <details className="research-passage">
@@ -135,8 +178,8 @@ export default function EvidenceResults({ result, retry, retrying, canRetry }: {
     </header>
 
     <div className="research-breakdown">
-      <dl aria-label="Page and record counts">
-        <div><dt>Retrieved pages</dt><dd>{snapshot.pages.length}</dd></div>
+      <dl aria-label="Source and record counts">
+        <div><dt>Retrieved sources</dt><dd>{snapshot.pages.length}</dd></div>
         <div><dt>Independent records identified</dt><dd>{review.independentCount}</dd></div>
         <div><dt>Records that contributed</dt><dd>{review.weightedCount}</dd></div>
       </dl>
@@ -144,7 +187,8 @@ export default function EvidenceResults({ result, retry, retrying, canRetry }: {
       {review.records.length > 0 && <details className="research-passage">
         <summary>See independent records</summary>
         <ul>{review.records.map(record => <li key={record.id}>
-          <strong>{record.primary.page.title}</strong>
+          <strong>{record.primary.page.paper?.title ?? record.primary.page.title}</strong>
+          <PaperDetails page={record.primary.page} />
           <p className="workspace-meta">{record.primary.finding.record?.type} · {record.pages.length} linked {record.pages.length === 1 ? "page" : "pages"} · {record.contributes ? "Contributed" : "Did not contribute"}</p>
           <OriginalPage page={record.primary.page} />
         </li>)}</ul>

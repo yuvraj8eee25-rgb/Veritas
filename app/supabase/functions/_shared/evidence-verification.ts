@@ -1,6 +1,6 @@
 export const VERIFICATION_VERSION = 2;
 export const MAX_EVIDENCE_PAGES = 12;
-export const MAX_EXCERPT_LENGTH = 1600;
+export const MAX_EXCERPT_LENGTH = 3600;
 
 const stances = ["supports", "contradicts", "neutral", "irrelevant"] as const;
 const strengths = ["strong", "moderate", "weak"] as const;
@@ -25,7 +25,18 @@ export type Plan = {
   counterQuery: string;
   primaryQuery: string;
 };
-export type Passage = { id: string; sourceId: string; text: string; scope: "retrieved excerpt" };
+export type Passage = { id: string; sourceId: string; text: string; scope: "retrieved excerpt" | "abstract" | "metadata only" };
+export type Paper = {
+  provider: "openalex";
+  workId: string;
+  providerUrl: string;
+  landingUrl: string | null;
+  title: string;
+  doi: string | null;
+  authors: string[];
+  year: number | null;
+  type: string | null;
+};
 export type Page = {
   id: string;
   url: string;
@@ -33,6 +44,7 @@ export type Page = {
   date: string | null;
   author: string | null;
   links: string[];
+  paper?: Paper;
   passage: Passage;
 };
 type RecordProof = {
@@ -54,7 +66,8 @@ export type Finding = {
   limitation: string;
   record: RecordProof | null;
 };
-export type Assessment = { id: string; findings: Finding[] };
+export type ArticleSummary = { text: string; quote: string };
+export type Assessment = { id: string; findings: Finding[]; articleSummary?: ArticleSummary };
 
 export function object(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === "object" && !Array.isArray(value)
@@ -100,14 +113,42 @@ function fingerprint(text: string): string {
   return (hash >>> 0).toString(36);
 }
 
+export function doiUrl(value: unknown): string | null {
+  const identity = resolverIdentity(value);
+  return identity?.startsWith("doi:") ? `https://doi.org/${identity.slice(4)}` : null;
+}
+
+function readPaper(value: unknown): Paper | undefined {
+  const paper = object(value);
+  if (paper?.provider !== "openalex" || typeof paper.workId !== "string" || !/^W\d{1,20}$/.test(paper.workId)) return;
+  const title = bounded(paper.title, 2000);
+  if (!title) return;
+  const authors = Array.isArray(paper.authors) ? paper.authors.slice(0, 100)
+    .map(name => bounded(name, 200)).filter(Boolean) : [];
+  return {
+    provider: "openalex", workId: paper.workId, providerUrl: `https://openalex.org/${paper.workId}`,
+    doi: doiUrl(paper.doi), landingUrl: canonicalPageUrl(paper.landingUrl), title, authors,
+    year: typeof paper.year === "number" && Number.isInteger(paper.year) && paper.year > 0 && paper.year <= 9999
+      ? paper.year : null,
+    type: bounded(paper.type, 60) || null,
+  };
+}
+
 export function readSearchPages(response: unknown): Page[] {
   const data = object(response);
   if (data?.ok !== true || !Array.isArray(data.results)) throw new Error("Search returned an invalid response.");
   return data.results.flatMap((value): Page[] => {
     const result = object(value);
-    const id = canonicalPageUrl(result?.url);
-    if (!id || typeof result?.url !== "string") return [];
-    const text = typeof result.text === "string" ? result.text.slice(0, MAX_EXCERPT_LENGTH) : "";
+    const paper = readPaper(result?.paper);
+    if (result?.paper && !paper) return [];
+    const url = canonicalPageUrl(result?.url);
+    const id = paper ? paper.doi ?? paper.providerUrl : doiUrl(url) ?? url;
+    if (!id || !url || typeof result?.url !== "string") return [];
+    // DOI matches can carry paper metadata alongside a separately retrieved web excerpt.
+    const retrieved = typeof result.text === "string" ? result.text.slice(0, MAX_EXCERPT_LENGTH) : "";
+    const scope = !paper || (result.textType === "retrieved excerpt" && paper.doi && doiUrl(url) === paper.doi)
+      ? "retrieved excerpt" : result.textType === "abstract" && retrieved.trim() ? "abstract" : "metadata only";
+    const text = scope === "metadata only" ? "" : retrieved;
     return [{
       id, url: result.url, title: bounded(result.title, 250) || id,
       date: bounded(result.publishedDate, 40) || null,
@@ -116,7 +157,11 @@ export function readSearchPages(response: unknown): Page[] {
         const link = canonicalPageUrl(value);
         return link ? [link] : [];
       }),
-      passage: { id: `${id}#passage-${fingerprint(text)}`, sourceId: id, text, scope: "retrieved excerpt" },
+      ...(paper ? { paper } : {}),
+      passage: {
+        id: `${id}#passage-${fingerprint(scope === "abstract" ? `abstract:\n${text}` : text)}`,
+        sourceId: id, text, scope,
+      },
     }];
   });
 }
@@ -137,9 +182,31 @@ export function terms(text: string): Set<string> {
 }
 
 function outcomePresent(outcome: string, quote: string): boolean {
-  const wanted = [...terms(outcome)];
-  const present = terms(quote);
+  const normalize = (value: string) => value
+    .replace(/\bpeaceabl[ey]\b/gi, "peacefully")
+    .replace(/\bnon[ -]citizens?\b|\bforeign nationals?\b|\bforeigners?\b/gi, "foreigner");
+  const wanted = [...terms(normalize(outcome))];
+  const present = terms(normalize(quote));
   return wanted.length > 0 && wanted.every(term => present.has(term));
+}
+
+function provisionNumber(text: string): string | undefined {
+  const provision = text.match(/\b(?:article|section)\s+(\d+[a-z]?)\b/i)
+    ?? text.match(/^\s*(\d+[a-z]?)\.\s+\S/i);
+  return provision?.[1].toLowerCase();
+}
+
+export function isOfficialIndianLawPage(page: Page) {
+  const host = safeSourceUrl(page.url)?.hostname;
+  return Boolean(host && /(?:^|\.)(?:indiacode\.nic\.in|legislative\.gov\.in)$/.test(host));
+}
+
+export function isDirectStatutoryText(page: Page, finding: Finding, target: Target) {
+  const provision = provisionNumber(target.text);
+  return Boolean(isOfficialIndianLawPage(page) && !target.causal
+    && finding.record?.type === "law" && finding.record.relation === "primary"
+    && finding.strength === "strong" && finding.match === "direct"
+    && provision && provisionNumber(finding.quote) === provision);
 }
 
 const policyPattern = /^(?:should|ought|is it (?:right|ethical)|what should)\b|\b(?:should|ought to|morally right|morally wrong)\b/i;
@@ -226,9 +293,14 @@ function readRecord(value: unknown, page: Page, quote: string): RecordProof | nu
     return (explicit || matchedTitle) && quote.includes(proof)
       ? { type, relation: "secondary", url, proof, aliases: [], title: explicit ? null : title } : null;
   }
+  // A provider work ID or DOI identifies the abstract's record, but the
+  // model still has to cite exact text and the audit must confirm provenance.
+  const paper = page.passage.scope === "abstract" ? page.paper : undefined;
+  const matchesPaperDoi = paper?.doi && doiUrl(url) === paper.doi;
+  if (paper && (type !== "study" || (url !== page.id && url !== paper.providerUrl && !matchesPaperDoi))) return null;
   // The resolver itself is direct metadata. Other pages must explicitly identify their own record.
   const self = resolverIdentity(page.id);
-  if (url !== page.id && (!identity || !identifierIn(proof, identity))) return null;
+  if (!paper && url !== page.id && (!identity || (identity !== self && !identifierIn(proof, identity)))) return null;
   if ((url !== page.id || !self) && terms(proof).size < 5) return null;
   const aliases = Array.isArray(record.aliases)
     ? record.aliases.flatMap(value => {
@@ -237,7 +309,7 @@ function readRecord(value: unknown, page: Page, quote: string): RecordProof | nu
         return alias && identifier && identifierIn(proof, identifier) ? [alias] : [];
       }).slice(0, 2)
     : [];
-  return { type, relation: "primary", url, proof, aliases, title: null };
+  return { type, relation: "primary", url: paper ? page.id : url, proof, aliases, title: null };
 }
 
 export function readAssessment(response: unknown, pages: Page[], targets: Target[]): Assessment[] {
@@ -267,13 +339,18 @@ export function readAssessment(response: unknown, pages: Page[], targets: Target
       }
       const quote = excerptQuote(page.passage.text, raw.quote);
       if (!quote) throw new Error("Assessment cited text absent from the retrieved passage.");
+      const record = readRecord(raw.record, page, quote);
+      const expressesCitizenRestriction = record?.type === "law" && record.relation === "primary"
+        && isOfficialIndianLawPage(page)
+        && provisionNumber(target.text) && provisionNumber(target.text) === provisionNumber(quote)
+        && /\b(?:all|only|every) citizens?\b/i.test(quote);
       const outcomeMatched = outcomePresent(target.outcome, quote);
       const missingQualifier = target.qualifiers.find(qualifier =>
         qualifier.kind !== "causality" && qualifier.kind !== "outcome" && !outcomePresent(qualifier.text, quote)
+        && !(expressesCitizenRestriction && qualifier.kind === "population" && /\b(?:foreign|non.?citizen)/i.test(qualifier.text))
       );
       const causalDesign = /\b(?:randomi[sz]\w*|controlled trial|quasi.experimental|natural experiment|difference.in.differences|regression discontinuity)\b/i.test(quote);
       const direct = raw.match === "direct" && outcomeMatched && !missingQualifier && (!target.causal || causalDesign);
-      const record = readRecord(raw.record, page, quote);
       const gap = !outcomeMatched ? "The quoted text does not identify the requested outcome."
         : missingQualifier ? `The quoted text does not establish the requested ${missingQualifier.kind}: ${missingQualifier.text}.`
         : target.causal && !causalDesign ? "The quoted text does not establish a design that can support the causal claim."
@@ -289,6 +366,10 @@ export function readAssessment(response: unknown, pages: Page[], targets: Target
         record,
       }];
     });
-    return { id: page.id, findings };
+    const summary = object(entry.articleSummary);
+    const summaryText = bounded(summary?.text, 500);
+    const summaryQuote = excerptQuote(page.passage.text, summary?.quote);
+    return { id: page.id, findings, ...(summaryText && summaryQuote
+      ? { articleSummary: { text: summaryText, quote: summaryQuote } } : {}) };
   });
 }

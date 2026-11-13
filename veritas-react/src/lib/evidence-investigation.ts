@@ -1,5 +1,7 @@
 import {
   fallbackPlan,
+  isDirectStatutoryText,
+  isOfficialIndianLawPage,
   MAX_EVIDENCE_PAGES,
   object,
   readAssessment,
@@ -17,11 +19,12 @@ export const MAX_ASSESSMENT_CALLS = 8;
 export type EvidenceRequest = (
   name: "assess-evidence" | "exa-search", body: Record<string, unknown>, signal?: AbortSignal,
 ) => Promise<unknown>;
-export type SearchDirection = "Neutral" | "Counterevidence" | "Primary records" | "Missing proposition" | "Recovery";
-type Query = { direction: SearchDirection; text: string; provider?: "exa" | "tavily" };
+export type SearchDirection = "Neutral" | "Research papers" | "Counterevidence" | "Primary records" | "Missing proposition" | "Recovery";
+type Query = { direction: SearchDirection; text: string; provider?: "exa" | "tavily" | "openalex" };
 export type SearchLog = Query & {
   state: "failed" | "limited" | "skipped" | "empty" | "retrieved";
   pageIds: string[];
+  textCount?: number;
   error?: string;
 };
 export type TraceStep = { title: string; notes: string[] };
@@ -58,10 +61,17 @@ export function mergePages(pages: Page[], scope: string): Page[] {
   const unique = new Map<string, Page>();
   for (const page of pages) {
     const previous = unique.get(page.id);
-    if (!previous || pagePriority(page, scope) > pagePriority(previous, scope)) unique.set(page.id, page);
-    else if (previous.passage.id === page.passage.id) {
-      unique.set(page.id, { ...previous, links: [...new Set([...previous.links, ...page.links])].slice(0, 30) });
-    }
+    if (!previous) { unique.set(page.id, page); continue; }
+    const hasText = Boolean(page.passage.text.trim());
+    const hadText = Boolean(previous.passage.text.trim());
+    const preferNew = hasText !== hadText ? hasText
+      : !hasText && page.passage.scope !== previous.passage.scope ? page.passage.scope === "metadata only"
+      : pagePriority(page, scope) > pagePriority(previous, scope);
+    const best = preferNew ? page : previous;
+    const paper = best.paper ?? (resolverIdentity(best.id)?.startsWith("doi:") ? previous.paper ?? page.paper : undefined);
+    const links = previous.passage.id === page.passage.id
+      ? [...new Set([...previous.links, ...page.links])].slice(0, 30) : best.links;
+    unique.set(page.id, { ...best, ...(paper ? { paper } : {}), links });
   }
   return [...unique.values()];
 }
@@ -73,6 +83,7 @@ function pagePriority(page: Page, scope: string): number {
   const matching = [...wanted].reduce((score, word) => score + Number(title.has(word)) + 2 * Number(passage.has(word)), 0);
   // Use retrieval signals for selection only. They never determine independence or a stance.
   return matching + 4 * Number(Boolean(page.passage.text.trim())) + 3 * Number(Boolean(resolverIdentity(page.id)))
+    + 7 * Number(/\b(?:constitution|article|statute)\b/i.test(scope) && isOfficialIndianLawPage(page))
     + Number(Boolean(page.date)) + Math.min(page.passage.text.length, 800) / 800;
 }
 
@@ -81,11 +92,15 @@ export function selectPages(pages: Page[], plan: Plan, claim: string, limit = MA
   const confirmed = new Set(reviewed.filter(entry =>
     entry.recordId && entry.finding.match === "direct" && entry.finding.strength !== "weak"
   ).map(entry => entry.page.passage.id));
-  const pool = mergePages(pages, scope);
+  const pool = mergePages(pages, scope).filter(page => page.passage.text.trim());
   const ranks = plan.targets.map(target => pool.map(page => ({
     page, score: pagePriority(page, target.text) + 4 * Number(confirmed.has(page.passage.id)),
   })).sort((a, b) => b.score - a.score));
   const selected = new Map<string, Page>();
+  // Keep a scholarly passage in the assessment even when the web results fill the batch.
+  const scholarly = pool.filter(page => page.passage.scope === "abstract")
+    .sort((a, b) => pagePriority(b, scope) - pagePriority(a, scope));
+  for (const page of scholarly.slice(0, Math.min(2, limit))) selected.set(page.id, page);
   for (let index = 0; index < pool.length && selected.size < limit; index++) {
     for (const rank of ranks) {
       const page = rank[index].page;
@@ -152,6 +167,17 @@ function groupFindings(pages: Page[], assessments: Assessment[], plan: Plan): Ci
       if (alias !== root) parents.set(alias, root);
     }
   }
+  // Count copies at the paper's known landing page and provider record only once.
+  for (const { page, finding: { record } } of primaryEntries) {
+    const { paper } = page;
+    if (!record || !paper || recordKey(record.url) !== recordKey(page.id) || ambiguousPages.has(page.id)) continue;
+    const root = find(recordKey(record.url));
+    for (const url of [paper.providerUrl, paper.landingUrl]) {
+      if (!url || !parents.has(recordKey(url))) continue;
+      const alias = find(recordKey(url));
+      if (alias !== root) parents.set(alias, root);
+    }
+  }
   const primaryTitles = new Map<string, string[]>();
   for (const { page, finding: { record } } of primaryEntries) {
     if (!record || ambiguousPages.has(page.id)) continue;
@@ -186,8 +212,12 @@ export function reviewEvidence(snapshot: Snapshot, assessments: Assessment[]): R
     const relevant = findings.filter(item => item.finding.targetId === target.id);
     const supporting = strongestByRecord(relevant, "supports");
     const challenging = strongestByRecord(relevant, "contradicts");
+    const directlyStatesProvision = (entries: CitedFinding[]) => entries.some(entry =>
+      isDirectStatutoryText(entry.page, entry.finding, target)
+    );
     const status = supporting.length && challenging.length ? "mixed"
-      : supporting.length >= 2 ? "supported" : challenging.length >= 2 ? "refuted" : "insufficient";
+      : supporting.length >= 2 || directlyStatesProvision(supporting) ? "supported"
+      : challenging.length >= 2 || directlyStatesProvision(challenging) ? "refuted" : "insufficient";
     return { target, status, supporting, challenging };
   });
   const recordIds = new Set(findings.flatMap(finding => finding.recordId ? [finding.recordId] : []));
@@ -208,7 +238,10 @@ export function reviewEvidence(snapshot: Snapshot, assessments: Assessment[]): R
     : snapshot.plan.complete && targets.every(target => target.status === "refuted") ? "refuted" : "insufficient";
   const reason = snapshot.plan.policy ? "The review checks factual premises and trade-offs. The policy decision is yours."
     : status === "mixed" ? "Direct findings disagree on the same checked proposition."
+    : (status === "supported" || status === "refuted") && targets.some(target => target.supporting.length + target.challenging.length === 1)
+      ? "The official text directly addresses the named provision. This verdict applies to that provision."
     : status === "supported" || status === "refuted" ? "At least two independent records directly address each checked proposition in the same direction."
+    : !snapshot.selected.length ? "The searches returned source records without passages that could be assessed."
     : !snapshot.plan.complete ? "The checked scope could not be confirmed for the whole claim."
     : targets.length > 1 ? "The checked propositions do not all reach the same conclusion."
     : "A directional verdict needs at least two independent records with direct, credible findings on this question.";
@@ -232,10 +265,17 @@ async function verify(snapshot: Snapshot, request: EvidenceRequest, signal: Abor
     plan: { ...snapshot.plan, ok: true, version: VERIFICATION_VERSION },
     sources: snapshot.selected.map(page => ({
       url: page.url, title: page.title, text: page.passage.text, publishedDate: page.date, author: page.author, links: page.links,
+      ...(page.paper ? { paper: page.paper, textType: page.passage.scope } : {}),
     })),
   }, signal);
   signal.throwIfAborted();
-  return readAssessment(result, snapshot.selected, snapshot.plan.targets);
+  const unassessed = object(result)?.unassessedIds;
+  if (unassessed === undefined) return readAssessment(result, snapshot.selected, snapshot.plan.targets);
+  const selectedIds = new Set(snapshot.selected.map(page => page.id));
+  if (!Array.isArray(unassessed)
+    || !unassessed.every(id => typeof id === "string" && selectedIds.delete(id))
+    || !selectedIds.size) throw new Error("The assessment did not identify which pages were verified.");
+  return readAssessment(result, snapshot.selected.filter(page => selectedIds.has(page.id)), snapshot.plan.targets);
 }
 
 function complete(snapshot: Snapshot, assessments: Assessment[], caveats: string[]): Extract<Investigation, { state: "complete" }> {
@@ -256,7 +296,9 @@ function complete(snapshot: Snapshot, assessments: Assessment[], caveats: string
   if (snapshot.searches.some(search => search.state === "empty")) {
     coverage.push("At least one search direction returned no usable pages.");
   }
-  if (snapshot.pages.some(page => !assessments.some(entry => entry.id === page.id))) {
+  if (snapshot.selected.some(page => !assessments.some(entry => entry.id === page.id))) {
+    coverage.push("Some selected pages could not be verified. The verdict uses the assessments that passed verification.");
+  } else if (snapshot.pages.some(page => page.passage.scope !== "metadata only" && !assessments.some(entry => entry.id === page.id))) {
     coverage.push("Some retrieved pages remain unassessed and did not contribute to the result.");
   }
   if (review.findings.some(item => !item.recordId)) {
@@ -273,9 +315,11 @@ function searchStep(title: string, searches: SearchLog[]): TraceStep {
       const outcome = search.state === "limited" ? "search limit reached"
         : search.state === "skipped" ? "skipped after the search limit was reached"
         : search.state === "failed" ? `failed (${search.error})`
-        : search.state === "empty" ? "no usable pages" : `${search.pageIds.length} distinct pages`;
-      const provider = search.provider === "tavily" ? " (Tavily)" : "";
-      return `${search.direction}${provider}: ${search.text} · ${outcome}`;
+        : search.state === "empty" ? "no results"
+        : `${search.pageIds.length} distinct ${search.provider === "openalex" ? "papers" : "pages"}`;
+      const provider = search.provider === "openalex" ? " (OpenAlex)" : search.provider === "tavily" ? " (Tavily)" : " (Exa)";
+      const retrievedText = search.textCount === undefined ? "" : `; ${search.textCount} with abstract text`;
+      return `${search.direction}${provider}: ${search.text} · ${outcome}${retrievedText}`;
     }),
   };
 }
@@ -291,10 +335,15 @@ export async function runInvestigation(claim: string, request: EvidenceRequest, 
         ...(query.provider ? { provider: query.provider } : {}),
       }, signal);
       signal.throwIfAborted();
+      const provider = object(response)?.provider;
+      if (query.provider === "openalex" && provider !== "openalex") {
+        throw new Error("The search function does not support OpenAlex yet.");
+      }
       const pages = mergePages(readSearchPages(response), claim);
       const log: SearchLog = {
-        ...query, provider: object(response)?.provider === "tavily" ? "tavily" : "exa",
+        ...query, provider: provider === "tavily" || provider === "openalex" ? provider : "exa",
         state: pages.length ? "retrieved" : "empty", pageIds: pages.map(page => page.id),
+        ...(provider === "openalex" && pages.length ? { textCount: pages.filter(page => page.passage.scope === "abstract").length } : {}),
       };
       return { log, pages };
     } catch (error) {
@@ -323,39 +372,53 @@ export async function runInvestigation(claim: string, request: EvidenceRequest, 
     return results.map(result => result.log);
   }
 
-  trace({ title: "Checking scope and starting a neutral search", notes: [] });
+  trace({ title: "Checking scope and searching for web sources and research papers", notes: [] });
   const [initial, planned] = await Promise.all([
-    collect([{ direction: "Neutral", text: claim }]),
+    collect([{ direction: "Neutral", text: claim }, { direction: "Research papers", provider: "openalex", text: claim }]),
     request("assess-evidence", {
       version: VERIFICATION_VERSION, action: "plan_verification", claim,
     }, signal).catch(() => null),
   ]);
   signal.throwIfAborted();
   snapshot.plan = readPlan(planned, claim);
-  trace(searchStep("Neutral search", initial));
+  trace(searchStep("Web and scholarly search", initial));
   trace({ title: "Looking for counterevidence and primary records", notes: [] });
   const broad = await collect([
     { direction: "Counterevidence", text: snapshot.plan.counterQuery },
     { direction: "Primary records", text: snapshot.plan.primaryQuery },
   ]);
   trace(searchStep("Counterevidence and primary records", broad));
-  if (!snapshot.pages.length) {
+  const namedIndianLaw = /\b(?:india|indian)\b/i.test(claim)
+    && /\b(?:article|section)\s+\d+/i.test(claim);
+  const webPages = snapshot.pages.filter(page => page.passage.scope === "retrieved excerpt");
+  if (namedIndianLaw && webPages.length && !webPages.some(page => isOfficialIndianLawPage(page) && page.passage.text)) {
+    const primary = await collect([{ direction: "Primary records", provider: "tavily", text: snapshot.plan.primaryQuery }]);
+    trace(searchStep("Checking official legal sources", primary));
+  }
+  if (!webPages.some(page => page.passage.text.trim()) && seen.size < MAX_SEARCHES) {
     const recovered = await collect([{
       direction: "Recovery", provider: "tavily",
       text: `Original records and evidence, including null results and exceptions: ${claim}`,
     }]);
     trace(searchStep("Recovery search", recovered));
   }
-  if (!snapshot.pages.length) {
+  snapshot.selected = selectPages(snapshot.pages, snapshot.plan, claim);
+  if (!snapshot.selected.length && snapshot.pages.some(page => page.passage.scope === "metadata only")) {
+    const result = complete(snapshot, [], []);
+    trace(finalStep(result));
+    return result;
+  }
+  if (!snapshot.selected.length) {
     const successful = snapshot.searches.some(log => log.state === "empty");
     return {
       state: successful && !searchLimitReached ? "empty" : "search-failed", snapshot,
-      reason: searchLimitReached ? searchLimitMessage : successful ? "The completed searches returned no usable pages."
+      reason: searchLimitReached ? searchLimitMessage
+        : snapshot.pages.length ? "The search found source records, but none included text that could be assessed."
+        : successful ? "The completed searches returned no usable pages."
         : snapshot.searches[0]?.error || "The search service did not respond.",
     };
   }
 
-  snapshot.selected = selectPages(snapshot.pages, snapshot.plan, claim);
   trace({ title: "Assessing retrieved excerpts", notes: [`${snapshot.selected.length} pages selected from ${snapshot.pages.length} distinct pages.`] });
   let assessments: Assessment[];
   try {
@@ -385,14 +448,22 @@ export async function runInvestigation(claim: string, request: EvidenceRequest, 
     const followup = await collect(optional);
     trace(searchStep("Targeted verification searches", followup));
     const selected = selectPages(snapshot.pages, snapshot.plan, claim, MAX_EVIDENCE_PAGES, previous.findings);
-    const signature = (page: Page) => JSON.stringify([page.passage.id, page.links]);
-    const previousIds = new Set(snapshot.selected.map(signature));
-    if (selected.some(page => !previousIds.has(signature(page)))) {
-      const next = { ...snapshot, selected };
-      trace({ title: "Verifying the updated evidence set", notes: [`${selected.length} pages selected for assessment.`] });
+    const signature = (page: Page) => JSON.stringify([page.passage.id, page.url, page.links]);
+    const assessedIds = new Set(assessments.map(entry => entry.id));
+    const previousIds = new Set(snapshot.selected.filter(page => assessedIds.has(page.id)).map(signature));
+    const toAssess = selected.filter(page => !previousIds.has(signature(page)));
+    if (toAssess.length) {
+      const next = { ...snapshot, selected: toAssess };
+      trace({ title: "Verifying additional source passages", notes: [`${toAssess.length} new or previously unverified pages selected for assessment.`] });
       try {
-        assessments = await verify(next, request, signal);
-        snapshot.selected = selected;
+        const updated = await verify(next, request, signal);
+        const refreshed = new Set(updated.map(entry => entry.id));
+        const earlierPages = new Map(snapshot.selected.map(page => [page.id, page]));
+        const earlier = assessments.filter(entry => !refreshed.has(entry.id) && selected.some(page => page.id === entry.id));
+        const preserved = new Set(earlier.map(entry => entry.id));
+        snapshot.selected = selected.map(page => preserved.has(page.id) ? earlierPages.get(page.id)! : page);
+        snapshot.pages = snapshot.pages.map(page => preserved.has(page.id) ? earlierPages.get(page.id)! : page);
+        assessments = [...updated, ...earlier];
       } catch (error) {
         signal.throwIfAborted();
         caveats.push(`Follow-up assessment was unavailable. The previous validated evidence was kept. ${sourceError(error)}`);
@@ -411,14 +482,14 @@ export async function runInvestigation(claim: string, request: EvidenceRequest, 
 }
 
 function finalStep(result: Extract<Investigation, { state: "complete" }>): TraceStep {
-  const { snapshot, review } = result;
+  const { snapshot, review, assessments } = result;
   const weightedPages = new Set(review.targets.flatMap(target =>
     [...target.supporting, ...target.challenging].map(entry => entry.page.id)
   ));
   return {
     title: "Comparing validated findings",
     notes: [
-      `${snapshot.pages.length} distinct pages retrieved; ${snapshot.selected.length} assessed; ${review.independentCount} independent records identified; ${review.weightedCount} contributed to a checked proposition.`,
+      `${snapshot.pages.length} distinct sources retrieved; ${assessments.length} assessed; ${review.independentCount} independent records identified; ${review.weightedCount} contributed to a checked proposition.`,
       ...snapshot.searches.filter(search => search.state === "retrieved" && !search.pageIds.some(id => weightedPages.has(id)))
         .map(search => `No retained direct independent finding from ${search.direction.toLowerCase()}: ${search.text}`),
     ],
