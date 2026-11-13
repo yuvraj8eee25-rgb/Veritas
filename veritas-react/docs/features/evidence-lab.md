@@ -1,6 +1,6 @@
 # Evidence Lab
 
-Evidence Lab keeps the submitted claim with its results. It uses Exa to search the claim as written, then looks for counterevidence and original records. When the first searches return no usable pages or a proposition lacks enough verified evidence, the app can use one of its search slots to try Tavily. Tavily can prioritize official legal sources for questions about India. Its retrieved text goes through the same assessment and verification as Exa. The activity log shows which search used Tavily, along with failures, empty results and retained pages.
+Evidence Lab keeps the submitted claim with its results. It uses Exa to search the claim as written, then looks for counterevidence and original records. When the first searches return no usable pages or a proposition lacks enough verified evidence, the app can use one of its search slots to try Tavily. For questions about Indian law, this fallback searches official legislative and court domains. Its retrieved text goes through the same assessment and verification as Exa. The activity log shows which search used Tavily, along with failures, empty results and retained pages.
 
 A retrieved page, a passage from that page and the underlying evidence record have separate identities. Tracking variants count as one page. A record counts once even when multiple pages report it. Pages whose relationship to a primary record could not be verified are available to read but cannot influence the verdict.
 

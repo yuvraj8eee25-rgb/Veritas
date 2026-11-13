@@ -78,7 +78,7 @@ async function searchTavily(query: string, key: string) {
     body: JSON.stringify({
       query: query.slice(0, 400), max_results: NUM_RESULTS, search_depth: "basic",
       include_answer: false, include_raw_content: "text",
-      ...(indianLaw ? { include_domains: officialDomains, include_domains_mode: "prefer" } : {}),
+      ...(indianLaw ? { include_domains: officialDomains } : {}),
     }),
   });
   if (!response.ok) {
