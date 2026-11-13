@@ -1,6 +1,7 @@
 import {
   fallbackPlan,
   MAX_EVIDENCE_PAGES,
+  object,
   readAssessment,
   readPlan,
   readSearchPages,
@@ -17,7 +18,7 @@ export type EvidenceRequest = (
   name: "assess-evidence" | "exa-search", body: Record<string, unknown>, signal?: AbortSignal,
 ) => Promise<unknown>;
 export type SearchDirection = "Neutral" | "Counterevidence" | "Primary records" | "Missing proposition" | "Recovery";
-type Query = { direction: SearchDirection; text: string };
+type Query = { direction: SearchDirection; text: string; provider?: "exa" | "tavily" };
 export type SearchLog = Query & {
   state: "failed" | "empty" | "retrieved";
   pageIds: string[];
@@ -267,7 +268,8 @@ function searchStep(title: string, searches: SearchLog[]): TraceStep {
     notes: searches.map(search => {
       const outcome = search.state === "failed" ? `failed (${search.error})`
         : search.state === "empty" ? "no usable pages" : `${search.pageIds.length} distinct pages`;
-      return `${search.direction}: ${search.text} · ${outcome}`;
+      const provider = search.provider === "tavily" ? " (Tavily)" : "";
+      return `${search.direction}${provider}: ${search.text} · ${outcome}`;
     }),
   };
 }
@@ -277,10 +279,16 @@ export async function runInvestigation(claim: string, request: EvidenceRequest, 
   const seen = new Set<string>();
   const search = async (query: Query) => {
     try {
-      const response = await request("exa-search", { version: VERIFICATION_VERSION, query: query.text }, signal);
+      const response = await request("exa-search", {
+        version: VERIFICATION_VERSION, query: query.text,
+        ...(query.provider ? { provider: query.provider } : {}),
+      }, signal);
       signal.throwIfAborted();
       const pages = mergePages(readSearchPages(response), claim);
-      const log: SearchLog = { ...query, state: pages.length ? "retrieved" : "empty", pageIds: pages.map(page => page.id) };
+      const log: SearchLog = {
+        ...query, provider: object(response)?.provider === "tavily" ? "tavily" : "exa",
+        state: pages.length ? "retrieved" : "empty", pageIds: pages.map(page => page.id),
+      };
       return { log, pages };
     } catch (error) {
       signal.throwIfAborted();
@@ -291,7 +299,7 @@ export async function runInvestigation(claim: string, request: EvidenceRequest, 
   async function collect(queries: Query[]) {
     const pending = queries.flatMap(query => {
       const text = query.text.trim().slice(0, 560);
-      const key = text.toLowerCase().replace(/\s+/g, " ");
+      const key = `${query.provider ?? "exa"}:${text.toLowerCase().replace(/\s+/g, " ")}`;
       if (!text || seen.has(key) || seen.size >= MAX_SEARCHES) return [];
       seen.add(key);
       return [search({ ...query, text })];
@@ -318,9 +326,10 @@ export async function runInvestigation(claim: string, request: EvidenceRequest, 
     { direction: "Primary records", text: snapshot.plan.primaryQuery },
   ]);
   trace(searchStep("Counterevidence and primary records", broad));
-  if (!snapshot.pages.length && snapshot.searches.some(log => log.state !== "failed")) {
+  if (!snapshot.pages.length) {
     const recovered = await collect([{
-      direction: "Recovery", text: `Original records and evidence, including null results and exceptions: ${claim}`,
+      direction: "Recovery", provider: "tavily",
+      text: `Original records and evidence, including null results and exceptions: ${claim}`,
     }]);
     trace(searchStep("Recovery search", recovered));
   }
@@ -345,8 +354,13 @@ export async function runInvestigation(claim: string, request: EvidenceRequest, 
   const gap = previous.targets.find(target => target.status === "insufficient");
   const noChallenge = !previous.targets.some(target => target.challenging.length > 0);
   const optional: Query[] = [];
+  const triedTavily = snapshot.searches.some(search => search.provider === "tavily");
   if (gap) {
-    optional.push({ direction: "Missing proposition", text: `Direct primary evidence or null results: ${gap.target.text}` });
+    optional.push({
+      direction: "Missing proposition",
+      text: `Direct primary evidence or null results: ${gap.target.text}`,
+      provider: !triedTavily ? "tavily" : "exa",
+    });
   }
   if (noChallenge) {
     optional.push({ direction: "Counterevidence", text: `Original studies or records reporting null results, exceptions, or contrary outcomes: ${claim}` });

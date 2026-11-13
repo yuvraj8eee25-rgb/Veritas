@@ -23,8 +23,10 @@
 // =========================================================
 
 import { guardUserRequest, withCors } from "../_shared/http.ts";
+import { object, safeSourceUrl, terms, VERIFICATION_VERSION } from "../_shared/evidence-verification.ts";
 
 const EXA_API_KEY = Deno.env.get("EXA_API_KEY");
+const TAVILY_API_KEY = Deno.env.get("TAVILY_API_KEY");
 
 const MAX_QUERY_CHARS = 300;
 const NUM_RESULTS = 4;
@@ -42,22 +44,74 @@ function json(body: unknown, status = 200) {
   });
 }
 
+function relevantExcerpt(raw: string, query: string) {
+  if (raw.length <= MAX_TEXT_CHARS) return raw;
+  const keywords = terms(query);
+  // Compare overlapping windows so relevant passages after navigation or a long introduction
+  // have a chance to reach the assessor. Return a contiguous slice of the original text.
+  const text = raw.slice(0, 100_000);
+  let best = text.slice(0, MAX_TEXT_CHARS);
+  let bestScore = -1;
+  for (let offset = 0; offset < text.length; offset += 800) {
+    const window = text.slice(offset, offset + MAX_TEXT_CHARS);
+    const start = offset ? window.search(/\s/) + 1 : 0;
+    const end = offset + window.length < text.length ? Math.max(window.lastIndexOf(" "), window.lastIndexOf("\n")) : window.length;
+    const excerpt = window.slice(start, end > start ? end : window.length);
+    const words = terms(excerpt);
+    const score = [...keywords].filter(term => words.has(term)).length;
+    if (score > bestScore) {
+      bestScore = score;
+      best = excerpt;
+    }
+  }
+  return best;
+}
+
+async function searchTavily(query: string, key: string) {
+  const indianLaw = /\bindia(?:n)?\b/i.test(query) &&
+    /\b(?:law|legal|constitution\w*|right[s]?|judg(?:e)?ment[s]?|court|statute)\b/i.test(query);
+  const officialDomains = ["indiacode.nic.in", "legislative.gov.in", "sci.gov.in", "ecourts.gov.in", "calcuttahighcourt.gov.in"];
+  const response = await fetch("https://api.tavily.com/search", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    signal: AbortSignal.timeout(18_000),
+    body: JSON.stringify({
+      query: query.slice(0, 400), max_results: NUM_RESULTS, search_depth: "basic",
+      include_answer: false, include_raw_content: "text",
+      ...(indianLaw ? { include_domains: officialDomains, include_domains_mode: "prefer" } : {}),
+    }),
+  });
+  if (!response.ok) {
+    console.warn(JSON.stringify({ event: "tavily_provider_error", status: response.status }));
+    return json({ ok: false, error: `Tavily search returned status ${response.status}.` }, 502);
+  }
+  const payload = object(await response.json());
+  if (!Array.isArray(payload?.results)) return json({ ok: false, error: "Tavily returned an invalid search response." }, 502);
+  const results = payload.results.slice(0, NUM_RESULTS).flatMap(value => {
+    const item = object(value);
+    if (!item || !safeSourceUrl(item.url)) return [];
+    const raw = typeof item.raw_content === "string" ? item.raw_content.trim() : "";
+    return [{
+      url: item.url, title: item.title, text: relevantExcerpt(raw, query),
+      publishedDate: item.published_date ?? null, author: null, links: [],
+    }];
+  });
+  return json({ ok: true, provider: "tavily", results });
+}
+
 Deno.serve(withCors(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS_HEADERS });
   if (req.method !== "POST") return json({ ok: false, error: "Method not allowed" }, 405);
   const guarded = await guardUserRequest(req, "exa-search", 15, 600);
   if (guarded) return guarded;
 
-  if (!EXA_API_KEY) {
-    console.error("EXA_API_KEY secret is not set");
-    return json({ ok: false, error: "Search is not configured" }, 500);
-  }
-
   let query = "";
   let verification = false;
+  let useTavily = false;
   try {
     const body = await req.json();
-    verification = body?.version === 2;
+    verification = body?.version === VERIFICATION_VERSION;
+    useTavily = verification && body?.provider === "tavily" && Boolean(TAVILY_API_KEY);
     query = String(body?.query ?? "").trim().slice(0, verification ? 560 : MAX_QUERY_CHARS);
   } catch {
     return json({ ok: false, error: "Invalid JSON body" }, 400);
@@ -65,6 +119,8 @@ Deno.serve(withCors(async (req) => {
   if (!query) return json({ ok: false, error: "query is required" }, 400);
 
   try {
+    if (useTavily && TAVILY_API_KEY) return await searchTavily(query, TAVILY_API_KEY);
+    if (!EXA_API_KEY) return json({ ok: false, error: "Search is not configured" }, 500);
     const res = await fetch("https://api.exa.ai/search", {
       method: "POST",
       headers: { "x-api-key": EXA_API_KEY, "Content-Type": "application/json" },
@@ -100,9 +156,10 @@ Deno.serve(withCors(async (req) => {
         }))
       : [];
 
-    return json({ ok: true, results });
+    return json({ ok: true, ...(verification ? { provider: "exa" } : {}), results });
   } catch (err) {
-    console.error(JSON.stringify({ event: "exa_request_failed", name: err instanceof Error ? err.name : "Error" }));
-    return json({ ok: false, error: "Search request failed" }, 500);
+    const provider = useTavily ? "Tavily" : "Exa";
+    console.error(JSON.stringify({ event: "search_request_failed", provider, name: err instanceof Error ? err.name : "Error" }));
+    return json({ ok: false, error: `${provider} search request failed.` }, 502);
   }
 }));

@@ -311,6 +311,29 @@ test("a stronger follow-up can enter a full batch; failed reassessment keeps the
   }
 });
 
+test("a gap in verified records triggers Tavily while the first searches use Exa", async () => {
+  const original = makeHit("original");
+  const extra = makeHit("recovery", positive2);
+  const calls = [];
+  const trace = [];
+  const result = await runInvestigation(claim, async (name, body) => {
+    calls.push({ name, body });
+    if (name === "exa-search") {
+      return body.provider === "tavily"
+        ? { ok: true, provider: "tavily", results: [extra] }
+        : { ok: true, provider: "exa", results: [original] };
+    }
+    if (body.action === "plan_verification") return plan();
+    return batch(pageList(body.sources));
+  }, activeSignal(), step => trace.push(step));
+  const searches = calls.filter(call => call.name === "exa-search");
+  assert.ok(searches.slice(0, 3).every(({ body }) => body.provider !== "tavily"));
+  assert.equal(searches.filter(({ body }) => body.provider === "tavily").length, 1);
+  assert.equal(result.review.status, "supported");
+  assert.equal(result.review.weightedCount, 2);
+  assert.ok(trace.some(step => step.notes.some(note => note.includes("Missing proposition (Tavily)"))));
+});
+
 test("search failure, empty search and a failed direction remain distinguishable", async () => {
   assert.equal((await scenario({ search() { throw new Error("Search failed"); } }).run()).state, "search-failed");
   assert.equal((await scenario({ search: () => [] }).run()).state, "empty");
@@ -428,6 +451,14 @@ test("versioned Edge actions preserve legacy Vite classify and search response c
       if (url.startsWith("https://api.exa.ai/")) return Response.json({
         results: [{ ...makeHit("a"), extras: { links: ["https://example.org/report"] } }],
       });
+      if (url === "https://api.tavily.com/search") {
+        assert.equal(request.headers.Authorization, "Bearer fixture-only");
+        return Response.json({ results: [
+          { url: "https://sci.gov.in/example", raw_content: "Introduction ".repeat(190) + "Article 19 of the Constitution addresses rights in India." },
+          { url: "https://sci.gov.in/snippet", content: "An unverified search snippet." },
+          { url: "javascript:alert(1)", raw_content: "Invalid source" },
+        ] });
+      }
       return Response.json({ candidates: [{ content: { parts: [{ text: JSON.stringify({
         assessments: [{ id: 7, stance: "supports", strength: "strong", finding: "Direct evidence." }],
       }) }] } }] });
@@ -450,6 +481,17 @@ test("versioned Edge actions preserve legacy Vite classify and search response c
     assert.equal(requests.at(-1).query.length, 450);
     assert.deepEqual(requests.at(-1).contents.extras, { links: 30 });
     assert.deepEqual(newSearch.results[0].links, ["https://example.org/report"]);
+    const legacyWithProvider = await (await search(post({ query: "Article 19 in India", provider: "tavily" }))).json();
+    assert.ok(!Object.hasOwn(legacyWithProvider, "provider"));
+    assert.equal(requests.at(-1).numResults, 4);
+    const alternative = await (await search(post({ query: "Article 19 Constitution rights in India", version, provider: "tavily" }))).json();
+    assert.equal(alternative.provider, "tavily");
+    assert.equal(requests.at(-1).include_raw_content, "text");
+    assert.equal(requests.at(-1).include_answer, false);
+    assert.ok(requests.at(-1).include_domains.includes("sci.gov.in"));
+    assert.equal(alternative.results.length, 2);
+    assert.match(alternative.results[0].text, /Article 19 of the Constitution/);
+    assert.equal(alternative.results[1].text, "");
   } finally {
     edgeHooks.deregister();
     globalThis.fetch = originalFetch;
