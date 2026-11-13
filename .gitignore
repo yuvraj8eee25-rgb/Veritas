@@ -1,34 +1,31 @@
-# Dependencies and generated application builds
+# Dependencies and build output
 node_modules/
-dist/
+.pnpm-store/
+.next/
 .vite/
+dist/
+out/
 coverage/
 *.tsbuildinfo
 
-# Local environment files and secrets. Keep the shareable template tracked.
+# Local environment and service state
 .env
 .env.*
 !.env.example
 !.env.*.example
-
-# Local Supabase/Vercel project state
+.vercel/
 supabase/.temp/
 supabase/.branches/
-.vercel/
 
-# Test output and browser artifacts
+# Local test output and system files
 test-results/
 playwright-report/
 blob-report/
-playwright/.cache/
-
-# Logs
 *.log
-npm-debug.log*
-yarn-debug.log*
-pnpm-debug.log*
-
-# Operating-system metadata
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+# Unrelated files from the transfer
+/ChatGPT Image 12 Nov 2026, 17_18_19.png
+/app/imgs/Assignment_1_CM_Set_1_Worked_Answers.pdf
