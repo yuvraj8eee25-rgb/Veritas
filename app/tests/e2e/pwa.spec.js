@@ -19,6 +19,8 @@ test("production shell works offline and never caches private API routes", async
   await expect(page.locator("#pwa-status")).toContainText("You’re offline");
   await page.reload({ waitUntil: "domcontentloaded" });
   await expect(page).toHaveTitle(/Veritas/);
-  await expect(page.locator("#screen-auth")).toHaveClass(/active/, { timeout: 10_000 });
+  await expect(page.locator("#pwa-status")).toContainText("You’re offline");
+  await expect(page.locator("#screen-home")).toHaveClass(/active/, { timeout: 10_000 });
+  await expect(page.getByRole("complementary", { name: "Guest account" })).toBeVisible();
   await context.setOffline(false);
 });
