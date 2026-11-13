@@ -31,6 +31,8 @@ const TAVILY_API_KEY = Deno.env.get("TAVILY_API_KEY");
 const MAX_QUERY_CHARS = 300;
 const NUM_RESULTS = 4;
 const MAX_TEXT_CHARS = 1600;
+// An investigation can use five searches, including its fallback.
+const SEARCHES_PER_WINDOW = 25;
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -102,7 +104,7 @@ async function searchTavily(query: string, key: string) {
 Deno.serve(withCors(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS_HEADERS });
   if (req.method !== "POST") return json({ ok: false, error: "Method not allowed" }, 405);
-  const guarded = await guardUserRequest(req, "exa-search", 15, 600);
+  const guarded = await guardUserRequest(req, "exa-search", SEARCHES_PER_WINDOW, 600);
   if (guarded) return guarded;
 
   let query = "";

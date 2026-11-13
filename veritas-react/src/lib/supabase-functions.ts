@@ -9,6 +9,13 @@ export class VeritasConnectionError extends Error {
   }
 }
 
+export class VeritasFunctionError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message);
+    this.name = "VeritasFunctionError";
+  }
+}
+
 export async function invokeVeritasFunction(functionName: VeritasFunction, body: Record<string, unknown>, signal?: AbortSignal) {
   if (!auth) throw new Error("Connect Supabase before using this feature.");
 
@@ -41,7 +48,7 @@ export async function invokeVeritasFunction(functionName: VeritasFunction, body:
   if (!response.ok) {
     const message = typeof result?.error === "string" ? result.error : `Supabase function returned ${response.status}.`;
     const reference = typeof result?.request_id === "string" ? result.request_id : response.headers.get("x-request-id");
-    throw new Error(reference ? `${message} Reference: ${reference}` : message);
+    throw new VeritasFunctionError(reference ? `${message} Reference: ${reference}` : message, response.status);
   }
   return result;
 }

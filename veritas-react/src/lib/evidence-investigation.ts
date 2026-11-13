@@ -20,7 +20,7 @@ export type EvidenceRequest = (
 export type SearchDirection = "Neutral" | "Counterevidence" | "Primary records" | "Missing proposition" | "Recovery";
 type Query = { direction: SearchDirection; text: string; provider?: "exa" | "tavily" };
 export type SearchLog = Query & {
-  state: "failed" | "empty" | "retrieved";
+  state: "failed" | "limited" | "skipped" | "empty" | "retrieved";
   pageIds: string[];
   error?: string;
 };
@@ -52,6 +52,7 @@ export type Investigation =
 
 const strengthWeight = { strong: 2, moderate: 1, weak: 0 };
 const sourceError = (error: unknown) => error instanceof Error ? error.message : "The service did not respond.";
+const searchLimitMessage = "Evidence Lab reached its search limit. Wait a few minutes before starting another investigation.";
 
 export function mergePages(pages: Page[], scope: string): Page[] {
   const unique = new Map<string, Page>();
@@ -242,6 +243,9 @@ function complete(snapshot: Snapshot, assessments: Assessment[], caveats: string
   const coverage = [...caveats];
   const counter = snapshot.searches.filter(search => search.direction === "Counterevidence");
   const directChallenges = new Set(review.targets.flatMap(target => target.challenging.map(entry => entry.page.id)));
+  if (snapshot.searches.some(search => search.state === "limited")) {
+    coverage.unshift("Evidence Lab reached its search limit. The result uses the sources it found before that limit. Wait a few minutes before starting another investigation.");
+  }
   const failedDirections = [...new Set(snapshot.searches.filter(search => search.state === "failed").map(search => search.direction))];
   if (failedDirections.length) {
     coverage.push(`Search failed for ${failedDirections.map(direction => direction.toLowerCase()).join(", ")}. See the activity log for the affected queries.`);
@@ -266,7 +270,9 @@ function searchStep(title: string, searches: SearchLog[]): TraceStep {
   return {
     title,
     notes: searches.map(search => {
-      const outcome = search.state === "failed" ? `failed (${search.error})`
+      const outcome = search.state === "limited" ? "search limit reached"
+        : search.state === "skipped" ? "skipped after the search limit was reached"
+        : search.state === "failed" ? `failed (${search.error})`
         : search.state === "empty" ? "no usable pages" : `${search.pageIds.length} distinct pages`;
       const provider = search.provider === "tavily" ? " (Tavily)" : "";
       return `${search.direction}${provider}: ${search.text} · ${outcome}`;
@@ -277,6 +283,7 @@ function searchStep(title: string, searches: SearchLog[]): TraceStep {
 export async function runInvestigation(claim: string, request: EvidenceRequest, signal: AbortSignal, trace: Trace): Promise<Investigation> {
   const snapshot: Snapshot = { claim, plan: fallbackPlan(claim), pages: [], selected: [], searches: [], calls: 1 };
   const seen = new Set<string>();
+  let searchLimitReached = false;
   const search = async (query: Query) => {
     try {
       const response = await request("exa-search", {
@@ -292,7 +299,9 @@ export async function runInvestigation(claim: string, request: EvidenceRequest, 
       return { log, pages };
     } catch (error) {
       signal.throwIfAborted();
-      const log: SearchLog = { ...query, state: "failed", pageIds: [], error: sourceError(error) };
+      const limited = object(error)?.status === 429;
+      if (limited) searchLimitReached = true;
+      const log: SearchLog = { ...query, state: limited ? "limited" : "failed", pageIds: [], error: sourceError(error) };
       return { log, pages: [] };
     }
   };
@@ -302,6 +311,10 @@ export async function runInvestigation(claim: string, request: EvidenceRequest, 
       const key = `${query.provider ?? "exa"}:${text.toLowerCase().replace(/\s+/g, " ")}`;
       if (!text || seen.has(key) || seen.size >= MAX_SEARCHES) return [];
       seen.add(key);
+      if (searchLimitReached) {
+        const log: SearchLog = { ...query, text, state: "skipped", pageIds: [] };
+        return [Promise.resolve({ log, pages: [] })];
+      }
       return [search({ ...query, text })];
     });
     const results = await Promise.all(pending);
@@ -334,10 +347,11 @@ export async function runInvestigation(claim: string, request: EvidenceRequest, 
     trace(searchStep("Recovery search", recovered));
   }
   if (!snapshot.pages.length) {
-    const successful = snapshot.searches.some(log => log.state !== "failed");
+    const successful = snapshot.searches.some(log => log.state === "empty");
     return {
-      state: successful ? "empty" : "search-failed", snapshot,
-      reason: successful ? "The completed searches returned no usable pages." : snapshot.searches[0]?.error || "The search service did not respond.",
+      state: successful && !searchLimitReached ? "empty" : "search-failed", snapshot,
+      reason: searchLimitReached ? searchLimitMessage : successful ? "The completed searches returned no usable pages."
+        : snapshot.searches[0]?.error || "The search service did not respond.",
     };
   }
 

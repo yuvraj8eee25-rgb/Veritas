@@ -334,6 +334,39 @@ test("a gap in verified records triggers Tavily while the first searches use Exa
   assert.ok(trace.some(step => step.notes.some(note => note.includes("Missing proposition (Tavily)"))));
 });
 
+test("a search limit keeps existing evidence and skips further provider requests", async () => {
+  const calls = [];
+  const trace = [];
+  const request = async (name, body) => {
+    if (name === "exa-search") {
+      calls.push(body);
+      if (body.query === claim) return { ok: true, results: [makeHit("before-limit")] };
+      throw Object.assign(new Error("Too many requests."), { status: 429 });
+    }
+    if (body.action === "plan_verification") return plan();
+    return batch(pageList(body.sources));
+  };
+  const result = await runInvestigation(claim, request, activeSignal(), step => trace.push(step));
+  assert.equal(result.state, "complete");
+  assert.equal(result.snapshot.pages.length, 1);
+  assert.equal(calls.length, 3);
+  assert.ok(calls.every(body => body.provider !== "tavily"));
+  assert.match(result.caveats[0], /search limit.*sources it found before/);
+  assert.ok(trace.some(step => step.notes.some(note => note.includes("skipped after the search limit"))));
+});
+
+test("a search limit on the first request is reported separately from empty results", async () => {
+  let searches = 0;
+  const result = await runInvestigation(claim, async (name, body) => {
+    if (name === "assess-evidence" && body.action === "plan_verification") return plan();
+    searches++;
+    throw Object.assign(new Error("Too many requests."), { status: 429 });
+  }, activeSignal(), () => {});
+  assert.equal(searches, 1);
+  assert.equal(result.state, "search-failed");
+  assert.match(result.reason, /search limit.*Wait a few minutes/);
+});
+
 test("search failure, empty search and a failed direction remain distinguishable", async () => {
   assert.equal((await scenario({ search() { throw new Error("Search failed"); } }).run()).state, "search-failed");
   assert.equal((await scenario({ search: () => [] }).run()).state, "empty");
