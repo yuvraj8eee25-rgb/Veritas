@@ -67,32 +67,36 @@ export default function SoloDrillScreen({ state }: { state: DrillState }) {
         <strong>{answered ? "Time stopped" : `0:0${speedSecondsLeft}`}</strong><span>{answered ? "Review your answer" : "Seconds left"}</span>
       </div>}
       {activeMode === "speed" && <span className="sr-only" role="status">{!answered && speedSecondsLeft === 2 ? "Two seconds left" : ""}</span>}
-      <article className="drill-reading">
-        <p className="workspace-caption">{instruction.label}</p>
-        <h1 ref={heading} tabIndex={-1}>{question.prompt}</h1>
-      </article>
-      <fieldset className="workspace-fieldset drill-options">
-        <legend>{instruction.instruction}</legend>
-        {question.options.map((option, index) => {
-          const isCorrect = answered && index === question.correct;
-          const isWrong = answered && currentAnswer === index && !isCorrect;
-          return (
-            <button type="button" key={index} disabled={answered} data-result={isCorrect ? "correct" : isWrong ? "incorrect" : undefined}
-              onClick={() => submitAnswer(index)}>
-              <span className="drill-option-key">{String.fromCharCode(65 + index)}</span>
-              <span>{option}{(isCorrect || isWrong) && <small>{isCorrect ? "Correct answer" : "Your answer · incorrect"}</small>}</span>
-              {isCorrect ? <Check size={17} aria-hidden="true" /> : isWrong ? <X size={17} aria-hidden="true" /> : null}
-            </button>
-          );
-        })}
-      </fieldset>
+      <div className="drill-question" key={questionIndex}>
+        <article className="drill-reading">
+          <p className="workspace-caption">{instruction.label}</p>
+          <h1 ref={heading} tabIndex={-1}>{question.prompt}</h1>
+        </article>
+        <fieldset className="workspace-fieldset drill-options">
+          <legend>{instruction.instruction}</legend>
+          {question.options.map((option, index) => {
+            const isCorrect = answered && index === question.correct;
+            const isWrong = answered && currentAnswer === index && !isCorrect;
+            return (
+              <button type="button" key={index} disabled={answered} data-result={isCorrect ? "correct" : isWrong ? "incorrect" : undefined}
+                onClick={() => submitAnswer(index)}>
+                <span className="drill-option-key">{String.fromCharCode(65 + index)}</span>
+                <span>{option}{(isCorrect || isWrong) && <small>{isCorrect ? "Correct answer" : "Your answer · incorrect"}</small>}</span>
+                {isCorrect ? <Check size={17} aria-hidden="true" /> : isWrong ? <X size={17} aria-hidden="true" /> : null}
+              </button>
+            );
+          })}
+        </fieldset>
+      </div>
       {answered && (
         <section className="drill-feedback" data-result={correct ? "correct" : "incorrect"}>
           <div role="status">
             <h2>{correct ? "Correct" : currentAnswer === -1 ? "Time is up" : "Not quite"}</h2>
-            <h3>{instruction.review}</h3>
-            <p>{question.explain}</p>
-            <p className="workspace-meta">{question.tip}</p>
+            <div className="drill-explanation">
+              <h3>{instruction.review}</h3>
+              <p>{question.explain}</p>
+              <p className="workspace-meta">{question.tip}</p>
+            </div>
           </div>
           <button ref={next} type="button" className="workspace-primary" onClick={advanceQuestion}>
             {questionIndex + 1 === questions.length ? "See your results" : "Next question"}<ArrowRight size={16} aria-hidden="true" />

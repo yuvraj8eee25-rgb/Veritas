@@ -1,46 +1,23 @@
 # Evidence Lab
 
-## 1. Purpose
+Evidence Lab keeps the submitted claim with its results. It searches the claim as written, then looks for counterevidence and original records. Follow-up searches target unresolved propositions or seek evidence missing from one direction. The activity log records queries, failures, empty results and how many pages and records were retained.
 
-Investigate a user-entered claim by searching both sides, reviewing sources, assessing their stance/strength, and presenting a confidence-weighted conclusion with caveats and an operational trace.
+A retrieved page, a passage from that page and the underlying evidence record have separate identities. Tracking variants count as one page. A record counts once even when multiple pages report it. Pages whose relationship to a primary record could not be verified are available to read but cannot influence the verdict.
 
-## 2. Current problems
+The assessment checks whether a quotation appears in the saved excerpt and whether the quotation in context supports the interpretation and its stated scope. Open a citation to see the original wording, its limitations and the original page link. The summary and comparison are assembled from validated findings, with citations attached to each interpretation. The app reviews excerpts and does not establish scientific consensus.
 
-- Search form, investigation trace, verdict, subclaims, comparison, caveats, and source cards are conditionally stacked in one component (`src/features/EvidenceLab.tsx`). Long results push key actions far down the page.
-- Loading is represented by a changing phase string and trace; source count and bounded retry work need clear progress semantics.
-- Empty-result/provider failures and incomplete investigation need distinguishable recovery actions; an earlier observed live run showed a generic “No sources” or Edge Function transport error, so errors should retain request context and retry guidance.
-- Source excerpts and AI assessment are displayed together; the design must make original-source links and limitations easy to inspect.
+A directional verdict requires at least two verified independent records with direct, credible findings for each checked proposition. Direct findings that materially disagree on the same proposition produce a mixed result. Indirect outcomes, weak evidence, an unresolved proposition or an incomplete claim scope can leave the result insufficient. Policy questions show factual premises and trade-offs and leave the policy decision to the reader.
 
-## 3. Target design
+When the initial assessment is unavailable, pages remain browsable and the verdict and findings are withheld. Retry assessment uses the saved claim and exact excerpts. A failed follow-up assessment keeps the last validated evidence and shows the additional pages as unassessed.
 
-- Search area stays at the top: claim text area, 500-character count, Investigate button, and short security note. The trace is a compact native <details> disclosure with current step and completed/failed markers.
-- Results: verdict/confidence summary; testable subclaims; source comparison/cross-examination; caveats; source-by-source cards with stance, strength, publisher/date, finding, and original link. Use two-column source cards on wide desktop, one column below 900 px.
-- States: empty prompt; invalid short claim; submitting; planning/searching/classifying/replanning; completed; no sources; provider/proxy error with request reference and retry; partial result with caveats; malformed source URL handled without crashing. Use supports/refutes/mixed/insufficient evidence language.
+## Verification
 
-## 4. Components used
+From `veritas-react/` run `node --test tests/evidence-verification.test.mjs` on Node.js 22.18 or later. The suite uses fixed provider responses and executes the actual response validation, scoring, search and retry controller, Edge dispatch, and React result rendering. The original Vite contracts are exercised with mocked providers. Its own checks run with `npm run test:ci` from `app/`.
 
-- Existing: `EvidenceLab`, `Card`, `Textarea`, `Button`, `Badge`, Lucide `Search`/`LoaderCircle` icons.
-- Target: shared `ProgressBar`, `StatusBadge`, `AlertBanner`, and `EmptyState`, composed with feature-specific source/verdict content; use native `<details>` for the trace disclosure.
+The [FEVER dataset examples](https://fever.ai/dataset/fever.html) and the [FEVER paper](https://aclanthology.org/N18-1074/) supply the reference labels in `tests/evidence-evaluation.mjs`. The fixture file keeps each frozen excerpt and flags its human review needs. All three reference snapshots are expected to abstain under Evidence Lab's independent-record rule. One published label is insufficient and two are directional, so this set cannot measure live verdict accuracy. The two interpretations rendered from these snapshots have resolvable quotations and source links. Their semantic adequacy still needs human review. Clearly synthetic fixtures separately test directional verdicts, conflicts, causal proxies, incomplete coverage and abstention.
 
-## 5. Files involved
+## Live validation
 
-- `src/features/EvidenceLab.tsx`
-- `src/lib/supabase-functions.ts`
-- `src/app/api/supabase-functions/route.ts`
-- `src/components/ui/card.tsx`
-- `src/components/ui/textarea.tsx`
-- `src/components/ui/button.tsx`
-- `src/components/ui/badge.tsx`
-- `src/styles.css`
-- `../app/src/features/evidence-lab.js`
-- `../app/agentic-investigation.js`
-- `../app/supabase/functions/assess-evidence/`
-- `../app/README.md`
+Deploy the updated `exa-search` and `assess-evidence` Edge Functions before validating the React app against providers. The version 2 assessment actions are separate from the original Vite actions. In a signed-in test session, verify that Exa returns neutral, counterevidence and primary-record results with available link metadata, that Gemini returns a complete passage assessment and audit within the proxy timeout, and that citations, follow-up and assessment-only retry behave correctly. Live source relevance and provenance, model judgment, and latency are not measured by the fixtures.
 
-## 6. Done when
-
-- [ ] At 1366x768, claim input, count and primary Investigate action are visible without scrolling.
-- [ ] At 320 px, search form, AlertBanner, trace and source cards fit without horizontal scrolling; URLs wrap safely.
-- [ ] Empty, invalid, searching, zero-results, partial-results, proxy/Edge error, retry and completed states have distinct status text.
-- [ ] Native details expands/collapses trace by keyboard; source links and caveats are reachable in order.
-- [ ] selectors for this feature removed from src/styles.css.
+The exact-quote and scope checks are conservative. An otherwise relevant paraphrase, alternate population label or record with insufficient identity metadata may remain unweighted. Review the excerpt and its original context before drawing a conclusion.

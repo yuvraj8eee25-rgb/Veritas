@@ -1,5 +1,6 @@
 // =========================================================
 import { guardUserRequest, withCors } from "../_shared/http.ts";
+import { handleVerification } from "./verification.ts";
 
 // VERITAS — assess-evidence (Supabase Edge Function)
 //
@@ -90,7 +91,7 @@ class GeminiRequestError extends Error {
   }
 }
 
-async function callGemini(prompt: string, maxTokens: number): Promise<string> {
+async function callGemini(prompt: string, maxTokens: number, verificationSignal?: AbortSignal): Promise<string> {
   let response: Response;
   for (let attempt = 0; ; attempt++) {
     response = await fetch(
@@ -101,13 +102,14 @@ async function callGemini(prompt: string, maxTokens: number): Promise<string> {
         // Evidence excerpts can take longer than a short chat prompt. Keep the
         // server timeout below Supabase's request idle limit, while allowing a
         // slower Gemini response to finish instead of silently falling back.
-        signal: AbortSignal.timeout(60000),
+        signal: verificationSignal ?? AbortSignal.timeout(60000),
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
             temperature: 0.1,
             maxOutputTokens: maxTokens,
             thinkingConfig: { thinkingLevel: "minimal" },
+            ...(verificationSignal ? { responseMimeType: "application/json" } : {}),
           },
         }),
       },
@@ -407,6 +409,9 @@ Deno.serve(withCors(async (req) => {
   }
 
   try {
+    if (body?.action === "plan_verification" || body?.action === "verify_passages") {
+      return await handleVerification(body, callGemini);
+    }
     if (body?.action === "plan_queries") return await handlePlanQueries(body);
     if (body?.action === "classify") return await handleClassify(body);
     if (body?.action === "cross_examine") return await handleCrossExamine(body);

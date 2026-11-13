@@ -54,9 +54,11 @@ Deno.serve(withCors(async (req) => {
   }
 
   let query = "";
+  let verification = false;
   try {
     const body = await req.json();
-    query = String(body?.query ?? "").trim().slice(0, MAX_QUERY_CHARS);
+    verification = body?.version === 2;
+    query = String(body?.query ?? "").trim().slice(0, verification ? 560 : MAX_QUERY_CHARS);
   } catch {
     return json({ ok: false, error: "Invalid JSON body" }, 400);
   }
@@ -70,7 +72,10 @@ Deno.serve(withCors(async (req) => {
       body: JSON.stringify({
         query,
         numResults: NUM_RESULTS,
-        contents: { text: { maxCharacters: MAX_TEXT_CHARS } },
+        contents: {
+          text: { maxCharacters: MAX_TEXT_CHARS },
+          ...(verification ? { extras: { links: 30 } } : {}),
+        },
       }),
     });
 
@@ -80,13 +85,18 @@ Deno.serve(withCors(async (req) => {
     }
 
     const payload = await res.json();
+    if (verification && !Array.isArray(payload?.results)) {
+      return json({ ok: false, error: "Search provider returned an invalid response" }, 502);
+    }
     const results = Array.isArray(payload?.results)
-      ? payload.results.map((r: Record<string, unknown>) => ({
+      ? payload.results.filter((r: unknown) => r && typeof r === "object").map((r: Record<string, unknown>) => ({
           title: r.title ?? null,
           url: r.url ?? null,
           text: r.text ?? "",
           publishedDate: r.publishedDate ?? null,
           author: typeof r.author === "string" ? r.author.trim().slice(0, 200) || null : null,
+          ...(verification ? { links: Array.isArray((r.extras as { links?: unknown })?.links)
+            ? (r.extras as { links: unknown[] }).links.filter(link => typeof link === "string").slice(0, 30) : [] } : {}),
         }))
       : [];
 

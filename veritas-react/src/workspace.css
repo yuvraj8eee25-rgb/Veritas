@@ -35,7 +35,9 @@
   --text-body: .9375rem;
   --text-meta: .8125rem;
   --text-control: .875rem;
-  --motion: 150ms ease;
+  --motion: 150ms ease-out;
+  --motion-reveal: 180ms ease-out;
+  --motion-panel: 200ms ease-out;
   --mobile-nav-size: calc(4rem + env(safe-area-inset-bottom, 0px));
   --line: var(--border);
   --accent: var(--primary);
@@ -362,7 +364,14 @@ button:disabled { cursor: default; }
   .workspace-location-brand, .workspace-location-divider { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+  .workspace-shell .spinner { animation: none; }
 }
 
 .workspace-flow { max-width: 1000px; margin-inline: auto; min-width: 0; }
@@ -721,13 +730,85 @@ button:disabled { cursor: default; }
   .research-breakdown dl > div { padding: var(--space-2); }
   .research-breakdown dt { font-size: var(--text-meta); }
 }
-@media (prefers-reduced-motion: no-preference) {
-  .research-step { animation: research-step-enter 220ms ease-out both; }
-  .research-step[data-state="running"] .research-step-marker svg { animation: research-step-spin 1s linear infinite; }
-  .research-step-notes > li { animation: research-step-enter 180ms ease-out both; }
+/* Leave text, focus, and selection visible while the surrounding UI responds. */
+:is(.workspace-shell, .workspace-menu) button:not(:disabled):is(:hover, :active) {
+  transform: none;
+  filter: none;
 }
-@keyframes research-step-enter {
-  from { opacity: 0; transform: translateY(5px); }
+
+:is(.workspace-nav-item, .workspace-mobile button, .home-format, .practice-choice, .drill-options button, .workspace-icon-button, .workspace-account-link, .tabs button, .leader-tabs button):not(:disabled) {
+  transition: background-color var(--motion), border-color var(--motion);
+}
+
+:is(.workspace-nav-item, .workspace-mobile button, .home-format, .practice-choice, .drill-options button, .workspace-icon-button, .workspace-account-link, .workspace-secondary, .tabs button, .leader-tabs button):not(:disabled):active {
+  background-color: var(--surface-hover);
+}
+
+.workspace-primary:not(:disabled):active {
+  background-color: color-mix(in srgb, var(--primary) 84%, var(--background));
+}
+
+.debate-turn-status {
+  border-inline-start: 2px solid var(--primary);
+  padding: .45rem .65rem;
+  background-color: color-mix(in srgb, var(--primary) 6%, transparent);
+}
+
+.debate-turn-status[data-waiting="true"] {
+  border-color: var(--intelligence);
+  background-color: color-mix(in srgb, var(--intelligence) 8%, transparent);
+}
+
+:is(.debate-room-round [role="timer"], .live-turn-status > span)[data-urgent="true"] {
+  color: var(--warning);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .home-workspace { animation: home-appear var(--motion-reveal) both; }
+  .drill-question { --motion-accent: var(--intelligence); }
+  .workspace-error { --motion-accent: var(--danger); }
+  .drill-question, .workspace-note[role="status"], .workspace-error, .research-step-notes > li {
+    animation: accent-appear var(--motion-reveal) both;
+  }
+  .drill-explanation { animation: explanation-appear var(--motion-panel) both; }
+  .workspace-menu[data-state="open"], .research-trace[open] > .research-trace-content {
+    animation: panel-appear var(--motion-panel) both;
+  }
+  .research-step-marker { animation: explanation-appear var(--motion-reveal) both; }
+  .research-step[data-state="running"] .research-step-marker svg {
+    animation: research-step-spin 1s linear infinite;
+  }
+  .debate-turn-status, .live-scoreboard-players article {
+    transition: background-color var(--motion), border-color var(--motion);
+  }
+}
+
+@keyframes home-appear { from { opacity: .96; } to { opacity: 1; } }
+@keyframes explanation-appear { from { opacity: .88; } to { opacity: 1; } }
+@keyframes panel-appear {
+  from { opacity: .94; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }
 }
+@keyframes accent-appear {
+  from { background-color: color-mix(in srgb, var(--motion-accent, var(--primary)) 9%, transparent); }
+  to { background-color: transparent; }
+}
 @keyframes research-step-spin { to { transform: rotate(360deg); } }
+
+.research-verification-findings { list-style: none; padding: 0 !important; }
+.research-verification-findings > li { padding-block: var(--space-2); border-bottom: 1px solid var(--border); }
+.research-verification-findings > li > p { margin: 0 0 var(--space-2); }
+.research-passage { margin-block: var(--space-2); min-width: 0; }
+.research-passage > summary { color: var(--intelligence); cursor: pointer; min-height: 44px; padding-block: var(--space-2); overflow-wrap: anywhere; }
+.research-passage > blockquote, .research-conclusion > blockquote { white-space: pre-wrap; overflow-wrap: anywhere; }
+.research-passage > blockquote {
+  margin: 0 0 var(--space-2); padding: var(--space-2) var(--space-3);
+  border-inline-start: 2px solid var(--border-strong); background: var(--surface);
+}
+.research-passage > a + a { margin-inline-start: var(--space-3); }
+.research-coverage-note { margin-top: var(--space-3); color: var(--foreground-muted); }
+.research-coverage-note > strong { color: var(--warning); }
+.research-targets p { margin: .25rem 0 0; }
+.research-targets li > strong { color: var(--evidence-tone, var(--foreground)); }
+.research-record-conflict { margin-top: var(--space-4); }
+.research-source-status { overflow-wrap: anywhere; }

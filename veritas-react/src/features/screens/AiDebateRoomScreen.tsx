@@ -107,12 +107,13 @@ export default function AiDebateRoomScreen({ state }: { state: RoomState }) {
         <div><p className="workspace-caption">You argue {debateStance} the motion</p><h1 className="workspace-page-title">{debateTopic}</h1></div>
         <div className="debate-room-round">
           <span>{turnCount} of {debateMaxTurns} turns sent</span>
-          <strong role="timer" aria-label={debateBusy ? "Clock paused" : aiTurnRemaining === null ? "Unlimited turn time" : `${aiTurnRemaining} seconds left`}>
+          <strong role="timer" data-urgent={!debateBusy && aiTurnRemaining !== null && aiTurnRemaining <= 10}
+            aria-label={debateBusy ? "Clock paused" : aiTurnRemaining === null ? "Unlimited turn time" : `${aiTurnRemaining} seconds left`}>
             {debateBusy ? "Clock paused" : aiTurnRemaining === null ? "Untimed" : clock(aiTurnRemaining)}
           </strong>
         </div>
       </header>
-      <p className="workspace-meta" role="status">{debateBusy ? (turnCount === debateMaxTurns && debateTurns.at(-1)?.speaker === "ai" ? "The referee is preparing your report." : "The AI opponent is preparing a response.") : "Your turn to make a case."}{debateBusy && slow ? " This is taking longer than usual." : ""}</p>
+      <p className="workspace-meta debate-turn-status" data-waiting={debateBusy} role="status">{debateBusy ? (turnCount === debateMaxTurns && debateTurns.at(-1)?.speaker === "ai" ? "The referee is preparing your report." : "The AI opponent is preparing a response.") : "Your turn to make a case."}{debateBusy && slow ? " This is taking longer than usual." : ""}</p>
       <span className="sr-only" role="status">{aiTurnRemaining === 10 ? "Ten seconds left in your turn" : ""}</span>
       {debateTurns.length ? <DebateTranscript turns={debateTurns} playbackUrls={playbackUrls} copy /> : (
         <div className="workspace-empty"><strong>Make your opening argument</strong><p>State your position and give a reason the other side can respond to.</p></div>

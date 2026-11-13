@@ -9,7 +9,7 @@ export class VeritasConnectionError extends Error {
   }
 }
 
-export async function invokeVeritasFunction(functionName: VeritasFunction, body: Record<string, unknown>) {
+export async function invokeVeritasFunction(functionName: VeritasFunction, body: Record<string, unknown>, signal?: AbortSignal) {
   if (!auth) throw new Error("Connect Supabase before using this feature.");
 
   const { data, error } = await auth.auth.getSession();
@@ -28,8 +28,13 @@ export async function invokeVeritasFunction(functionName: VeritasFunction, body:
       },
       body: JSON.stringify({ functionName, body }),
       cache: "no-store",
+      signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(75_000)]) : undefined,
     });
-  } catch {
+  } catch (cause) {
+    if (signal?.aborted) throw signal.reason;
+    if (cause instanceof Error && cause.name === "TimeoutError") {
+      throw new Error(`The request timed out. Reference: ${requestId}`);
+    }
     throw new VeritasConnectionError(requestId);
   }
   const result = await response.json().catch(() => null);
