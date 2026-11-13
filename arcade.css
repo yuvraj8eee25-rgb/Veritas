@@ -1,0 +1,283 @@
+/* =========================================================
+   VERITAS — Arcade Layer styles
+   Load after theme-horizon.css. Uses only existing tokens.
+   ========================================================= */
+
+/* ---------------------------------------------------------
+   COMBO HUD
+   Sits opposite the score. Quiet at rest so it doesn't
+   compete with the question; loud only once a chain exists.
+   --------------------------------------------------------- */
+.combo-hud {
+  position: absolute;
+  top: -12px;
+  left: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+  opacity: 0.4;
+  transition: opacity 0.2s var(--ease-out), border-color 0.2s, box-shadow 0.2s;
+}
+
+.combo-hud.live {
+  opacity: 1;
+  border-color: var(--line-strong);
+  box-shadow: var(--shadow-glow);
+}
+
+.combo-hud[data-tier="2.5"] { box-shadow: 0 8px 26px rgba(255, 181, 71, 0.4); border-color: rgba(255, 181, 71, 0.5); }
+.combo-hud[data-tier="3"]   { box-shadow: 0 8px 30px rgba(238, 93, 80, 0.45); border-color: rgba(238, 93, 80, 0.55); }
+
+.combo-count {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1;
+}
+
+.combo-x { font-size: 0.72rem; color: var(--ink-mute); }
+
+.combo-mult {
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.combo-hud[data-tier="2.5"] .combo-mult { color: var(--amber); }
+.combo-hud[data-tier="3"] .combo-mult { color: var(--magenta); }
+
+.combo-label {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--ink-mute);
+}
+
+.combo-hud.bump { animation: combo-bump 0.32s var(--ease-spring); }
+.combo-hud.break { animation: combo-break 0.4s var(--ease-out); }
+
+@keyframes combo-bump {
+  0% { transform: scale(1); }
+  45% { transform: scale(1.14); }
+  100% { transform: scale(1); }
+}
+
+@keyframes combo-break {
+  0% { transform: translateX(0) scale(1); border-color: var(--magenta); }
+  25% { transform: translateX(-5px) scale(0.96); }
+  55% { transform: translateX(4px) scale(0.98); }
+  100% { transform: translateX(0) scale(1); }
+}
+
+/* ---------------------------------------------------------
+   JUICE
+   --------------------------------------------------------- */
+.juice-pop {
+  position: fixed;
+  z-index: 200;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--green);
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+  animation: juice-rise 1s var(--ease-out) forwards;
+}
+
+.juice-pop.big { font-size: 1.9rem; color: var(--amber); }
+.juice-pop.bad { color: var(--magenta); }
+
+@keyframes juice-rise {
+  0%   { opacity: 0; transform: translate(-50%, -30%) scale(0.7); }
+  18%  { opacity: 1; transform: translate(-50%, -60%) scale(1.12); }
+  100% { opacity: 0; transform: translate(-50%, -190%) scale(1); }
+}
+
+.juice-shake { animation: juice-shake 0.34s var(--ease-out); }
+
+@keyframes juice-shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-7px); }
+  40% { transform: translateX(6px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(2px); }
+}
+
+.juice-confetti {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  pointer-events: none;
+}
+
+/* Auto-advance: the button fills left-to-right, so the timing
+   is visible rather than a surprise. */
+.auto-advancing {
+  position: relative;
+  overflow: hidden;
+}
+
+.auto-advancing::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.18);
+  transform-origin: left;
+  animation: advance-fill var(--advance-dur, 4000ms) linear forwards;
+  pointer-events: none;
+}
+
+@keyframes advance-fill {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+/* ---------------------------------------------------------
+   DAILY GOALS
+   --------------------------------------------------------- */
+.quest-card { padding: 18px 20px 6px; }
+
+.quest-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.quest-head .section-heading { margin: 0; }
+
+.quest-tally {
+  font-family: var(--font-display);
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.quest-rows { display: flex; flex-direction: column; gap: 12px; }
+
+.quest-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.quest-tick {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1.5px solid var(--line);
+  font-size: 0.7rem;
+  color: transparent;
+  transition: all var(--dur-hover);
+}
+
+.quest-row.done .quest-tick {
+  border-color: var(--green);
+  background: var(--green);
+  color: #fff;
+}
+
+.quest-body { flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+
+.quest-text {
+  font-size: 0.83rem;
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.quest-row.done .quest-text { color: var(--ink-mute); text-decoration: line-through; }
+
+.quest-bar {
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(var(--ink-rgb), 0.08);
+  overflow: hidden;
+}
+
+.quest-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent-grad, var(--accent));
+  transition: width 0.6s var(--ease-out);
+}
+
+.quest-row.done .quest-bar-fill { background: var(--green); }
+
+.quest-xp {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--ink-mute);
+  flex: none;
+}
+
+.quest-row.done .quest-xp { color: var(--green); }
+
+/* ---------------------------------------------------------
+   ACHIEVEMENTS
+   --------------------------------------------------------- */
+.ach-toggle {
+  width: 100%;
+  margin-top: 16px;
+  padding: 12px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: 0;
+  border-top: 1px solid var(--line);
+  color: var(--ink-soft);
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ach-toggle svg { margin-left: auto; transition: transform var(--dur-hover); }
+.ach-toggle.open svg { transform: rotate(180deg); }
+.ach-tally { color: var(--ink-mute); font-weight: 500; }
+
+.ach-grid {
+  display: none;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+  padding-bottom: 16px;
+}
+
+.ach-grid.open { display: grid; }
+
+.ach {
+  padding: 12px;
+  border-radius: var(--radius-lg);
+  background: var(--bg-muted);
+  border: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  opacity: 0.45;
+}
+
+.ach.got {
+  opacity: 1;
+  border-color: var(--line-strong);
+}
+
+.ach-icon { font-size: 1.1rem; color: var(--ink-mute); }
+.ach.got .ach-icon { color: var(--accent); }
+.ach-name { font-size: 0.78rem; font-weight: 700; color: var(--ink); }
+.ach-desc { font-size: 0.7rem; color: var(--ink-mute); line-height: 1.35; }
+
+@media (max-width: 640px) {
+  .combo-hud { padding: 6px 11px; gap: 6px; }
+  .combo-label { display: none; }
+}
