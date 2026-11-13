@@ -457,6 +457,17 @@ test("an original agency dataset can verify a linked secondary page only for the
   assert.match(safeHtml(result), /dataset · 2 linked pages/);
 });
 
+test("Edge assessment reports a timeout while keeping invalid responses distinct", async () => {
+  const input = { version, action: "verify_passages", claim, plan: plan(), sources: [makeHit("slow")] };
+  const timeout = await handleVerification(input, async () => {
+    throw new DOMException("Timed out", "TimeoutError");
+  });
+  assert.equal(timeout.status, 504);
+  assert.match((await timeout.json()).error, /Retry to use the sources already retrieved/);
+  const invalid = await handleVerification(input, async () => '{"assessments":[]}');
+  assert.equal(invalid.status, 502);
+});
+
 test("versioned Edge actions preserve legacy Vite classify and search response contracts", async () => {
   const originalFetch = globalThis.fetch;
   const originalDeno = globalThis.Deno;

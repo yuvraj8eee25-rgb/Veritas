@@ -1,4 +1,5 @@
 import { auth } from "./supabase";
+import { supabaseFunctionTimeouts } from "./supabase-function-timeouts";
 
 export type VeritasFunction = "assess-evidence" | "exa-search" | "ai-debate" | "classroom-service";
 
@@ -24,6 +25,7 @@ export async function invokeVeritasFunction(functionName: VeritasFunction, body:
   if (error || !accessToken) throw new Error("Sign in to use this feature.");
 
   const requestId = globalThis.crypto?.randomUUID?.() || `veritas-${Date.now()}-${Math.random().toString(36).slice(2,10)}`;
+  const { browser: timeout } = supabaseFunctionTimeouts(functionName, body);
   let response: Response;
   try {
     response = await fetch("/api/supabase-functions", {
@@ -35,7 +37,7 @@ export async function invokeVeritasFunction(functionName: VeritasFunction, body:
       },
       body: JSON.stringify({ functionName, body }),
       cache: "no-store",
-      signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(75_000)]) : undefined,
+      signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(timeout)]) : undefined,
     });
   } catch (cause) {
     if (signal?.aborted) throw signal.reason;

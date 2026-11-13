@@ -1,3 +1,5 @@
+import { supabaseFunctionTimeouts } from "../../../lib/supabase-function-timeouts";
+
 const ALLOWED_FUNCTIONS = new Set(["assess-evidence", "exa-search", "ai-debate", "classroom-service"]);
 
 export const dynamic = "force-dynamic";
@@ -33,6 +35,7 @@ export async function POST(request: Request) {
     return routeError("Supabase is not configured.", 503, requestId);
   }
 
+  const { proxy: timeout } = supabaseFunctionTimeouts(input.functionName, input.body);
   try {
     const upstream = await fetch(
       `${supabaseUrl.replace(/\/$/, "")}/functions/v1/${input.functionName}`,
@@ -46,7 +49,7 @@ export async function POST(request: Request) {
         },
         body: JSON.stringify(input.body ?? {}),
         cache: "no-store",
-        signal: AbortSignal.timeout(70_000),
+        signal: AbortSignal.any([request.signal, AbortSignal.timeout(timeout)]),
       },
     );
 
@@ -62,7 +65,7 @@ export async function POST(request: Request) {
     });
   } catch (cause) {
     if (cause instanceof Error && cause.name === "TimeoutError") {
-      return routeError("The Supabase function timed out after 70 seconds.", 504, requestId);
+      return routeError(`The Supabase function timed out after ${timeout / 1000} seconds.`, 504, requestId);
     }
     return routeError("Could not reach the Supabase function. Check the project's Supabase URL and network access.", 502, requestId);
   }
