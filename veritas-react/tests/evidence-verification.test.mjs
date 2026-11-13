@@ -333,13 +333,16 @@ test("Edge verification audits the meaning and provenance of each quoted passage
     version, action: "verify_passages", claim, plan: plan(), sources: [page],
   }, async prompt => {
     if (prompt.startsWith("Verify proposed")) return JSON.stringify({ checks: [{ key: "0:0", decision: "indirect", recordConfirmed: false }] });
-    return JSON.stringify({ assessments: [{ id: 0, findings: [makeFinding(pageList([page])[0])] }] });
+    return JSON.stringify({ assessments: [{ id: 0, findings: [{
+      ...makeFinding(pageList([page])[0]), passageIndex: 0, quote: "Provider text cannot replace the indexed passage.",
+    }] }] });
   });
   assert.equal(edge.status, 200);
   const result = await edge.json();
   assert.equal(result.assessments[0].findings[0].match, "indirect");
   assert.equal(result.assessments[0].findings[0].record, null);
   assert.equal(result.assessments[0].findings[0].stance, "neutral");
+  assert.equal(result.assessments[0].findings[0].quote, page.text);
   const malformed = await handleVerification({
     version, action: "verify_passages", claim, plan: plan(), sources: [page],
   }, async () => JSON.stringify({ assessments: [{ id: 17, findings: [] }] }));

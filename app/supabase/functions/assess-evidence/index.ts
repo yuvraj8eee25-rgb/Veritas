@@ -91,7 +91,7 @@ class GeminiRequestError extends Error {
   }
 }
 
-async function callGemini(prompt: string, maxTokens: number, verificationSignal?: AbortSignal): Promise<string> {
+async function callGemini(prompt: string, maxTokens: number, verificationSignal?: AbortSignal, responseSchema?: Record<string, unknown>): Promise<string> {
   let response: Response;
   for (let attempt = 0; ; attempt++) {
     response = await fetch(
@@ -109,7 +109,7 @@ async function callGemini(prompt: string, maxTokens: number, verificationSignal?
             temperature: 0.1,
             maxOutputTokens: maxTokens,
             thinkingConfig: { thinkingLevel: "minimal" },
-            ...(verificationSignal ? { responseMimeType: "application/json" } : {}),
+            ...(verificationSignal ? { responseMimeType: "application/json", responseJsonSchema: responseSchema } : {}),
           },
         }),
       },
@@ -117,6 +117,12 @@ async function callGemini(prompt: string, maxTokens: number, verificationSignal?
     // Gemini can briefly return 503 while a model is under heavy demand. Retry
     // just those transient responses, with short exponential backoff, so one
     // capacity spike does not immediately force keyword-based classification.
+    if (response.status === 400 && responseSchema && attempt === 0) {
+      // Fall back to JSON mode when this model rejects the optional response schema.
+      // The response still goes through the same parser and validation.
+      responseSchema = undefined;
+      continue;
+    }
     if (response.status !== 503 || attempt >= 2) break;
     const delayMs = 500 * (2 ** attempt) + Math.floor(Math.random() * 300);
     await new Promise((resolve) => setTimeout(resolve, delayMs));
@@ -132,8 +138,15 @@ async function callGemini(prompt: string, maxTokens: number, verificationSignal?
     throw new GeminiRequestError(response.status, providerMessage);
   }
   const payload = await response.json();
-  const raw: string = payload?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-  return raw.replace(/^```json\s*|^```\s*|```$/gm, "").trim();
+  const candidate = payload?.candidates?.[0];
+  const parts: { text?: string; thought?: boolean }[] = candidate?.content?.parts ?? [];
+  if (verificationSignal && candidate?.finishReason && candidate.finishReason !== "STOP") {
+    const reason = candidate.finishReason;
+    const allowed = ["MAX_TOKENS", "SAFETY", "RECITATION", "OTHER", "BLOCKLIST", "PROHIBITED_CONTENT"];
+    throw new Error(`Gemini response stopped: ${allowed.includes(reason) ? reason : "UNKNOWN"}`);
+  }
+  const raw = parts.filter(part => !part.thought && typeof part.text === "string").map(part => part.text).join("");
+  return raw.trim().replace(/^```(?:json)?\s*|\s*```$/g, "").trim();
 }
 
 // Without generationConfig.responseMimeType forcing structured output, the model

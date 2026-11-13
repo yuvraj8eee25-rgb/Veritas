@@ -18,6 +18,8 @@ The [FEVER dataset examples](https://fever.ai/dataset/fever.html) and the [FEVER
 
 ## Live validation
 
-Deploy the updated `exa-search` and `assess-evidence` Edge Functions before validating the React app against providers. The version 2 assessment actions are separate from the original Vite actions. In a signed-in test session, verify that Exa returns neutral, counterevidence and primary-record results with available link metadata, that Gemini returns a complete passage assessment and audit within the proxy timeout, and that citations, follow-up and assessment-only retry behave correctly. Live source relevance and provenance, model judgment, and latency are not measured by the fixtures.
+Deploy the updated `exa-search` and `assess-evidence` Edge Functions before validating the React app against providers. The version 2 assessment actions are separate from the original Vite actions. Gemini selects a passage index, and the Edge Function copies the quotation directly from the retained excerpt before auditing the interpretation. This avoids failures caused by the model transcribing punctuation or formatting differently.
+
+For a signed-in smoke test, run a neutral investigation and open a citation. Check the trace for any failed search directions or partial coverage. When retrying a failed assessment, confirm that the existing sources remain visible and that the retry uses the saved excerpts. The fixtures do not measure provider latency or general verdict accuracy.
 
 The exact-quote and scope checks are conservative. An otherwise relevant paraphrase, alternate population label or record with insufficient identity metadata may remain unweighted. Review the excerpt and its original context before drawing a conclusion.
