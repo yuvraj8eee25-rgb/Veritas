@@ -150,33 +150,48 @@
 
   <div class="home-content">
 
-    <!-- Hero -->
-    <section class="home-hero flat">
-      <img class="hero-visual" src="imgs/classroom/debate-hero.webp" alt="Abstract illustration of two opposing ideas balanced for fair judgment" width="1774" height="887" fetchpriority="high" decoding="async">
-      <div class="home-hero-main">
+    <section class="home-start flat" aria-labelledby="home-start-title">
+      <div>
         <p class="hero-greeting"><span id="home-greeting-time">Good evening</span>, <span id="home-greeting-name">Debater</span></p>
-        <h1 class="hero-title">Build a stronger<br>argument today.</h1>
-        <p class="hero-intro">Three turns with an AI opponent. A fresh perspective and feedback you can use.</p>
-        <div class="hero-actions">
-          <a class="hero-btn hero-btn-secondary btn" href="/demo/index.html">Preview the club workflow</a>
-          <button type="button" class="hero-btn hero-btn-primary btn btn-primary" data-nav="ai-debate">Start a debate <span aria-hidden="true">→</span></button>
-        </div>
-        <button type="button" class="hero-next-step raised" id="home-hero-next-step">Your next step: choose a short practice drill <span aria-hidden="true">↗</span></button>
+        <h1 id="home-start-title">What do you want to improve?</h1>
+        <p>Pick a skill to set up your next drill.</p>
       </div>
+      <div id="home-goal-grid" class="home-goal-grid" role="group" aria-label="Practice goal"></div>
+      <button type="button" class="btn btn-primary" id="home-goal-start" disabled>Set up a drill</button>
+    </section>
 
-      <div class="hero-status">
+    <section class="home-overview" aria-label="Practice progress">
+      <div class="home-overview-card flat">
         <div class="xp-block">
           <div class="xp-label">
             <span class="rank-badge" id="home-rank" title="Your rank title is based on total XP earned.">Novice Debater</span>
-            <span class="xp-count" title="XP rewards your completed drills, daily challenges, and achievements."><span id="home-xp-value">0</span> XP <span class="stat-info" aria-hidden="true">ⓘ</span></span>
+            <span class="xp-count" title="XP rewards your completed drills, daily challenges, and achievements."><span id="home-xp-value">0</span> XP </span>
           </div>
           <div class="xp-bar" id="home-xp-bar" role="progressbar" aria-label="Progress toward the next rank" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-describedby="home-xp-next"><div class="xp-bar-fill" id="home-xp-fill"></div></div>
           <div class="xp-sub"><span id="home-xp-next">0 XP to next rank</span></div>
         </div>
-        <div class="streak-block">
-          <span class="streak-num" id="home-streak" title="Consecutive days with at least one completed practice session.">0</span>
-          <span class="streak-label">day streak</span>
-        </div>
+        <details class="home-xp-guide">
+          <summary aria-label="How progress is measured" title="How progress is measured">?</summary>
+          <p>XP rewards completed practice. Rank follows total XP. Drill mastery uses assessed answers. Live debate rating uses rated matches.</p>
+        </details>
+      </div>
+      <div class="home-overview-card flat">
+        <strong>This week</strong>
+        <span id="home-week-runs">0 practice sessions</span>
+        <span class="chip"><span id="home-streak">0</span> day streak</span>
+      </div>
+      <details class="home-overview-card flat" id="home-missions">
+        <summary>Daily missions <span class="chip" id="home-mission-count">0 of 3</span></summary>
+        <div id="arcade-quests"></div>
+      </details>
+    </section>
+
+    <!-- Practice -->
+    <section class="home-section">
+      <h2 class="section-heading">Practice formats</h2>
+      <div id="home-practice-highlight"></div>
+      <div class="practice-list">
+        <div class="practice-rows" id="home-mode-grid"><!-- injected --></div>
       </div>
     </section>
 
@@ -265,19 +280,6 @@
       </div>
     </section>
 
-    <!-- Daily goals + achievements (rendered by arcade.js) -->
-    <section class="home-section" id="arcade-quests"></section>
-
-    <!-- Practice -->
-    <section class="home-section">
-      <h2 class="section-heading">Drills between debates</h2>
-      <div id="home-practice-highlight"></div>
-      <div class="practice-list">
-        <div class="practice-rows" id="home-mode-grid"><!-- injected --></div>
-        
-      </div>
-    </section>
-
     <!-- Recent activity -->
     <section class="home-section">
       <h2 class="section-heading">Recent practice</h2>
@@ -297,7 +299,7 @@
     <span class="subbar-title" id="mode-select-title">Mode</span>
     <span class="subbar-spacer"></span>
   </header>
-  <div class="mode-detail-wrap">
+  <div class="mode-detail-wrap page">
     <div class="mode-detail-icon" id="mode-detail-icon"></div>
     <h1 id="mode-detail-name">Fallacy Hunter</h1>
     <p class="mode-detail-desc" id="mode-detail-desc">Spot the logical fallacy hiding in each argument.</p>
@@ -371,7 +373,7 @@
 
 <!-- ============ RUN SUMMARY ============ -->
 <section class="screen" data-screen="summary" id="screen-summary">
-  <div class="summary-wrap">
+  <div class="summary-wrap page">
     <div class="summary-badge" id="summary-badge">
       <svg width="48" height="48" viewBox="0 0 64 64" fill="none"><circle cx="32" cy="32" r="30" stroke="var(--border-soft)" stroke-width="2.5"/><path d="M22 33L28 39L42 25" stroke="var(--accent)" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </div>
@@ -636,7 +638,7 @@
     <span class="subbar-title">Daily Challenge</span>
     <span class="subbar-spacer"></span>
   </header>
-  <div class="daily-detail-wrap">
+  <div class="daily-detail-wrap page">
     <div class="daily-detail-icon">
       <svg width="34" height="34" viewBox="0 0 24 24" fill="none"><path d="M12 2L14.5 8.5L21 11L14.5 13.5L12 20L9.5 13.5L3 11L9.5 8.5L12 2Z" fill="var(--accent)"/></svg>
     </div>
@@ -662,24 +664,30 @@
     <span class="subbar-spacer"></span>
   </header>
 
-  <div class="mp-wrap" id="mp-browse-state">
-    <div class="mp-topics-header">
-      <div>
-        <h3 class="section-heading">Choose your debate topic</h3>
-        <p class="mp-hint">Pick a prompt, or join an open match and let the queue choose.</p>
+  <div class="mp-wrap page" id="mp-browse-state">
+    <p class="mp-lobby-intro">Debate a live opponent or invite a partner to practise.</p>
+    <section class="mp-setup flat" id="mp-lobby-setup" aria-labelledby="mp-setup-title">
+      <h2 id="mp-setup-title">Debate setup</h2>
+      <label class="field field-label" for="mp-motion">Motion
+        <input class="inset" id="mp-motion" maxlength="200" autocomplete="off" placeholder="Leave blank for an open match">
+      </label>
+      <div class="actions" id="mp-motion-picks" aria-label="Suggested motions">
+        <div class="actions" id="mp-featured-topics"></div>
+        <button type="button" class="btn chip" id="mp-shuffle-topic">Shuffle topic</button>
+        <button type="button" class="btn chip" id="mp-toggle-topics-btn" aria-expanded="false" aria-controls="mp-topic-browser">Browse all topics</button>
       </div>
-      <button type="button" class="ghost-btn toggle-btn btn" id="mp-toggle-topics-btn" aria-expanded="false" aria-controls="mp-topic-browser">Browse all topics</button>
+      <div class="training-options">
+        <veritas-choice id="mp-practice-mode" label="Practice mode" choices="[[&quot;written&quot;, &quot;Written (3 min per turn)&quot;], [&quot;speech&quot;, &quot;Recorded speech&quot;]]" value="written" class="field"></veritas-choice>
+        <veritas-choice id="mp-speech-seconds" label="Speech length" choices="[[&quot;60&quot;, &quot;60 seconds&quot;], [&quot;90&quot;, &quot;90 seconds&quot;], [&quot;180&quot;, &quot;3 minutes&quot;]]" value="90" class="field"></veritas-choice>
+        <veritas-choice id="mp-turns" label="Turns per side" choices="[[&quot;3&quot;, &quot;3&quot;], [&quot;5&quot;, &quot;5&quot;]]" value="3" class="field"></veritas-choice>
     </div>
-    <section class="mp-featured-section" aria-labelledby="mp-featured-title">
-      <div class="mp-section-heading-row">
-        <h4 id="mp-featured-title">Quick picks</h4>
-        <span>Choose one to set the match topic</span>
-      </div>
-      <div class="mp-featured-topics" id="mp-featured-topics">
-        <div class="hot-topic-skel"></div>
-        <div class="hot-topic-skel"></div>
-        <div class="hot-topic-skel"></div>
-      </div>
+      <details class="mp-rules-collapsible">
+        <summary>Match rules</summary>
+        <ul class="mp-rules-list">
+          <li>Written turns allow 3 minutes and 4,000 characters. Speech turns include a timed recording and 3 minutes for preparation and transcript review.</li>
+          <li>The AI referee scores clarity and reasoning. Arguments are locked after you send them.</li>
+        </ul>
+      </details>
     </section>
 
     <section class="mp-topic-browser hidden flat" id="mp-topic-browser" aria-label="Browse all debate topics">
@@ -697,52 +705,34 @@
       </div>
     </section>
 
-    <div class="glass-card mp-selected-card hidden flat" id="mp-selected-card">
-      <span class="mp-selected-label">Selected topic</span>
-      <p id="mp-selected-text"></p>
-      <div class="mp-selected-actions">
-        <button type="button" class="mp-clear-btn btn" id="mp-change-topic">Change topic</button>
-        <button type="button" class="mp-clear-btn btn" id="mp-clear-topic">Clear</button>
-      </div>
+
+    <div class="mp-action-grid" id="mp-lobby-actions">
+      <section class="raised mp-action-card" id="mp-public-panel" aria-labelledby="mp-public-title">
+        <h2 id="mp-public-title">Public match</h2>
+        <p id="mp-queue-type" role="status">Open match · the queue will choose a topic</p>
+        <button type="button" class="btn btn-primary" id="mp-find-match-btn">Find opponent</button>
+      </section>
+      <section class="raised mp-action-card" id="mp-private-panel" aria-labelledby="mp-private-title">
+        <h2 id="mp-private-title">Private room</h2>
+        <p id="mp-private-context"></p>
+        <button type="button" class="btn" id="mp-private-create" disabled>Create room</button>
+        <div class="mp-join-row">
+          <label class="field field-label">Room code<input id="mp-private-code" maxlength="12" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Code from your partner"></label>
+          <button type="button" class="btn" id="mp-private-join" disabled>Join</button>
+        </div>
+        <button type="button" class="btn chip hidden" id="mp-private-copy">Copy code</button>
+        <p id="mp-private-status" role="status" aria-live="polite"></p>
+      </section>
     </div>
-
-    <p class="mp-topic-state" id="mp-topic-state" role="status">No topic selected · you can still join an open match.</p>
-    <div class="mp-queue-info flat" id="mp-queue-info" role="status"><span class="mp-queue-dot" aria-hidden="true"></span><span id="mp-queue-type">Open match · the queue will choose a topic</span></div>
-
-    <details class="glass-card mp-rules-card mp-rules-collapsible flat">
-      <summary>How the match works <span>3 or 5 turns · written or recorded speech</span></summary>
-      <ul class="mp-rules-list">
-        <li>Each player gets 3 or 5 turns, according to the practice settings.</li>
-        <li>Written turns allow 3 minutes and 4,000 characters. Speech turns allow 60, 90 or 180 seconds of recording plus 3 minutes for preparation and transcript review.</li>
-        <li>The AI referee scores the debate based on clarity and reasoning.</li>
-        <li>Once you send, your argument is locked in.</li>
-      </ul>
-    </details>
-
-    <div class="training-options">
-      <label>Practice mode<select id="mp-practice-mode"><option value="written">Written (3 min per turn)</option><option value="speech">Recorded speech</option></select></label>
-      <label>Speech length<select id="mp-speech-seconds"><option value="60">60 seconds</option><option value="90" selected>90 seconds</option><option value="180">3 minutes</option></select></label>
-      <label>Turns per side<select id="mp-turns"><option value="3">3</option><option value="5">5</option></select></label>
-    </div>
-    <p class="training-note">Speech turns include 3 minutes for preparation, transcription and review. Partners are matched on the same practice settings.</p>
-    <section class="glass-card private-room-panel flat" id="mp-private-panel" aria-label="Private practice room">
-      <h3>Private practice</h3><p id="mp-private-context" class="training-note"></p>
-      <label>Motion<input id="mp-private-topic" maxlength="200" placeholder="Enter your debate motion"></label>
-      <div class="cw-actions"><button type="button" class="ghost-btn btn" id="mp-private-create">Create private room</button></div>
-      <label>Room code<input id="mp-private-code" maxlength="12" autocomplete="off" placeholder="Code from your partner"></label>
-      <div class="cw-actions"><button type="button" class="ghost-btn btn" id="mp-private-join">Join private room</button><button type="button" class="ghost-btn btn" id="mp-private-copy">Copy code</button></div>
-      <p id="mp-private-status" role="status" aria-live="polite"></p>
-    </section>
-    <button type="button" class="cta-btn btn btn-primary" id="mp-find-match-btn">Find a public match</button>
-    <p class="mp-online-note" id="mp-online-note"></p>
   </div>
 
-  <div class="mp-wrap mp-searching-state hidden" id="mp-searching-state">
+  <div class="mp-wrap page mp-searching-state hidden" id="mp-searching-state">
     <img class="mp-search-illustration" src="imgs/debate/matchmaking.svg" alt="" width="220" height="150" decoding="async">
     <div class="mp-radar-spinner small" aria-hidden="true"><span></span><span></span><span></span></div>
     <h3>Searching for an opponent…</h3>
     <div class="mp-search-elapsed" id="mp-search-elapsed">0:00</div>
     <p class="mp-hint" id="mp-searching-topic"></p>
+    <p class="mp-hint" id="mp-online-note" role="status"></p>
     <button type="button" class="ghost-btn btn" id="mp-cancel-search-btn">Cancel</button>
   </div>
 </section>
@@ -859,7 +849,7 @@
     <span class="subbar-spacer"></span>
   </header>
 
-  <div class="mp-wrap">
+  <div class="mp-wrap page">
     <h3 class="section-heading">Pick a topic</h3>
     <p class="mp-hint">Choose a prompt or write your own. You’ll argue one side; the AI takes the other.</p>
 
@@ -909,9 +899,9 @@
     </div>
 
     <div class="training-options">
-      <label>Practice mode<select id="aidebate-practice-mode"><option value="written">Written argument</option><option value="speech">Recorded speech</option></select></label>
-      <label>Speech length<select id="aidebate-speech-seconds"><option value="60">60 seconds</option><option value="90" selected>90 seconds</option><option value="180">3 minutes</option></select></label>
-      <label>Turns per side<select id="aidebate-turns"><option value="3">3 (opening, rebuttal, closing)</option><option value="5">5 (extended practice)</option></select></label>
+      <veritas-choice id="aidebate-practice-mode" label="Practice mode" choices="[[&quot;written&quot;, &quot;Written argument&quot;], [&quot;speech&quot;, &quot;Recorded speech&quot;]]" value="written" class="field"></veritas-choice>
+      <veritas-choice id="aidebate-speech-seconds" label="Speech length" choices="[[&quot;60&quot;, &quot;60 seconds&quot;], [&quot;90&quot;, &quot;90 seconds&quot;], [&quot;180&quot;, &quot;3 minutes&quot;]]" value="90" class="field"></veritas-choice>
+      <veritas-choice id="aidebate-turns" label="Turns per side" choices="[[&quot;3&quot;, &quot;3 (opening, rebuttal, closing)&quot;], [&quot;5&quot;, &quot;5 (extended practice)&quot;]]" value="3" class="field"></veritas-choice>
     </div>
     <p class="training-note">Speech mode adds 3 minutes per turn for preparation, transcription and review. Recordings are private. This is practice, with content feedback rather than delivery scoring.</p>
     <h3 class="section-heading">Written turn time</h3>
@@ -1052,7 +1042,7 @@
     <span class="subbar-spacer"></span>
   </header>
 
-  <div class="agent-investigation-wrap">
+  <div class="agent-investigation-wrap page">
     <!-- Top Control Card -->
     <div class="glass-card agent-control-card flat">
       <img class="agent-lab-visual" src="imgs/classroom/evidence-lab.webp" alt="Illustration of research papers being examined with a magnifying glass" width="1254" height="1254" loading="lazy" decoding="async">
@@ -1086,13 +1076,7 @@
         </div>
 
         <div class="agent-demo-mode-select" hidden>
-          <label class="agent-label" for="agent-demo-mode-select">Demo scenarios:</label>
-          <select id="agent-demo-mode-select" class="agent-select">
-            <option value="normal">Normal run</option>
-            <option value="search_failure">Demo: search fails, agent recovers</option>
-            <option value="conflicting_evidence">Demo: sources disagree, agent resolves</option>
-            <option value="weak_evidence">Demo: weak evidence, agent digs deeper</option>
-          </select>
+          <veritas-choice id="agent-demo-mode-select" label="Demo scenarios" choices="[[&quot;normal&quot;, &quot;Normal run&quot;], [&quot;search_failure&quot;, &quot;Demo: search fails, agent recovers&quot;], [&quot;conflicting_evidence&quot;, &quot;Demo: sources disagree, agent resolves&quot;], [&quot;weak_evidence&quot;, &quot;Demo: weak evidence, agent digs deeper&quot;]]" value="normal" class="field"></veritas-choice>
         </div>
       </div>
     </div>
@@ -1252,7 +1236,7 @@
     <h1 class="subbar-title" id="study-screen-title">Study</h1>
     <span class="subbar-spacer"></span>
   </header>
-  <main class="study-wrap" id="study-root" tabindex="-1">
+  <main class="study-wrap page" id="study-root" tabindex="-1">
     <p class="study-loading" role="status">Loading your study plan…</p>
   </main>
 </section>
@@ -1268,13 +1252,13 @@
     <span class="subbar-spacer"></span>
   </header>
 
-    <div class="classroom-wrap">
+    <div class="classroom-wrap page">
     <div class="cw-skeleton flat" role="status">Loading your classrooms…</div>
   </div></section>
 
 <!-- ============ AUTH ============ -->
 <section class="screen" data-screen="auth" id="screen-auth">
-  <div class="auth-wrap">
+  <div class="auth-wrap page">
     <div class="auth-brand">
       <svg width="40" height="40" viewBox="0 0 88 88" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path d="M44 6L78 24V64L44 82L10 64V24L44 6Z" stroke="var(--text-primary)" stroke-width="3"/>

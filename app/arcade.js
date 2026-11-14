@@ -266,10 +266,6 @@ window.Arcade = (function () {
 
       container.innerHTML = `
         <div class="quest-card glass-card flat">
-          <div class="quest-head">
-            <h2 class="section-heading">Today's goals</h2>
-            <span class="quest-tally">${doneCount}/3</span>
-          </div>
           <div class="quest-rows">
             ${defs.map(d => {
               const prog = Math.min(q.prog[d.id] || 0, d.goal);
@@ -295,6 +291,7 @@ window.Arcade = (function () {
           toggle.classList.toggle("open");
         });
       }
+      return doneCount;
     }
   };
 

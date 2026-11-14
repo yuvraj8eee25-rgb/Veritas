@@ -740,6 +740,45 @@ function tickUp(el, from, to, duration = 900) {
    8. HOME RENDER
    --------------------------------------------------------- */
 
+const HOME_GOALS = {
+  speed: ["Think faster", "2 min"],
+  rebuttal: ["Build stronger rebuttals", "5 min"],
+  fallacy: ["Use better evidence", "4 min"],
+  steelman: ["Prepare for debate", "5 min"]
+};
+let homeGoal = null;
+
+function renderHomeGoals() {
+  const grid = document.getElementById("home-goal-grid");
+  const start = document.getElementById("home-goal-start");
+  const setGoal = mode => {
+    homeGoal = mode;
+    grid.querySelectorAll("[data-mode]").forEach(button => {
+      button.setAttribute("aria-pressed", String(button.dataset.mode === mode));
+    });
+    start.disabled = !mode;
+    start.textContent = mode ? `Set up ${MODE_META[mode].name}` : "Set up a drill";
+  };
+  if (!grid.childElementCount) {
+    Object.entries(HOME_GOALS).forEach(([key, [label]]) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "tile";
+      button.dataset.mode = key;
+      button.innerHTML = `<span class="mode-card-icon" aria-hidden="true">${MODE_META[key].icon}</span><strong>${label}</strong>`;
+      button.addEventListener("click", () => {
+        playClick();
+        setGoal(key);
+      });
+      grid.append(button);
+    });
+    start.addEventListener("click", () => {
+      if (homeGoal) openModeSelect(homeGoal);
+    });
+  }
+  setGoal(homeGoal);
+}
+
 function renderHome() {
   state.skills = masteryScores(state.assessments);
   const { current: currentRank, next } = rankForXp(state.totalXp);
@@ -749,7 +788,12 @@ function renderHome() {
   document.getElementById("home-greeting-time").textContent = timeGreeting;
   document.getElementById("home-greeting-name").textContent = cachedProfile.displayName || "Debater";
 
-  Arcade.quests.render(document.getElementById("arcade-quests"), state, todayStr());
+  renderHomeGoals();
+  const completedMissions = Arcade.quests.render(document.getElementById("arcade-quests"), state, todayStr());
+  document.getElementById("home-mission-count").textContent = `${completedMissions} of 3`;
+  const weeklyRuns = Array.from({ length: 7 }, (_, offset) => Number(state.activity?.[todayStr(-offset)]) || 0)
+    .reduce((sum, count) => sum + count, 0);
+  document.getElementById("home-week-runs").textContent = `${weeklyRuns} practice ${weeklyRuns === 1 ? "session" : "sessions"}`;
   const homeRankEl = document.getElementById("home-rank");
   homeRankEl.textContent = currentRank.name;
   paintRankTier(homeRankEl, currentRank);
@@ -802,14 +846,13 @@ function renderHome() {
     const card = document.createElement("button");
     card.className = "mode-card tile";
     card.dataset.mode = mode.key;
-    const stats = state.modeStats[mode.key];
     card.innerHTML = `
       <div class="mode-card-icon">${mode.icon}</div>
       <div class="mode-card-body">
         <h3>${mode.name}</h3>
         <p>${mode.desc}</p>
       </div>
-      ${stats ? `<span class="mode-card-tag chip">BEST ${stats.bestPct}%</span>` : `<span class="mode-card-tag chip">NEW</span>`}
+      <span class="mode-card-tag chip">${HOME_GOALS[mode.key][1]}</span>
     `;
     card.addEventListener("click", () => {
       playClick();
@@ -870,23 +913,6 @@ function renderHomeCoach() {
     { key: "rhetoric", label: "Steelman", mode: "steelman" },
     { key: "speed", label: "Quick thinking", mode: "speed" }
   ];
-  const nextSkill = skillModes
-    .map(item => ({ ...item, value: Math.max(0, Math.min(100, Number(state.skills?.[item.key]) || 0)) }))
-    .sort((a, b) => a.value - b.value)[0];
-  const mode = MODE_META[nextSkill.mode];
-  const heroNextStep = document.getElementById("home-hero-next-step");
-  if (heroNextStep) {
-    heroNextStep.replaceChildren(document.createTextNode(`Next up: ${mode.name}`));
-    const arrow = document.createElement("span");
-    arrow.setAttribute("aria-hidden", "true");
-    arrow.textContent = " ↗";
-    heroNextStep.appendChild(arrow);
-    heroNextStep.onclick = () => {
-      playClick();
-      openModeSelect(nextSkill.mode);
-    };
-  }
-
   list.replaceChildren();
   skillModes.forEach(({ key, label }) => {
     const value = Math.max(0, Math.min(100, Number(state.skills?.[key]) || 0));
@@ -1007,6 +1033,7 @@ function openModeSelect(selectedKey) {
   document.getElementById("mode-select-title").textContent = mode.name;
   document.getElementById("mode-detail-icon").innerHTML = mode.icon;
   document.getElementById("mode-detail-name").textContent = mode.name;
+  document.getElementById("mode-start-btn").textContent = `Start ${mode.name}`;
   document.getElementById("mode-detail-desc").textContent = mode.desc;
   document.getElementById("mode-xp-reward").textContent = "+" + mode.xp;
 

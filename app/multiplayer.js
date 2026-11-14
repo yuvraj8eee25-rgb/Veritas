@@ -222,10 +222,6 @@ async function openLobby() {
   topicSearchQuery = "";
   const searchInput = document.getElementById("mp-topic-search");
   if (searchInput) searchInput.value = "";
-  document.getElementById("mp-selected-card").classList.add("hidden");
-  document.getElementById("mp-topic-state").textContent = "No topic selected · you can still join an open match.";
-  updateQueueInfo();
-  document.getElementById("mp-online-note").textContent = "Choose matching practice settings or invite a partner to a private room.";
   applyTrainingContext();
   setTopicBrowserOpen(false);
   await window.mpSupabase.ready;
@@ -251,14 +247,14 @@ async function loadHotTopics() {
     allHotTopics = topics;
     activeCategory = "All";
     renderCategoryTabs();
-    renderHotTopics(getQuickPickTopics(), "mp-featured-topics");
+    renderTopicChips();
     renderHotTopics(filterByActiveCategory());
   } catch (e) {
     console.error("Failed to load hot topics, using fallback:", e);
     allHotTopics = FALLBACK_TOPICS;
     activeCategory = "All";
     renderCategoryTabs();
-    renderHotTopics(getQuickPickTopics(), "mp-featured-topics");
+    renderTopicChips();
     renderHotTopics(filterByActiveCategory());
   }
 }
@@ -342,8 +338,8 @@ function renderCategoryTabs() {
 const ICON_NEWS = '<svg width="10" height="10" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>';
 const ICON_LINK = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M10 14L20 4M20 4H14M20 4V10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 13V19A1 1 0 0117 20H5A1 1 0 014 19V7A1 1 0 015 6H11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
-function renderHotTopics(topics, targetId = "mp-hot-topics") {
-  const listEl = document.getElementById(targetId);
+function renderHotTopics(topics) {
+  const listEl = document.getElementById("mp-hot-topics");
   listEl.innerHTML = "";
   if (!topics.length) {
     const empty = document.createElement("div");
@@ -424,38 +420,50 @@ function selectTopic(text) {
     input?.focus({ preventScroll: true });
     return;
   }
-  selectedTopic = text;
-  document.getElementById("mp-selected-text").textContent = text;
-  document.getElementById("mp-selected-card").classList.remove("hidden");
-  document.getElementById("mp-topic-state").textContent = `Selected topic: ${text}`;
-  updateQueueInfo();
-  document.querySelectorAll(".hot-topic-item").forEach((el) => {
-    const isSelected = el.dataset.topic === selectedTopic;
-    el.classList.toggle("selected", isSelected);
-    el.setAttribute("aria-pressed", String(isSelected));
-    const action = el.querySelector(".hot-topic-action");
-    if (action) action.textContent = isSelected ? "Selected ✓" : "";
-  });
+  syncMotion(text);
   setTopicBrowserOpen(false);
+  motionInput.focus({ preventScroll: true });
 }
 
-document.getElementById("mp-clear-topic").addEventListener("click", () => {
-  selectedTopic = null;
-  document.getElementById("mp-selected-card").classList.add("hidden");
-  document.querySelectorAll(".hot-topic-item").forEach((el) => {
-    el.classList.remove("selected");
-    el.setAttribute("aria-pressed", "false");
-    const action = el.querySelector(".hot-topic-action");
-    if (action) action.textContent = "";
-  });
-  document.getElementById("mp-topic-state").textContent = "No topic selected · you can still join an open match.";
+const motionInput = document.getElementById("mp-motion");
+const roomCode = document.getElementById("mp-private-code");
+const createRoomButton = document.getElementById("mp-private-create");
+const joinRoomButton = document.getElementById("mp-private-join");
+
+function syncMotion(text) {
+  motionInput.value = assignedPractice?.settings.topic ?? text ?? "";
   updateQueueInfo();
+}
+
+function renderTopicChips() {
+  const container = document.getElementById("mp-featured-topics");
+  container.replaceChildren();
+  getQuickPickTopics().forEach(({ text }) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "btn chip";
+    button.dataset.topic = text;
+    button.setAttribute("aria-pressed", String(text === selectedTopic));
+    button.textContent = text;
+    button.addEventListener("click", () => selectTopic(text));
+    container.append(button);
+  });
+}
+
+motionInput.addEventListener("input", updateQueueInfo);
+roomCode.addEventListener("input", updateRoomControls);
+document.getElementById("mp-shuffle-topic").addEventListener("click", () => {
+  const candidates = (allHotTopics.length ? allHotTopics : FALLBACK_TOPICS).filter(topic => topic.text !== selectedTopic);
+  const topic = candidates[Math.floor(Math.random() * candidates.length)];
+  if (topic) selectTopic(topic.text);
 });
 
-document.getElementById("mp-change-topic").addEventListener("click", () => {
-  setTopicBrowserOpen(true);
-  scrollTopicBrowserIntoView();
-});
+function updateRoomControls() {
+  createRoomButton.disabled = Array.from(motionInput.value.trim()).length < 3;
+  const hasRoomCode = roomCode.value.trim().length === roomCode.maxLength;
+  joinRoomButton.disabled = !hasRoomCode;
+  document.getElementById("mp-private-copy").classList.toggle("hidden", !hasRoomCode);
+}
 
 function setTopicBrowserOpen(open) {
   const browserEl = document.getElementById("mp-topic-browser");
@@ -477,12 +485,18 @@ function scrollTopicBrowserIntoView() {
 }
 
 function updateQueueInfo() {
-  if (assignedPractice) selectedTopic = assignedPractice.settings.topic;
-  const label = document.getElementById("mp-queue-type");
-  if (!label) return;
-  label.textContent = selectedTopic
-    ? "Topic-specific match · you’ll be matched with someone on this prompt"
-    : "Open match · the queue will choose a topic";
+  selectedTopic = assignedPractice?.settings.topic ?? (motionInput.value.trim() || null);
+  document.getElementById("mp-queue-type").textContent = selectedTopic
+    ? "Match with someone debating this motion."
+    : "Join the open queue and let Veritas choose a motion.";
+  document.querySelectorAll("#mp-featured-topics [data-topic], .hot-topic-item").forEach(button => {
+    const selected = button.dataset.topic === selectedTopic;
+    button.classList.toggle("selected", selected);
+    button.setAttribute("aria-pressed", String(selected));
+    const action = button.querySelector(".hot-topic-action");
+    if (action) action.textContent = selected ? "Selected" : "";
+  });
+  updateRoomControls();
 }
 
 const mpBackButton = document.getElementById("mp-back-btn");
@@ -520,10 +534,13 @@ function practiceSettings() {
 function applyTrainingContext() {
   const settings = practiceSettings();
   ['mode', 'speech-seconds', 'turns'].forEach((suffix, i) => { const el = document.getElementById(`mp-${suffix === 'mode' ? 'practice-mode' : suffix}`); el.value = String([settings.mode, settings.speech_seconds, settings.turns][i]); el.disabled = !!assignedPractice; });
-  document.getElementById('mp-find-match-btn').classList.toggle('hidden', assignedPractice?.kind === 'private_debate');
-  document.getElementById('mp-private-panel').classList.toggle('hidden', browseForAiDebate || assignedPractice?.kind === 'live_debate');
-  document.getElementById('mp-private-topic').value = assignedPractice?.settings.topic || selectedTopic || '';
-  document.getElementById('mp-private-topic').readOnly = !!assignedPractice;
+  document.getElementById("mp-public-panel").classList.toggle("hidden", assignedPractice?.kind === "private_debate");
+  document.getElementById("mp-private-panel").classList.toggle("hidden", assignedPractice?.kind === "live_debate");
+  document.getElementById("mp-lobby-actions").classList.toggle("hidden", browseForAiDebate);
+  document.getElementById("mp-lobby-setup").classList.toggle("hidden", browseForAiDebate);
+  document.getElementById("mp-motion-picks").classList.toggle("hidden", !!assignedPractice);
+  syncMotion(selectedTopic);
+  motionInput.readOnly = !!assignedPractice;
   document.getElementById('mp-private-context').textContent = assignedPractice ? `Assigned motion: ${assignedPractice.settings.topic}. Both partners must open this assignment before joining.` : 'Invite a partner with the room code. Private practice does not change global Elo.';
 }
 window.mpStartAssignedDebate = async assignment => {
@@ -540,7 +557,7 @@ async function restorePrivateRoom() {
   try {
     const room = await window.VeritasApi.tableQuery('private_debate_rooms', q => q.select('*').eq('id', saved.id).maybeSingle(), { timeoutMs: 10000 });
     if (!room || room.closed || (!room.debate_id && Date.parse(room.expires_at) < Date.now())) { sessionStorage.removeItem(key); return; }
-    privateRoom = room; document.getElementById('mp-private-code').value = room.code;
+    privateRoom = room; roomCode.value = room.code; updateRoomControls();
     if (room.debate_id) {
       const debate = await window.VeritasApi.tableQuery('debates', q => q.select('status').eq('id', room.debate_id).maybeSingle());
       if (debate?.status === 'active') { enterDebateRoom(room.debate_id); return; }
@@ -548,7 +565,7 @@ async function restorePrivateRoom() {
     }
     document.getElementById('mp-private-status').textContent = `Room ${room.code}. Waiting for your partner to join…`;
     clearInterval(privatePoll); privatePoll = setInterval(checkPrivateRoom, 2000);
-  } catch { document.getElementById('mp-private-status').textContent = 'Could not restore your room. Enter its code to rejoin.'; document.getElementById('mp-private-code').value = saved.code || ''; }
+  } catch { document.getElementById('mp-private-status').textContent = 'Could not restore your room. Enter its code to rejoin.'; roomCode.value = saved.code || ''; updateRoomControls(); }
 }
 async function checkPrivateRoom() {
   if (!privateRoom || privateRoom.debate_id) return;
@@ -564,9 +581,9 @@ async function openPrivateRoom(join) {
   try {
     await cancelSearch(); await window.mpSupabase.ready; const user = await window.VeritasApi.currentUser(); if (!user) throw Error('Sign in first.'); myUid = user.id;
     if (privateRoom && !privateRoom.debate_id && !join) await window.VeritasApi.rpc('close_private_debate_room', { p_room_id: privateRoom.id });
-    const room = await window.VeritasApi.rpc(join ? 'join_private_debate_room' : 'create_private_debate_room', join ? { p_code: document.getElementById('mp-private-code').value.trim(), p_assignment_id: assignedPractice?.id || null } : { p_assignment_id: assignedPractice?.id || null, p_topic: document.getElementById('mp-private-topic').value.trim(), p_settings: practiceSettings() });
+    const room = await window.VeritasApi.rpc(join ? 'join_private_debate_room' : 'create_private_debate_room', join ? { p_code: document.getElementById('mp-private-code').value.trim(), p_assignment_id: assignedPractice?.id || null } : { p_assignment_id: assignedPractice?.id || null, p_topic: motionInput.value.trim(), p_settings: practiceSettings() });
     privateRoom = room; sessionStorage.setItem(`veritas:private-room:${myUid}`, JSON.stringify({ id: room.id, code: room.code, assignmentId: room.assignment_id }));
-    document.getElementById('mp-private-code').value = room.code; status.textContent = `Room ${room.code}. Waiting for your partner to join…`;
+    roomCode.value = room.code; updateRoomControls(); status.textContent = `Room ${room.code}. Waiting for your partner to join…`;
     if (room.debate_id) enterDebateRoom(room.debate_id);
     else { clearInterval(privatePoll); privatePoll = setInterval(checkPrivateRoom, 2000); await checkPrivateRoom(); }
   } catch (error) { status.textContent = error.message || 'Could not open the private room.'; }
@@ -601,8 +618,8 @@ async function startSearch() {
   document.getElementById("mp-searching-topic").textContent = selectedTopic
     ? `Topic: "${selectedTopic}"`
     : "Any topic — matched with whoever's already waiting";
-  document.getElementById("mp-online-note").textContent = "Searching the queue — live opponents are on the way.";
 
+  document.getElementById("mp-online-note").textContent = "";
   inQueue = true;
   startSearchClock();
   // A completed match leaves the caller's matched row behind. Clear only
@@ -1271,15 +1288,8 @@ if (rematchBtn) rematchBtn.addEventListener("click", () => {
   currentDebateData = null;
   window.DA.showScreen("multiplayer");
   openLobby().then(() => {
-    if (topic) {
-      selectedTopic = topic;
-      const sel = document.getElementById("mp-selected-card");
-      const txt = document.getElementById("mp-selected-text");
-      if (txt) txt.textContent = topic;
-      if (sel) sel.classList.remove("hidden");
-    }
+    syncMotion(topic);
     if (previous?.isPrivate) {
-      document.getElementById('mp-private-topic').value = topic || '';
       if (!assignedPractice) {
         document.getElementById('mp-practice-mode').value = previous.practiceMode;
         document.getElementById('mp-speech-seconds').value = String(previous.speechSeconds);
