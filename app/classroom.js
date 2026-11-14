@@ -1,3 +1,4 @@
+import { choiceField } from "./src/shared/ui.js";
 /* Classroom production workspace. All state is authenticated and server backed. */
 import { trainingSettings, DRILL_MODES, canSubmitActivity } from './src/features/training-settings.js';
 import { appendRecording } from './src/features/speech-practice.js';
@@ -13,10 +14,10 @@ const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const date=v=>v?new Date(v).toLocaleString(undefined,{dateStyle:'medium',timeStyle:'short'}):'No deadline';
 const localDate=v=>v?new Date(new Date(v).getTime()-new Date(v).getTimezoneOffset()*60000).toISOString().slice(0,16):'';
 const btn=(text,action,id='',primary=false)=>`<button type="button" class="${primary?'cta-btn btn btn-primary':'ghost-btn btn'}" data-action="${action}" data-id="${esc(id)}">${esc(text)}</button>`;
-const field=(text,name,value='',type='text',extra='')=>`<label>${esc(text)}<input name="${name}" type="${type}" value="${esc(value)}" ${extra}></label>`;
-const area=(text,name,value='',extra='')=>`<label>${esc(text)}<textarea name="${name}" ${extra}>${esc(value)}</textarea></label>`;
+const field=(text,name,value='',type='text',extra='')=>`<label class="field">${esc(text)}<input name="${name}" type="${type}" value="${esc(value)}" ${extra}></label>`;
+const area=(text,name,value='',extra='')=>`<label class="field">${esc(text)}<textarea name="${name}" ${extra}>${esc(value)}</textarea></label>`;
 const check=(text,name,value)=>`<label class="cw-check"><input type="checkbox" name="${name}" ${value?'checked':''}>${esc(text)}</label>`;
-const select=(text,name,options,value)=>`<label>${esc(text)}<select name="${name}">${Object.entries(options).map(([k,v])=>`<option value="${esc(k)}" ${String(value)===k?'selected':''}>${esc(v)}</option>`).join('')}</select></label>`;
+const select=(text,name,options,value)=>choiceField(text,Object.entries(options),{name,value});
 const empty=text=>`<p class="cw-empty">${esc(text)}</p>`;
 const emptyAssignments=()=>`<div class="cw-empty"><p>No assignments yet. Your next practice activity will appear here.</p><div class="cw-actions">${cohort()?.coach?btn('Create assignment','assignment','',true):btn('Start a debate','practice','',true)+btn('All classrooms','home')}</div></div>`;
 const toast=text=>window.DA?.toast(text);

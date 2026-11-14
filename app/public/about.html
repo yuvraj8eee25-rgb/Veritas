@@ -13,7 +13,7 @@
   <style>
     * { box-sizing:border-box; }
     body { margin:0; min-height:100vh; background:var(--page); color:var(--ink); font:var(--type-base)/1.7 'Plus Jakarta Sans',sans-serif; }
-    main { width:min(900px,calc(100% - 40px)); margin:0 auto; padding:32px 0 72px; }
+    main { width:min(var(--form-width),calc(100% - var(--space-6))); margin:0 auto; padding:var(--space-7) 0; }
     header { display:flex; align-items:center; justify-content:space-between; gap:20px; padding:12px 0 64px; }
     .brand { color:var(--ink); font-size:var(--type-sm); font-weight:var(--weight-eyebrow); letter-spacing:.18em; text-decoration:none; }
     .back { color:var(--accent-text); font-size:var(--type-base); font-weight:var(--weight-heading); text-decoration:none; }
@@ -29,7 +29,7 @@
     .feature { padding:var(--space-4); }
     .feature h3 { margin:0 0 7px; font-size:var(--type-base); }
     .feature p { font-size:var(--type-base); }
-    @media(max-width:719px) { main { width:min(100% - 28px,900px); padding-top:18px; } header { padding-bottom:42px; } .panel { padding:22px; } .features { grid-template-columns:1fr; } }
+    @media(max-width:719px) { main { width:calc(100% - var(--space-6)); } header { padding-bottom:42px; } .panel { padding:22px; } .features { grid-template-columns:1fr; } }
   </style>
 </head>
 <body>

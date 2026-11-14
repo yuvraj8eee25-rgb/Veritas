@@ -19,7 +19,7 @@ body {
 .reset-button, .view-tab, .primary-button, .secondary-button { font: inherit; cursor: pointer; }
 .reset-button { padding: 8px 12px; color: var(--soft); font-size: var(--type-sm); }
 .reset-button:hover, .secondary-button:hover { color: var(--ink); }
-.page-shell { max-width: 1130px; margin: 0 auto; padding: 48px 26px 26px; }
+.page-shell { max-width: var(--form-width); margin: 0 auto; padding: 48px 26px 26px; }
 .intro { max-width: 720px; }
 .eyebrow { margin: 0 0 8px; color: var(--accent-text); }
 .eyebrow span { margin: 0 4px; color: var(--mute); }
@@ -130,7 +130,7 @@ body {
   .demo-status .status-divider { font-size: var(--type-sm); }
   .reset-button { padding: 8px 10px; font-size: 0; }
   .reset-button span { font-size: var(--type-base); }
-  .page-shell { padding: 34px 15px 20px; }
+  .page-shell { padding: var(--space-7) var(--space-4) var(--space-5); }
   .intro h1 { font-size: var(--type-2xl); }
   .intro-copy { font-size: var(--type-base); }
   .view-bar { align-items: flex-start; flex-direction: column; gap: 10px; margin-top: 24px; }
