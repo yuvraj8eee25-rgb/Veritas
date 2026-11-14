@@ -4991,6 +4991,7 @@ body:has(#screen-auth.active) .mobile-tabbar { display: none; }
 }
 
 /* Live debate setup */
+#screen-multiplayer .page-header { width: min(100%, var(--form-width)); align-self: center; }
 #screen-multiplayer .page {
   max-width: var(--form-width);
   margin-inline: auto;
@@ -5053,7 +5054,8 @@ body:has(#screen-auth.active) .mobile-tabbar { display: none; }
 .home-start h1 { font-size: var(--type-xl); margin-block: var(--space-1); }
 .home-start p { margin: 0; color: var(--text-2); }
 .home-start .hero-greeting { color: var(--accent-text); }
-.home-start .btn-primary { padding-inline: var(--space-4); }
+.home-start .btn-primary, .home-resources .btn { padding-inline: var(--space-4); }
+.home-resources .btn { display: inline-flex; align-items: center; text-decoration: none; }
 .home-goal-grid, #home-mode-grid {
   width: 100%;
   display: grid;
