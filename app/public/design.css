@@ -4,12 +4,14 @@
   --surface: #151c2b;
   --surface-hi: #1b2438;
   --surface-flat: #131a26;
+  --inset: #0f1521;
   --edge-top: rgba(255, 255, 255, .07);
   --edge-bottom: rgba(0, 0, 0, .45);
   --accent: #6366f1;
   --accent-warm: #e8a33d;
   --text: #f1f3f8;
   --text-2: #9aa4b8;
+  --placeholder: #5f6b82;
   --radius: 14px;
   --radius-sm: 10px;
   --radius-pill: 999px;
@@ -65,6 +67,10 @@
   --color-live-rgb: 184, 169, 241;
   --raised-fill: linear-gradient(180deg, var(--surface-hi), var(--surface));
   --primary-fill: linear-gradient(180deg, color-mix(in srgb, var(--accent-primary) 90%, var(--white)), var(--accent-primary));
+  --form-width: 760px;
+  --inset-depth: inset 0 2px 4px rgba(0, 0, 0, .35);
+  --inset-edge: inset 0 0 0 1px rgba(255, 255, 255, .04);
+  --chevron: inset -2px -2px currentColor;
   --depth-shadow: 0 8px 24px rgba(0, 0, 0, .35);
   --selected-shadow: inset 0 0 0 2px var(--accent), 0 0 12px var(--accent-glow);
   --disabled-opacity: .55;
@@ -210,7 +216,7 @@ summary::after {
   height: 8px;
   margin-inline: var(--space-2);
   vertical-align: .15em;
-  box-shadow: inset -2px -2px 0 currentColor;
+  box-shadow: var(--chevron);
   transform: rotate(-45deg);
   transition: transform var(--dur-hover) var(--ease-out);
 }
@@ -225,3 +231,131 @@ details[open] > summary::after { transform: rotate(45deg); }
   }
   :is(.raised, .tile, .btn):is(:hover, :active) { transform: none !important; }
 }
+
+.page {
+  width: min(100%, var(--form-width));
+  margin-inline: auto;
+  padding-block: var(--space-7) var(--space-6);
+}
+
+.field {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.field-label { font-weight: var(--weight-heading); }
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: center;
+}
+
+.inset,
+input:not([type="hidden"], [type="checkbox"], [type="radio"], [type="file"]),
+textarea {
+  min-width: 0;
+  background: var(--inset);
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  box-shadow: var(--inset-depth), var(--inset-edge);
+}
+
+input:not([type="hidden"], [type="checkbox"], [type="radio"], [type="file"]):focus,
+textarea:focus,
+.choice-trigger:focus {
+  box-shadow: var(--inset-depth), inset 0 0 0 2px var(--accent);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--placeholder);
+  font-weight: var(--weight-body);
+  opacity: 1;
+}
+
+.segmented {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: var(--space-2);
+}
+
+.segmented button {
+  flex: 1 1 auto;
+  min-height: 44px;
+  padding: var(--space-2) var(--space-3);
+  color: var(--text-2);
+  font: inherit;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  box-shadow: none;
+}
+
+.segmented button[aria-checked="true"] {
+  color: var(--text);
+  background: var(--raised-fill);
+  box-shadow: var(--selected-shadow), 0 2px var(--edge-bottom);
+}
+
+.choice-trigger {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: var(--space-2) var(--space-3);
+  text-align: start;
+  font: inherit;
+}
+
+.choice-trigger::after {
+  content: "";
+  flex-shrink: 0;
+  width: var(--space-2);
+  height: var(--space-2);
+  margin: 0 var(--space-1) var(--space-1);
+  box-shadow: var(--chevron);
+  transform: rotate(45deg);
+}
+
+.choice-trigger[aria-expanded="true"]::after { transform: rotate(225deg); }
+
+.choice-options {
+  display: grid;
+  gap: var(--space-1);
+  max-height: 16rem;
+  overflow-y: auto;
+  padding: var(--space-2);
+}
+
+.choice-options[hidden] { display: none; }
+
+.choice-option {
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-2);
+  padding: var(--space-2) var(--space-3);
+  min-height: 44px;
+  text-align: start;
+  font: inherit;
+}
+
+.choice-option:is(:hover, :focus-visible, [aria-selected="true"]) {
+  background: var(--surface-hi);
+  color: var(--text);
+}
+
+.choice-option[aria-selected="true"] { box-shadow: var(--selected-shadow); }
+
+button.chip {
+  min-height: 36px;
+  background: var(--raised-fill);
+  color: var(--text);
+}
+
+button.chip[aria-pressed="true"] { background: var(--accent-soft); }
