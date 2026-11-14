@@ -60,19 +60,19 @@ const FALLBACK_TOPICS = [
 const PRIMARY_CATEGORIES = ["Tech", "Economics", "Policy", "Ethics"];
 
 const CATEGORY_COLORS = {
-  Tech:        { bg: "rgba(56,142,235,0.16)",  text: "#7fb4f0" },
-  Economics:   { bg: "rgba(99,153,34,0.18)",   text: "#9ecb6b" },
-  Policy:      { bg: "rgba(186,117,23,0.20)",  text: "#f0b95c" },
-  Ethics:      { bg: "rgba(127,119,221,0.20)", text: "#b3aaf2" },
-  Society:     { bg: "rgba(212,83,126,0.18)",  text: "#f095b1" },
-  Science:     { bg: "rgba(56,142,235,0.16)",  text: "#7fb4f0" },
-  Environment: { bg: "rgba(99,153,34,0.18)",   text: "#9ecb6b" },
-  Education:   { bg: "rgba(186,117,23,0.20)",  text: "#f0b95c" },
-  Work:        { bg: "rgba(136,135,128,0.20)", text: "#c2c0b6" },
-  Sports:      { bg: "rgba(216,90,48,0.20)",   text: "#f0997b" },
-  Culture:     { bg: "rgba(212,83,126,0.18)",  text: "#f095b1" }
+  Tech:        { bg: "color-mix(in srgb, var(--focus-blue) 15%, var(--surface))", text: "var(--focus-blue)" },
+  Economics:   { bg: "color-mix(in srgb, var(--success) 15%, var(--surface))", text: "var(--success)" },
+  Policy:      { bg: "color-mix(in srgb, var(--warning) 15%, var(--surface))", text: "var(--warning)" },
+  Ethics:      { bg: "color-mix(in srgb, var(--live) 15%, var(--surface))", text: "var(--live)" },
+  Society:     { bg: "color-mix(in srgb, var(--danger) 15%, var(--surface))", text: "var(--danger)" },
+  Science:     { bg: "color-mix(in srgb, var(--focus-blue) 15%, var(--surface))", text: "var(--focus-blue)" },
+  Environment: { bg: "color-mix(in srgb, var(--success) 15%, var(--surface))", text: "var(--success)" },
+  Education:   { bg: "color-mix(in srgb, var(--warning) 15%, var(--surface))", text: "var(--warning)" },
+  Work:        { bg: "color-mix(in srgb, var(--text-2) 15%, var(--surface))", text: "var(--text-2)" },
+  Sports:      { bg: "color-mix(in srgb, var(--accent-warm) 15%, var(--surface))", text: "var(--accent-warm)" },
+  Culture:     { bg: "color-mix(in srgb, var(--danger) 15%, var(--surface))", text: "var(--danger)" }
 };
-const DEFAULT_CATEGORY_COLOR = { bg: "rgba(136,135,128,0.20)", text: "#c2c0b6" };
+const DEFAULT_CATEGORY_COLOR = { bg: "color-mix(in srgb, var(--text-2) 15%, var(--surface))", text: "var(--text-2)" };
 
 let allHotTopics = [];       // last loaded topic list, unfiltered
 let activeCategory = "All";  // currently selected tab
@@ -326,7 +326,7 @@ function renderCategoryTabs() {
     const isActive = cat === activeCategory;
     const tab = document.createElement("button");
     tab.type = "button";
-    tab.className = "mp-tab" + (isActive ? " active" : "");
+    tab.className = "mp-tab tile" + (isActive ? " active" : "");
     tab.setAttribute("aria-pressed", String(isActive));
     tab.innerHTML = `${categoryIcon(cat)}<span>${escapeHtml(cat)}</span>`;
     tab.addEventListener("click", () => {
@@ -347,7 +347,7 @@ function renderHotTopics(topics, targetId = "mp-hot-topics") {
   listEl.innerHTML = "";
   if (!topics.length) {
     const empty = document.createElement("div");
-    empty.className = "hot-topics-empty";
+    empty.className = "hot-topics-empty flat";
     empty.textContent = "No topics in this category right now — try another tab, or just find a match for a random one.";
     listEl.appendChild(empty);
     return;
@@ -358,9 +358,9 @@ function renderHotTopics(topics, targetId = "mp-hot-topics") {
     const hasNews = typeof t.newsUrl === "string" && t.newsUrl.length > 0;
 
     const card = document.createElement("article");
-    card.className = "hot-topic-card";
+    card.className = "hot-topic-card flat";
     const btn = document.createElement("button");
-    btn.className = "hot-topic-item";
+    btn.className = "hot-topic-item tile";
     btn.type = "button";
     btn.dataset.topic = t.text;
     const isSelected = selectedTopic === t.text;
@@ -369,10 +369,10 @@ function renderHotTopics(topics, targetId = "mp-hot-topics") {
     btn.innerHTML = `
       <div class="hot-topic-body">
         <div class="hot-topic-head">
-          <span class="hot-topic-tag" style="background:${color.bg}; color:${color.text};">
+          <span class="hot-topic-tag chip" style="background:${color.bg}; color:${color.text};">
             ${escapeHtml(tag.toUpperCase())}
           </span>
-          ${hasNews ? `<span class="hot-topic-news-badge" title="Based on a real news story">${ICON_NEWS} LIVE</span>` : ""}
+          ${hasNews ? `<span class="hot-topic-news-badge chip" title="Based on a real news story">${ICON_NEWS} LIVE</span>` : ""}
         </div>
         <div class="hot-topic-title">${escapeHtml(t.text)}</div>
       <span class="hot-topic-action">${isSelected ? "Selected" : ""}</span>
@@ -816,7 +816,7 @@ function renderDebateRoom() {
   wrap.innerHTML = "";
   if (!turns.length) {
     const hint = document.createElement("div");
-    hint.className = "debate-bubble theirs";
+    hint.className = "debate-bubble theirs flat";
     hint.innerHTML = `<div class="debate-bubble-meta">Live match</div><div>${data.playerOrder[0] === myUid ? "Start strong — you have the first move." : "Opponent is about to begin the first argument."}</div>`;
     wrap.appendChild(hint);
   }
@@ -835,7 +835,7 @@ function renderDebateRoom() {
       spent !== null ? `took ${Math.round(spent)}s` : ""
     ].filter(Boolean).join(" · ");
     const bubble = document.createElement("div");
-    bubble.className = "debate-bubble " + (mine ? "mine" : "theirs");
+    bubble.className = "debate-bubble flat " + (mine ? "mine" : "theirs");
     bubble.id = `debate-turn-${i}`;
     if (!previousTurns.has(bubble.id)) bubble.classList.add("new-message");
     bubble.innerHTML = `<div class="debate-bubble-meta">${meta}</div><div>${escapeHtml(t.text)}</div>`;
@@ -852,7 +852,7 @@ function renderDebateRoom() {
 
   if (data.status !== "active") {
     pill.textContent = "Debate over";
-    pill.className = "debate-turn-pill";
+    pill.className = "debate-turn-pill flat";
     composer.classList.add("hidden");
     waiting.classList.add("hidden");
     const resign = document.getElementById("debate-resign-btn");
@@ -866,7 +866,7 @@ function renderDebateRoom() {
   const whoseTurnUid = data.playerOrder[data.turnIndex % 2];
   const myTurn = whoseTurnUid === myUid;
   pill.textContent = myTurn ? "Your turn" : `${opponentName}'s turn`;
-  pill.className = "debate-turn-pill " + (myTurn ? "mine" : "theirs");
+  pill.className = "debate-turn-pill flat " + (myTurn ? "mine" : "theirs");
   const status = document.getElementById("debate-live-status");
   if (status) { status.textContent = myTurn ? "Your turn — make your next argument." : `${opponentName}'s turn — waiting for their argument.`; status.dataset.state = myTurn ? "ready" : "waiting"; }
   composer.classList.toggle("hidden", !myTurn);
@@ -1227,10 +1227,10 @@ function renderRefereeVerdict() {
             const delta = newElo - initialElo;
             const sign = delta >= 0 ? "+" : "";
             eloChangeEl.textContent = `Rating: ${newElo} ELO (${sign}${delta})`;
-            eloChangeEl.className = "debate-elo-change " + (delta > 0 ? "gain" : delta < 0 ? "loss" : "");
+            eloChangeEl.className = "debate-elo-change chip " + (delta > 0 ? "gain" : delta < 0 ? "loss" : "");
           } else {
             eloChangeEl.textContent = `Rating: ${newElo} ELO`;
-            eloChangeEl.className = "debate-elo-change";
+            eloChangeEl.className = "debate-elo-change chip";
           }
           eloChangeEl.classList.remove("hidden");
         }

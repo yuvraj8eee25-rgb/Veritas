@@ -237,7 +237,7 @@ function startAiDebate() {
   document.getElementById("aidebate-topic-label").textContent = currentTopic;
   const stanceLabel = document.getElementById("aidebate-stance-label");
   stanceLabel.textContent = currentStance === "for" ? "FOR" : "AGAINST";
-  stanceLabel.className = "debate-turn-pill mine";
+  stanceLabel.className = "debate-turn-pill mine flat";
 
   window.DA.showScreen("ai-debate-room");
   renderTranscript();
@@ -329,7 +329,7 @@ function renderTranscript() {
   wrap.innerHTML = "";
   if (!transcript.length) {
     const hint = document.createElement("div");
-    hint.className = "debate-bubble theirs";
+    hint.className = "debate-bubble theirs flat";
     hint.innerHTML = `<div class="debate-bubble-meta">Debate the AI</div><div>Make your opening argument ${
       currentStance === "for" ? "in favor of" : "against"
     } the topic — you have ${MAX_USER_TURNS} turns.</div>`;
@@ -348,7 +348,7 @@ function renderTranscript() {
       typeof t.spent === "number" ? `took ${Math.round(t.spent)}s` : ""
     ].filter(Boolean).join(" · ");
     const bubble = document.createElement("div");
-    bubble.className = "debate-bubble " + (mine ? "mine" : "theirs");
+    bubble.className = "debate-bubble flat " + (mine ? "mine" : "theirs");
     bubble.id = `aidebate-turn-${i}`;
     if (!previousTurns.has(bubble.id)) bubble.classList.add("new-message");
     bubble.innerHTML = `<div class="debate-bubble-meta">${meta}</div><div>${escapeHtml(t.text)}</div>`;
@@ -400,7 +400,7 @@ function updateScoreboard() {
   }
   const pill = document.getElementById("aidebate-turn-pill");
   pill.textContent = debateOver ? "Debate over" : `Turn ${userTurnsSoFar + 1} of ${MAX_USER_TURNS}`;
-  pill.className = "debate-turn-pill " + (debateOver ? "" : "mine");
+  pill.className = "debate-turn-pill flat " + (debateOver ? "" : "mine");
   document.getElementById("aidebate-progress-fill").style.width =
     Math.min(100, (transcript.length / (MAX_USER_TURNS * 2)) * 100) + "%";
 }
@@ -631,7 +631,7 @@ function renderVerdict(verdict, usedFallback) {
   (turnFeedback || []).forEach((f) => {
     const original = transcript.filter(t => t.speaker === "user")[Number(f.turn) - 1];
     const item = document.createElement("div");
-    item.className = "aidebate-feedback-item";
+    item.className = "aidebate-feedback-item flat";
     item.innerHTML = `
       <span class="aidebate-feedback-turn">Your turn ${f.turn}</span>
       ${original ? `<details class="feedback-original"><summary>Review your argument</summary><blockquote>${escapeHtml(original.text)}</blockquote></details>` : ""}

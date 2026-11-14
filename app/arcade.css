@@ -1,6 +1,6 @@
 /* =========================================================
    VERITAS — Arcade Layer styles
-   Load after theme-horizon.css. Uses only existing tokens.
+   Uses the shared tokens in public/design.css.
    ========================================================= */
 
 /* ---------------------------------------------------------
@@ -16,45 +16,39 @@
   align-items: center;
   gap: 8px;
   padding: 7px 14px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--bg-panel);
-  border: 1px solid var(--line);
   opacity: 0.4;
   transition: opacity 0.2s var(--ease-out), border-color 0.2s, box-shadow 0.2s;
 }
 
 .combo-hud.live {
   opacity: 1;
-  border-color: var(--line-strong);
-  box-shadow: var(--shadow-glow);
 }
-
-.combo-hud[data-tier="2.5"] { box-shadow: 0 8px 26px rgba(255, 181, 71, 0.4); border-color: rgba(255, 181, 71, 0.5); }
-.combo-hud[data-tier="3"]   { box-shadow: 0 8px 30px rgba(238, 93, 80, 0.45); border-color: rgba(238, 93, 80, 0.55); }
 
 .combo-count {
   font-family: var(--font-display);
-  font-size: 1.05rem;
-  font-weight: 700;
+  font-size: var(--type-base);
+  font-weight: var(--weight-eyebrow);
   color: var(--ink);
   line-height: 1;
 }
 
-.combo-x { font-size: 0.72rem; color: var(--ink-mute); }
+.combo-x { font-size: var(--type-sm); color: var(--ink-mute); }
 
 .combo-mult {
   font-family: var(--font-display);
-  font-size: 0.9rem;
-  font-weight: 700;
-  color: var(--accent);
+  font-size: var(--type-base);
+  font-weight: var(--weight-eyebrow);
+  color: var(--accent-text);
 }
 
 .combo-hud[data-tier="2.5"] .combo-mult { color: var(--amber); }
 .combo-hud[data-tier="3"] .combo-mult { color: var(--magenta); }
 
 .combo-label {
-  font-size: 0.62rem;
-  font-weight: 700;
+  font-size: var(--type-sm);
+  font-weight: var(--weight-eyebrow);
   letter-spacing: 0.08em;
   color: var(--ink-mute);
 }
@@ -69,7 +63,7 @@
 }
 
 @keyframes combo-break {
-  0% { transform: translateX(0) scale(1); border-color: var(--magenta); }
+  0% { transform: translateX(0) scale(1); }
   25% { transform: translateX(-5px) scale(0.96); }
   55% { transform: translateX(4px) scale(0.98); }
   100% { transform: translateX(0) scale(1); }
@@ -84,14 +78,14 @@
   transform: translate(-50%, -50%);
   pointer-events: none;
   font-family: var(--font-display);
-  font-size: 1.35rem;
-  font-weight: 700;
+  font-size: var(--type-xl);
+  font-weight: var(--weight-eyebrow);
   color: var(--green);
-  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+  text-shadow: 0 2px 12px color-mix(in srgb, var(--black) 50%, transparent);
   animation: juice-rise 1s var(--ease-out) forwards;
 }
 
-.juice-pop.big { font-size: 1.9rem; color: var(--amber); }
+.juice-pop.big { font-size: var(--type-2xl); color: var(--amber); }
 .juice-pop.bad { color: var(--magenta); }
 
 @keyframes juice-rise {
@@ -128,7 +122,7 @@
   content: "";
   position: absolute;
   inset: 0;
-  background: rgba(255, 255, 255, 0.18);
+  background: color-mix(in srgb, var(--white) 18%, transparent);
   transform-origin: left;
   animation: advance-fill var(--advance-dur, 4000ms) linear forwards;
   pointer-events: none;
@@ -155,9 +149,9 @@
 
 .quest-tally {
   font-family: var(--font-display);
-  font-size: 0.82rem;
-  font-weight: 700;
-  color: var(--accent);
+  font-size: var(--type-sm);
+  font-weight: var(--weight-eyebrow);
+  color: var(--accent-text);
 }
 
 .quest-rows { display: flex; flex-direction: column; gap: 12px; }
@@ -174,39 +168,37 @@
   flex: none;
   display: grid;
   place-items: center;
-  border-radius: 50%;
-  border: 1.5px solid var(--line);
-  font-size: 0.7rem;
+  border-radius: var(--radius-circle);
+  font-size: var(--type-sm);
   color: transparent;
   transition: all var(--dur-hover);
 }
 
 .quest-row.done .quest-tick {
-  border-color: var(--green);
   background: var(--green);
-  color: #fff;
+  color: var(--white);
 }
 
 .quest-body { flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 
 .quest-text {
-  font-size: 0.83rem;
+  font-size: var(--type-sm);
   color: var(--ink);
-  font-weight: 500;
+  font-weight: var(--weight-heading);
 }
 
 .quest-row.done .quest-text { color: var(--ink-mute); text-decoration: line-through; }
 
 .quest-bar {
   height: 4px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(var(--ink-rgb), 0.08);
   overflow: hidden;
 }
 
 .quest-bar-fill {
   height: 100%;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--accent-grad, var(--accent));
   transition: width 0.6s var(--ease-out);
 }
@@ -215,8 +207,8 @@
 
 .quest-xp {
   font-family: var(--font-mono);
-  font-size: 0.75rem;
-  font-weight: 600;
+  font-size: var(--type-sm);
+  font-weight: var(--weight-heading);
   color: var(--ink-mute);
   flex: none;
 }
@@ -235,17 +227,16 @@
   gap: 8px;
   background: none;
   border: 0;
-  border-top: 1px solid var(--line);
   color: var(--ink-soft);
   font-family: var(--font-body);
-  font-size: 0.8rem;
-  font-weight: 600;
+  font-size: var(--type-sm);
+  font-weight: var(--weight-heading);
   cursor: pointer;
 }
 
 .ach-toggle svg { margin-left: auto; transition: transform var(--dur-hover); }
 .ach-toggle.open svg { transform: rotate(180deg); }
-.ach-tally { color: var(--ink-mute); font-weight: 500; }
+.ach-tally { color: var(--ink-mute); font-weight: var(--weight-heading); }
 
 .ach-grid {
   display: none;
@@ -260,7 +251,6 @@
   padding: 12px;
   border-radius: var(--radius-lg);
   background: var(--bg-muted);
-  border: 1px solid var(--line);
   display: flex;
   flex-direction: column;
   gap: 3px;
@@ -269,13 +259,12 @@
 
 .ach.got {
   opacity: 1;
-  border-color: var(--line-strong);
 }
 
-.ach-icon { font-size: 1.1rem; color: var(--ink-mute); }
-.ach.got .ach-icon { color: var(--accent); }
-.ach-name { font-size: 0.78rem; font-weight: 700; color: var(--ink); }
-.ach-desc { font-size: 0.7rem; color: var(--ink-mute); line-height: 1.35; }
+.ach-icon { font-size: var(--type-base); color: var(--ink-mute); }
+.ach.got .ach-icon { color: var(--accent-text); }
+.ach-name { font-size: var(--type-sm); font-weight: var(--weight-eyebrow); color: var(--ink); }
+.ach-desc { font-size: var(--type-sm); color: var(--ink-mute); line-height: 1.35; }
 
 @media (max-width: 640px) {
   .combo-hud { padding: 6px 11px; gap: 6px; }

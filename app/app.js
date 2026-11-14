@@ -555,7 +555,7 @@ function playLevelUp() {
 function toast(msg) {
   const root = document.getElementById("toast-root");
   const el = document.createElement("div");
-  el.className = "toast";
+  el.className = "toast flat";
   el.textContent = msg;
   root.appendChild(el);
   window.setTimeout(() => el.remove(), 2800);
@@ -635,6 +635,7 @@ const SKILL_KEYS = ["logic", "speed", "rhetoric", "analysis", "strategy"];
 
 function drawRadar(canvasEl, values, opts = {}) {
   const ctx = canvasEl.getContext("2d");
+  const tokens = getComputedStyle(canvasEl);
   const dpr = window.devicePixelRatio || 1;
   const parent = canvasEl.parentElement;
   const available = (parent && parent.clientWidth) ? parent.clientWidth - 8 : canvasEl.clientWidth || 280;
@@ -663,13 +664,13 @@ function drawRadar(canvasEl, values, opts = {}) {
       const y = cy + Math.sin(angle) * r;
       if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
     }
-    ctx.strokeStyle = "rgba(255,255,255,0.07)";
+    ctx.strokeStyle = tokens.getPropertyValue("--edge-top").trim();
     ctx.lineWidth = 1;
     ctx.stroke();
   }
 
-  ctx.font = "11px 'JetBrains Mono', monospace";
-  ctx.fillStyle = "rgba(154,161,184,0.9)";
+  ctx.font = `${tokens.getPropertyValue("--type-sm").trim()} ${tokens.getPropertyValue("--font-mono").trim()}`;
+  ctx.fillStyle = tokens.getPropertyValue("--text-2").trim();
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   for (let i = 0; i < n; i++) {
@@ -679,7 +680,7 @@ function drawRadar(canvasEl, values, opts = {}) {
     ctx.beginPath();
     ctx.moveTo(cx, cy);
     ctx.lineTo(x2, y2);
-    ctx.strokeStyle = "rgba(255,255,255,0.07)";
+    ctx.strokeStyle = tokens.getPropertyValue("--edge-top").trim();
     ctx.stroke();
 
     const lx = cx + Math.cos(angle) * (radius + 22);
@@ -698,11 +699,11 @@ function drawRadar(canvasEl, values, opts = {}) {
     if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
   }
   const grad = ctx.createLinearGradient(0, 0, size, size);
-  grad.addColorStop(0, "rgba(0,229,255,0.35)");
-  grad.addColorStop(1, "rgba(255,45,123,0.25)");
+  grad.addColorStop(0, tokens.getPropertyValue("--radar-fill-start").trim());
+  grad.addColorStop(1, tokens.getPropertyValue("--radar-fill-end").trim());
   ctx.fillStyle = grad;
   ctx.fill();
-  ctx.strokeStyle = "#00e5ff";
+  ctx.strokeStyle = tokens.getPropertyValue("--info").trim();
   ctx.lineWidth = 2;
   ctx.stroke();
 
@@ -714,7 +715,7 @@ function drawRadar(canvasEl, values, opts = {}) {
     const y = cy + Math.sin(angle) * r;
     ctx.beginPath();
     ctx.arc(x, y, 3, 0, Math.PI * 2);
-    ctx.fillStyle = "#ffffff";
+    ctx.fillStyle = tokens.getPropertyValue("--text").trim();
     ctx.fill();
   }
 }
@@ -799,7 +800,7 @@ function renderHome() {
   grid.innerHTML = "";
   Object.values(MODE_META).forEach(mode => {
     const card = document.createElement("button");
-    card.className = "mode-card";
+    card.className = "mode-card tile";
     card.dataset.mode = mode.key;
     const stats = state.modeStats[mode.key];
     card.innerHTML = `
@@ -808,7 +809,7 @@ function renderHome() {
         <h3>${mode.name}</h3>
         <p>${mode.desc}</p>
       </div>
-      ${stats ? `<span class="mode-card-tag">BEST ${stats.bestPct}%</span>` : `<span class="mode-card-tag">NEW</span>`}
+      ${stats ? `<span class="mode-card-tag chip">BEST ${stats.bestPct}%</span>` : `<span class="mode-card-tag chip">NEW</span>`}
     `;
     card.addEventListener("click", () => {
       playClick();
@@ -831,13 +832,13 @@ function renderHome() {
       const playCount = Math.max(0, Math.floor(Number(stats.plays) || 0));
       const bestPct = Math.max(0, Math.min(100, Math.round(Number(stats.bestPct) || 0)));
       highlight.innerHTML = `
-        <article class="practice-highlight">
+        <article class="practice-highlight raised">
           <div class="practice-highlight-copy">
             <span class="classroom-eyebrow">YOUR GO-TO DRILL</span>
             <h3></h3>
             <p></p>
           </div>
-          <button type="button" class="ghost-btn practice-highlight-action">Run again <span aria-hidden="true">↗</span></button>
+          <button type="button" class="ghost-btn practice-highlight-action btn">Run again <span aria-hidden="true">↗</span></button>
           <details class="practice-highlight-note">
             <summary>Why am I seeing this?</summary>
             <p>This is the practice drill you’ve completed most often. Your drill list below stays in the same order.</p>
@@ -937,7 +938,7 @@ function renderRecentActivity() {
         ? "Recent"
         : date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
       const row = document.createElement("div");
-      row.className = "activity-row";
+      row.className = "activity-row flat";
       const dateEl = document.createElement("span");
       dateEl.className = "activity-row-date";
       dateEl.textContent = dateLabel;
@@ -979,7 +980,7 @@ function renderRecentActivity() {
   list.innerHTML = days.map(day => {
     const count = state.activity[day];
     return `
-      <div class="activity-row">
+      <div class="activity-row flat">
         <span class="activity-row-date">${formatActivityDate(day)}</span>
         <span class="activity-row-desc">${count} run${count === 1 ? "" : "s"} completed</span>
       </div>
@@ -1019,7 +1020,7 @@ function openModeSelect(selectedKey) {
   diffs.forEach(d => {
     const label = d === "all" ? "All" : d[0].toUpperCase() + d.slice(1);
     const btn = document.createElement("button");
-    btn.className = "diff-pill" + (d === "all" ? " active" : "");
+    btn.className = "diff-pill tile" + (d === "all" ? " active" : "");
     btn.textContent = label;
     btn.addEventListener("click", () => {
       playClick();
@@ -1132,7 +1133,7 @@ function renderQuestion() {
 
   const tagEl = document.getElementById("q-difficulty");
   tagEl.textContent = q.difficulty.toUpperCase();
-  tagEl.className = "q-tag" + (q.difficulty === "medium" ? " med" : q.difficulty === "hard" ? " hard" : "");
+  tagEl.className = "q-tag chip" + (q.difficulty === "medium" ? " med" : q.difficulty === "hard" ? " hard" : "");
   document.getElementById("q-text").textContent = q.prompt;
 
   const optionsGrid = document.getElementById("options-grid");
@@ -1142,7 +1143,7 @@ function renderQuestion() {
     optionsGrid.classList.add("tf-grid");
     ["True", "False"].forEach((label, i) => {
       const btn = document.createElement("button");
-      btn.className = "option-btn";
+      btn.className = "option-btn tile";
       btn.innerHTML = `<span>${label}</span>`;
       btn.addEventListener("click", () => selectAnswer(i === 0));
       optionsGrid.appendChild(btn);
@@ -1152,7 +1153,7 @@ function renderQuestion() {
     const letters = ["A", "B", "C", "D"];
     shuffleArray(q.options.map((opt, originalIndex) => ({ opt, originalIndex }))).forEach(({ opt, originalIndex }, i) => {
       const btn = document.createElement("button");
-      btn.className = "option-btn";
+      btn.className = "option-btn tile";
       btn.innerHTML = `<span class="option-letter">${letters[i]}</span><span>${opt}</span>`;
       btn.dataset.answer = String(originalIndex);
       btn.addEventListener("click", () => selectAnswer(originalIndex));
@@ -1427,7 +1428,7 @@ function renderProfileWeek() {
   const total = recent.reduce((sum, day) => sum + day.count, 0);
   const previous = days.slice(0, 7).reduce((sum, day) => sum + day.count, 0);
   const peak = Math.max(1, ...recent.map(day => day.count));
-  chart.innerHTML = recent.map(({date, count}) => `<div class="profile-day"><span>${count}</span><div class="profile-day-track"><div style="height:${count / peak * 100}%"></div></div><span>${date.toLocaleDateString(undefined, {weekday:'short', timeZone:'UTC'})}</span></div>`).join('');
+  chart.innerHTML = recent.map(({date, count}) => `<div class="profile-day"><span>${count}</span><div class="profile-day-track flat"><div style="height:${count / peak * 100}%"></div></div><span>${date.toLocaleDateString(undefined, {weekday:'short', timeZone:'UTC'})}</span></div>`).join('');
   document.getElementById("profile-week-summary").textContent = total ? `${total} sessions · ${recent.filter(day => day.count > 0).length} active days · ${total === previous ? 'same as' : Math.abs(total - previous) + (total > previous ? ' more than' : ' fewer than')} the previous seven days.` : 'Your next completed session starts this week’s chart.';
 }
 
@@ -1538,7 +1539,7 @@ function renderProfile() {
     const unlocked = b.cond(state);
     if (unlocked) unlockedCount++;
     const el = document.createElement("div");
-    el.className = "badge-item" + (unlocked ? " unlocked" : "");
+    el.className = "badge-item flat" + (unlocked ? " unlocked" : "");
     el.title = b.name;
     el.innerHTML = unlocked
       ? `<span style="font-size:20px">${b.icon}</span>`
@@ -1609,7 +1610,7 @@ function renderXpLeaderboard(list) {
 
   mockScores.forEach((row, i) => {
     const el = document.createElement("div");
-    el.className = "lb-row" + (row.self ? " self" : "");
+    el.className = "lb-row flat" + (row.self ? " self" : "");
     el.style.animationDelay = (i * 0.03) + "s";
     const initials = row.name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
     el.innerHTML = `
@@ -1628,7 +1629,7 @@ function renderXpLeaderboard(list) {
 async function renderEloLeaderboard(list) {
   // Show a loading hint while we fetch
   const loadEl = document.createElement("div");
-  loadEl.className = "lb-row";
+  loadEl.className = "lb-row flat";
   loadEl.style.opacity = "0.5";
   loadEl.innerHTML = `<span style="font-size:0.85rem;padding:1rem 0">Loading live ratings…</span>`;
   list.appendChild(loadEl);
@@ -1655,7 +1656,7 @@ async function renderEloLeaderboard(list) {
       const initials = name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
       const record = `${row.wins || 0}W / ${row.losses || 0}L / ${row.ties || 0}T`;
       const el = document.createElement("div");
-      el.className = "lb-row" + (isSelf ? " self" : "");
+      el.className = "lb-row flat" + (isSelf ? " self" : "");
       el.style.animationDelay = (i * 0.03) + "s";
       el.innerHTML = `
         <span class="lb-rank">${i + 1}</span>
@@ -1869,7 +1870,7 @@ function setupAuthEventListeners() {
 
   function showAlert(msg, type = "error") {
     alertEl.textContent = msg;
-    alertEl.className = `auth-alert ${type}`;
+    alertEl.className = `auth-alert ${type} flat`;
     alertEl.classList.remove("hidden");
   }
 
@@ -1977,7 +1978,7 @@ function setupAuthEventListeners() {
   function showForgotAlert(msg, type = "error") {
     if (!forgotAlertEl) return;
     forgotAlertEl.textContent = msg;
-    forgotAlertEl.className = `auth-alert ${type}`;
+    forgotAlertEl.className = `auth-alert ${type} flat`;
     forgotAlertEl.classList.remove("hidden");
   }
 
@@ -2045,7 +2046,7 @@ function setupAuthEventListeners() {
   function showResetAlert(msg, type = "error") {
     if (!resetAlertEl) return;
     resetAlertEl.textContent = msg;
-    resetAlertEl.className = `auth-alert ${type}`;
+    resetAlertEl.className = `auth-alert ${type} flat`;
     resetAlertEl.classList.remove("hidden");
   }
 

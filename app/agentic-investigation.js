@@ -1063,23 +1063,23 @@ function updateUIOnTrace(state, event) {
   if (traceList) {
     if (event.type === "step_start") {
       const stepCard = document.createElement("div");
-      stepCard.className = "trace-step-card running";
+      stepCard.className = "trace-step-card running flat";
       stepCard.id = `trace-step-${event.step}`;
       stepCard.innerHTML = `
         <div class="trace-step-header">
           <span class="trace-step-num">Step ${event.step}</span>
-          <span class="trace-tool-tag">${escapeHtml(formatToolLabel(event.tool))}</span>
+          <span class="trace-tool-tag chip">${escapeHtml(formatToolLabel(event.tool))}</span>
           <span class="trace-status-pill running">EXECUTING</span>
         </div>
         <p class="trace-reason"><strong>Objective:</strong> ${escapeHtml(event.reason)}</p>
-        <div class="trace-output-box">Processing phase...</div>
+        <div class="trace-output-box flat">Processing phase...</div>
       `;
       traceList.appendChild(stepCard);
       traceList.scrollTop = traceList.scrollHeight;
     } else if (event.type === "step_complete") {
       const stepCard = document.getElementById(`trace-step-${event.step}`);
       if (stepCard) {
-        stepCard.className = "trace-step-card completed";
+        stepCard.className = "trace-step-card completed flat";
         const statusPill = stepCard.querySelector(".trace-status-pill");
         if (statusPill) {
           statusPill.textContent = event.tool === "final_verification" ? "VERIFIED" : "COMPLETE";
@@ -1092,11 +1092,11 @@ function updateUIOnTrace(state, event) {
       }
     } else if (event.type === "adaptation") {
       const adaptCard = document.createElement("div");
-      adaptCard.className = "trace-step-card adaptation-card";
+      adaptCard.className = "trace-step-card adaptation-card flat";
       adaptCard.innerHTML = `
         <div class="trace-step-header">
           <span class="trace-adaptation-pill">⚡ STRATEGY RE-PLANNING</span>
-          <span class="trace-tool-tag">${escapeHtml(formatToolLabel(event.tool))}</span>
+          <span class="trace-tool-tag chip">${escapeHtml(formatToolLabel(event.tool))}</span>
         </div>
         <h4 class="adaptation-title">${escapeHtml(event.title)}</h4>
         <p class="adaptation-desc">${escapeHtml(event.description)}</p>
@@ -1131,7 +1131,7 @@ function updateUIOnTrace(state, event) {
       }
     } catch (_) { /* Unusable URLs remain plain text. */ }
     return `
-      <div class="evidence-item ${cls}">
+      <div class="evidence-item ${cls} flat">
         <div class="evidence-source-row">
           <strong class="evidence-source">${escapeHtml(item.title)}</strong>
         </div>
@@ -1189,9 +1189,6 @@ function updateUIOnTrace(state, event) {
       const verdictBadge = document.getElementById("agent-verdict-badge");
       if (verdictBadge) {
         verdictBadge.textContent = verdict.toUpperCase();
-        verdictBadge.style.background = isSupported ? "rgba(82,160,119,0.18)" : isPartial ? "rgba(224,159,62,0.18)" : "rgba(217,107,82,0.18)";
-        verdictBadge.style.color      = isSupported ? "var(--green)" : isPartial ? "var(--amber)" : "var(--magenta)";
-        verdictBadge.style.borderColor= isSupported ? "var(--green)" : isPartial ? "var(--amber)" : "var(--magenta)";
       }
 
       document.getElementById("agent-verdict-confidence").textContent = `${conf}% Confidence`;
@@ -1236,7 +1233,7 @@ function updateUIOnTrace(state, event) {
           const stance = s.assessment ? (stanceLabel[s.assessment.stance] || s.assessment.stance) : "unassessed";
           return `
           <li style="animation-delay:${i * 0.07}s">
-            <a href="${escapeHtml(s.url)}" target="_blank" rel="noopener" class="source-link">
+            <a href="${escapeHtml(s.url)}" target="_blank" rel="noopener" class="source-link btn">
               <span>${escapeHtml(s.title)}</span>
               <span style="margin-left:auto;white-space:nowrap;opacity:0.6;font-family:var(--font-mono);font-size:0.72rem;">${escapeHtml(stance)} \u00b7 ${Math.round(s.authority * 100)}% authority</span>
             </a>

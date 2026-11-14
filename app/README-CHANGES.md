@@ -1,9 +1,7 @@
 # What changed
 
 ## New files
-- `theme-horizon.css` — Navy Violet theme. Overrides the token layer in
-  `styles.css`; your original CSS is untouched. Remove the one `<link>`
-  in `index.html` to revert the whole look.
+- `public/design.css` shares design tokens, surfaces, and interaction states across the app and its public pages.
 - `arcade.css` / `arcade.js` — combo chains, daily goals, achievements,
   and the juice effects. `arcade.js` loads **before** `app.js` and
   exposes `window.Arcade`.

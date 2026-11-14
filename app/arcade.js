@@ -114,7 +114,9 @@ window.Arcade = (function () {
     canvas.height = window.innerHeight;
     document.body.appendChild(canvas);
     const ctx = canvas.getContext("2d");
-    const colors = ["#7c5cfc", "#4318ff", "#39b8ff", "#01b574", "#ffb547"];
+    const tokens = getComputedStyle(document.documentElement);
+    const colors = ["--accent", "--live", "--focus-blue", "--success", "--accent-warm"]
+      .map(name => tokens.getPropertyValue(name).trim());
     const n = count || 90;
     const bits = [];
     for (let i = 0; i < n; i++) {
@@ -263,7 +265,7 @@ window.Arcade = (function () {
       const doneCount = defs.filter(d => q.done.indexOf(d.id) !== -1).length;
 
       container.innerHTML = `
-        <div class="quest-card glass-card">
+        <div class="quest-card glass-card flat">
           <div class="quest-head">
             <h2 class="section-heading">Today's goals</h2>
             <span class="quest-tally">${doneCount}/3</span>
