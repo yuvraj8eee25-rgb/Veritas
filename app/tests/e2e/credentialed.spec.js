@@ -9,7 +9,8 @@ test.skip(!configured, "Requires a dedicated, disposable Veritas test project wi
 
 async function login(page, email, password) {
   await page.goto("/");
-  await expect(page.locator("#screen-auth")).toHaveClass(/active/, { timeout: 10_000 });
+  await page.locator("#screen-home.active .guest-banner-btn").click();
+  await page.getByRole("button", { name: "Log In", exact: true }).first().click();
   await page.locator("#auth-email").fill(email);
   await page.locator("#auth-password").fill(password);
   await page.getByRole("button", { name: "Log In" }).last().click();

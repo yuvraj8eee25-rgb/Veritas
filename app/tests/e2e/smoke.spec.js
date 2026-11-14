@@ -19,10 +19,16 @@ async function mockSupabase(page) {
   await page.route("**/storage/v1/**", async route => route.fulfill({ json: {} }));
 }
 
-async function signIn(page) {
+async function openSignIn(page) {
   await mockSupabase(page);
   await page.goto("/");
-  await expect(page.locator("#screen-auth")).toHaveClass(/active/, { timeout: 8_000 });
+  await page.locator("#screen-home.active .guest-banner-btn").click();
+  await page.getByRole("button", { name: "Log In", exact: true }).first().click();
+  await expect(page.locator("#screen-auth")).toHaveClass(/active/);
+}
+
+async function signIn(page) {
+  await openSignIn(page);
   await page.locator("#auth-email").fill("tester@example.invalid");
   await page.locator("#auth-password").fill("not-a-real-password");
   await page.getByRole("button", { name: "Log In" }).last().click();
@@ -30,14 +36,13 @@ async function signIn(page) {
 }
 
 async function expectAccessible(page, name) {
+  await expect(page.locator(".screen.exit")).toHaveCount(0);
   const result = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
   expect(result.violations, `${name}: ${result.violations.map(v => `${v.id}: ${v.help}`).join("; ")}`).toEqual([]);
 }
 
 test("sign-in validation, successful mocked sign-in, and offline practice persistence", async ({ page }) => {
-  await mockSupabase(page);
-  await page.goto("/");
-  await expect(page.locator("#screen-auth")).toHaveClass(/active/, { timeout: 8_000 });
+  await openSignIn(page);
   await page.getByRole("button", { name: "Log In" }).last().click();
   await expect(page.locator("#auth-alert")).toContainText("Please enter both email and password");
   await expectAccessible(page, "sign-in");
@@ -54,10 +59,8 @@ test("sign-in validation, successful mocked sign-in, and offline practice persis
 });
 
 test("auth card stays centered when the app sidebar is hidden", async ({ page }) => {
-  await mockSupabase(page);
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto("/");
-  await expect(page.locator("#screen-auth")).toHaveClass(/active/, { timeout: 8_000 });
+  await openSignIn(page);
 
   const alignment = await page.locator(".auth-card").evaluate(element => {
     const rect = element.getBoundingClientRect();
@@ -73,8 +76,24 @@ test("major debate, evidence, and Classroom screens pass automated accessibility
     await expect(page.locator(`#screen-${screen}`)).toHaveClass(/active/);
     if (screen === "classroom") await expect(page.locator("#screen-classroom .classroom-wrap")).toContainText("Classroom");
     await expectAccessible(page, screen);
+    if (screen === "ai-debate") {
+      const start = page.locator("#aidebate-start-btn");
+      await expect(start).toBeDisabled();
+      await page.getByRole("button", { name: "School homework" }).click();
+      await expect(start).toBeEnabled();
+      await page.locator("#aidebate-topic-input").fill("   ");
+      await expect(start).toBeDisabled();
+    }
+    if (screen === "investigation") {
+      const start = page.locator("#agent-start-btn");
+      await expect(start).toBeDisabled();
+      await page.getByRole("button", { name: "Nuclear Energy" }).click();
+      await expect(start).toBeEnabled();
+      await page.locator("#agent-claim-input").clear();
+      await expect(start).toBeDisabled();
+    }
     if (screen === "classroom") {
-      await page.getByRole("button", { name: "Create cohort" }).click();
+      await page.getByRole("button", { name: "Create a classroom" }).click();
       await expect(page.locator(".cw-dialog")).toBeVisible();
       await expectAccessible(page, "Classroom create dialog");
       await page.keyboard.press("Escape");
