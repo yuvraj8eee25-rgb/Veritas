@@ -143,6 +143,8 @@ function pickRandomTopic() {
 }
 
 function updateSetupSummary() {
+  const topic = document.getElementById("aidebate-topic-input");
+  document.getElementById("aidebate-start-btn").disabled = !topic.value.trim();
   const summary = document.getElementById("aidebate-setup-summary");
   if (!summary) return;
   const bot = BOTS[currentBot]?.name || "The Rival";

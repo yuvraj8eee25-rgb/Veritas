@@ -1300,7 +1300,7 @@ async function startInvestigationUI() {
   } finally {
     isRunning = false;
     if (btn) {
-      btn.disabled = false;
+      btn.disabled = !claimInput?.value.trim();
       btn.textContent = "Investigate this claim";
     }
   }
@@ -1313,6 +1313,12 @@ function initAgentEventListeners() {
   const outputHeader = document.querySelector(".agent-output-panel .agent-panel-header");
   if (verdictCard && outputHeader) outputHeader.after(verdictCard);
   const startBtn = document.getElementById("agent-start-btn");
+  const claimInput = document.getElementById("agent-claim-input");
+  function updateStartAvailability() {
+    if (startBtn) startBtn.disabled = isRunning || !claimInput?.value.trim();
+  }
+  updateStartAvailability();
+  claimInput?.addEventListener("input", updateStartAvailability);
   if (startBtn) {
     startBtn.addEventListener("click", startInvestigationUI);
   }
@@ -1321,8 +1327,8 @@ function initAgentEventListeners() {
     chip.addEventListener("click", (e) => {
       if (window.DA && window.DA.playClick) window.DA.playClick();
       const claim = e.target.getAttribute("data-claim");
-      const input = document.getElementById("agent-claim-input");
-      if (input && claim) input.value = claim;
+      if (claimInput && claim) claimInput.value = claim;
+      updateStartAvailability();
     });
   });
 
@@ -1345,7 +1351,6 @@ function initAgentEventListeners() {
     });
   }
 
-  const claimInput = document.getElementById("agent-claim-input");
   if (claimInput) {
     claimInput.addEventListener("keydown", (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {

@@ -420,6 +420,7 @@ function selectTopic(text) {
     if (input) input.value = text;
     browseForAiDebate = false;
     window.DA.showScreen("ai-debate");
+    input?.dispatchEvent(new Event("input", { bubbles: true }));
     input?.focus({ preventScroll: true });
     return;
   }
