@@ -19,9 +19,19 @@ describe("local practice progress", () => {
     expect(loadProgress(memoryStorage({ [STORAGE_KEY]: "{" }))).toEqual(defaultState());
     expect(normalizeProgress({ skills: null, achievements: "bad", activity: [] })).toEqual(defaultState());
   });
-  it("saves progress under the unchanged storage key", () => {
+  it("saves guest progress without overwriting another account", () => {
     const storage = memoryStorage();
     expect(saveProgress({ totalXp: 30 }, storage)).toBe(true);
-    expect(JSON.parse(storage.map.get(STORAGE_KEY)).totalXp).toBe(30);
+    expect(loadProgress(storage, "guest").totalXp).toBe(30);
+    expect(loadProgress(storage, "account-a").totalXp).toBe(0);
+    saveProgress({ totalXp: 80 }, storage, "account-a");
+    expect(loadProgress(storage, "account-a").totalXp).toBe(80);
+    expect(loadProgress(storage, "guest").totalXp).toBe(30);
+    expect(loadProgress(storage, "account-b").totalXp).toBe(0);
+  });
+  it("does not attach ambiguous historical progress to a signed-in account", () => {
+    const storage = memoryStorage({ [STORAGE_KEY]: JSON.stringify({ totalXp: 500 }) });
+    expect(loadProgress(storage, "account-a").totalXp).toBe(0);
+    expect(loadProgress(storage, "guest").totalXp).toBe(500);
   });
 });

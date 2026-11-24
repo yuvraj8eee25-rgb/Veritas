@@ -1,6 +1,6 @@
 # Evidence Lab
 
-The React Evidence Lab keeps the submitted claim with its results. It searches OpenAlex for research papers in parallel with Exa's neutral web search, then uses Exa to look for counterevidence and original records. The OpenAlex lookup uses one of the five search calls available per investigation. The remaining slot can be used for Tavily recovery, an official legal search, or a follow-up on an unresolved proposition or missing challenge. Tavily limits the Indian-law fallback to official legislative and court domains. The activity log lists providers, attempted queries, failures and empty results. It shows how many OpenAlex papers included usable abstract text. An OpenAlex error leaves the existing web search and assessment flow available.
+The React Evidence Lab starts with a debate motion. **Check a specific claim** optionally narrows the search. It searches OpenAlex and Exa in parallel, then looks for evidence on up to two factual questions behind the motion or looks for counterevidence and original records for a specific claim. The five-call budget includes the OpenAlex lookup and allows for Tavily recovery, an official legal search, or a follow-up on a gap. **Search activity** lists providers, queries, failures and empty results.
 
 A retrieved source, its saved passage and the underlying evidence record have separate identities. Tracking variants count as one web page. Papers are deduplicated by DOI or OpenAlex work ID. A record counts once even when multiple sources report it. Sources whose relationship to a primary record could not be verified are available to read but cannot influence the verdict.
 
@@ -8,13 +8,17 @@ OpenAlex supplies titles, authors, dates, identifiers and available abstracts. T
 
 The assessment checks whether an exact quotation appears in the saved excerpt and whether the quotation in context supports the interpretation and its stated scope. Paper citations show the title, available authors and year, the exact supporting excerpt and links to the DOI or paper page and the OpenAlex record when distinct. The citation and summary identify abstract text. Web citations continue to link to their original pages. Validated findings supply the evidence summary and comparison.
 
-A directional verdict requires at least two verified independent records with direct, credible findings for each checked proposition. Direct findings that materially disagree on the same proposition produce a mixed result. Indirect outcomes, weak evidence, an unresolved proposition or an incomplete claim scope can leave the result insufficient. Policy questions show factual premises and trade-offs and leave the policy decision to the reader.
+Results lead with up to three sources with usable excerpts and keep the full source list below the analysis. Motion research groups findings by question. A specific claim groups findings by whether they support, challenge, or provide context for the claim. If analysis is unavailable, students can read the available passages and retry reading those same excerpts.
 
-When the initial assessment is unavailable, pages remain browsable and the verdict and findings are withheld. Retry assessment uses the saved claim and exact excerpts. A failed follow-up assessment keeps the last validated evidence and shows the additional pages as unassessed.
+**Use this quote** preselects an exact passage. Students can choose different wording from the retrieved text, add optional notes, practise immediately, or save for later. Saved quotes keep the citation and excerpt label together and belong to the signed-in account in the current browser tab. They survive a refresh in that tab.
+
+**Practice with this quote** opens a written round in Debate AI. Choose a side, submit an argument, answer one challenge by revising it, then compare the wording in both versions. **Back to Evidence Lab** keeps the search results and **Resume quote practice** restores the current round and both drafts. The `evidence_challenge` and `evidence_feedback` actions check quoted spans against the submitted text before displaying the response. The round uses the existing `ai-debate` function and Gemini configuration, with no database migration.
 
 ## OpenAlex configuration
 
-The authenticated Supabase `exa-search` Edge Function calls OpenAlex. Set `OPENALEX_API_KEY` in the project's Edge Function secrets for higher limits. For local Supabase development, put it in the private environment file passed to the functions runtime. OpenAlex permits basic requests without a key under a smaller shared budget. No browser environment variable or database migration is required. [OpenAlex authentication](https://help.openalex.org/api/authentication/)
+The authenticated Supabase `exa-search` Edge Function calls OpenAlex. Set `OPENALEX_API_KEY` in the project's Edge Function secrets to use a verified account's higher limits. For local Supabase development, put it in the private environment file passed to the functions runtime. Keyless queries have a lower limit. If OpenAlex reaches its limit, Evidence Lab continues searching and assessing web sources. The results flag the unavailable paper search, and **Search activity** shows the provider error and request reference. [OpenAlex authentication](https://help.openalex.org/api/authentication/)
+
+Use the current `assess-evidence` function alongside `exa-search`. The current assessment response identifies support for OpenAlex abstracts. When the React app is connected to an older assessor, it keeps validated web findings and leaves the abstracts available to read and quote without showing them as assessed.
 
 ## Verification
 
@@ -24,8 +28,8 @@ The [FEVER dataset examples](https://fever.ai/dataset/fever.html) and the [FEVER
 
 ## Live validation
 
-Deploy the updated `exa-search` and `assess-evidence` Edge Functions before validating the React app against providers. The version 2 assessment actions are separate from the original Vite actions. Gemini selects a passage index, and the Edge Function copies the quotation directly from the retained excerpt before auditing the interpretation. This avoids failures caused by the model transcribing punctuation or formatting differently.
+Use preview deployments of `exa-search`, `assess-evidence` and `ai-debate` before validating the React app against live providers. The version 2 assessment actions are separate from the original Vite actions. Gemini selects a passage index, and the Edge Function copies the quotation directly from the retained excerpt before auditing the interpretation.
 
-For a signed-in smoke test, run a neutral investigation and open a citation. Check the trace for any failed search directions or partial coverage. When retrying a failed assessment, confirm that the existing sources remain visible and that the retry uses the saved excerpts. The fixtures do not measure provider latency or general verdict accuracy.
+For a signed-in smoke test, select a passage that explicitly reports an association. Build a card and submit an argument that overstates the result as causal. Check that the AI challenges the overstatement, then revise the argument to preserve the scope and report the association. Check that citation feedback identifies the original wording and the exact passage. For a pilot, use the same rubric across comparable rounds and track unsupported claims and citation accuracy.
 
 The exact-quote and scope checks are conservative. An otherwise relevant paraphrase, alternate population label or record with insufficient identity metadata may remain unweighted. Review the excerpt and its original context before drawing a conclusion.

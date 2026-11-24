@@ -1,151 +1,81 @@
-import { ArrowRight, BookOpen, Clock3, Flame, GraduationCap, MessageSquare, Search, Swords, Zap } from "lucide-react";
-import { practiceModeInfo, practiceModes, type PracticeMode, type PracticeModeInfo } from "../practice-questions";
+import { useEffect, useState } from "react";
+import { BookOpen, GraduationCap, MessageSquareText, Target } from "lucide-react";
+import ReasoningDiagram from "../../components/ReasoningDiagram";
+import { auth } from "../../lib/supabase";
+import { nextClassroomTask, type HomeAssignment } from "../../lib/home-assignment";
+import { readStudyStore } from "../../lib/study-storage";
+import { practiceModeInfo, type PracticeMode } from "../practice-questions";
 import type { Destination } from "../../components/AppShell";
-import type { Assignment } from "../Classroom";
-
-const modeDetails = {
-  fallacy: { icon: Search, skill: "Evidence and logic", duration: "About 4 minutes" },
-  rebuttal: { icon: MessageSquare, skill: "Rebuttals", duration: "About 5 minutes" },
-  speed: { icon: Zap, skill: "Quick thinking", duration: "About 2 minutes" },
-  steelman: { icon: Swords, skill: "Steelmanning", duration: "About 5 minutes" },
-};
 
 type HomeState = {
-  progress: {
-    totalXp: number;
-    totalRuns: number;
-    activity: Record<string, number>;
-    skills: Record<string, number>;
-    assessments: Record<string, { skill: string }>;
-  };
-  recommendedMode: PracticeMode;
-  recentMode?: PracticeMode;
-  favoriteMode: PracticeModeInfo | null;
-  favoriteBest: number;
-  favoritePlays: number;
-  homeSkillRows: { key: string; label: string }[];
-  guestMode: boolean;
-  isSupabaseConfigured: boolean;
-  pendingAssignmentResult: { assignment: Assignment; content: string; activity: Record<string, unknown> } | null;
-  submitAssignedResult: (assignment: Assignment, content: string, activity: Record<string, unknown>) => Promise<unknown>;
-  notice: string;
-  dismissNotice: () => void;
-  openPractice: (id: PracticeMode) => void;
-  openAccount: () => void;
-  navigate: (destination: Destination) => void;
+  progress: Record<string, any>; recommendedMode: PracticeMode; recentMode?: PracticeMode;
+  favoriteMode: { id: PracticeMode; name: string } | null; favoritePlays: number; favoriteBest: number;
+  rank: string; nextRank?: number; pct: number; guestMode: boolean; isSupabaseConfigured: boolean;
+  notice: string; homeSkillRows: { key: string; label: string }[];
+  pendingAssignmentResult: any; submitAssignedResult: (assignment: any, content: string, activity: any) => Promise<unknown>;
+  resumeSession: { mode: PracticeMode; questionIndex: number; questions: unknown[]; baseline?: boolean; daily: boolean } | null;
+  dismissNotice: () => void; discardResume: () => void; resumePractice: () => void; startBaseline: (id: PracticeMode) => void;
+  openPractice: (id: PracticeMode) => void; openAccount: () => void; navigate: (destination: Destination) => void;
+  dailyDone: boolean; dailyModeInfo: { name: string }; countdown: string; sessionEmail: string | null; sessionAccountId: string | null; displayName: string | null;
 };
 
 export default function HomeScreen({ state }: { state: HomeState }) {
-  const {
-    progress, recommendedMode, recentMode, favoriteMode, favoriteBest, favoritePlays, homeSkillRows,
-    guestMode, isSupabaseConfigured, pendingAssignmentResult, submitAssignedResult, notice,
-    dismissNotice, openPractice, openAccount, navigate,
-  } = state;
-  const assessed = new Set(Object.values(progress.assessments).map(record => record.skill));
-  const recommendation = practiceModeInfo(assessed.size ? recommendedMode : "fallacy");
-  const details = modeDetails[recommendation.id];
-  const unassessed = !assessed.has(recommendation.skill);
-  const reason = assessed.size === 0
-    ? "Start by spotting the gap between a claim and the reasoning behind it. Your answers will give you a baseline for future practice."
-    : unassessed
-      ? `You haven’t completed an assessed drill for ${details.skill.toLowerCase()} yet. This session gives you a baseline.`
-      : `Your saved practice puts ${details.skill.toLowerCase()} among the skills with the most room to improve.`;
-  const recentDays = Object.entries(progress.activity).sort(([a], [b]) => b.localeCompare(a)).slice(0, 3);
-
-  return (
-    <div className="home-workspace">
-      <header className="home-heading">
-        <h1 className="workspace-page-title">Practice workspace</h1>
-        <p className="workspace-lead">Build your skills one argument at a time.</p>
-      </header>
-
-      <section className="home-recommendation" aria-labelledby="next-practice-title">
-        <div>
-          <p className="workspace-caption">Recommended practice</p>
-          <h2 id="next-practice-title">{recommendation.name}</h2>
-          <p>{reason}</p>
-          <div className="home-recommendation-meta">
-            <span><Clock3 size={16} aria-hidden="true" />{details.duration}</span>
-            <span>{details.skill}</span>
-          </div>
-          <button type="button" className="workspace-primary" onClick={() => openPractice(recommendation.id)}>
-            Set up {recommendation.name}<ArrowRight size={17} aria-hidden="true" />
-          </button>
-        </div>
-        <aside className="home-practice-preview">
-          <details.icon size={24} strokeWidth={1.5} aria-hidden="true" />
-          <h3>What you’ll practise</h3>
-          <p>{recommendation.description}</p>
-          <span>Up to 8 questions with feedback</span>
-        </aside>
-      </section>
-
-      <div className="home-review">
-        <section aria-labelledby="home-progress-title">
-          <h2 id="home-progress-title">Your practice progress</h2>
-          {progress.totalRuns === 0 && assessed.size === 0 && progress.totalXp === 0 ? (
-            <div className="workspace-empty">
-              <strong>No assessed practice yet</strong>
-              <p>Finish your first drill to see an estimate based on your answers. Fresh questions and later reviews update each skill.</p>
-            </div>
-          ) : (
-            <>
-              <p className="workspace-meta">All time on this device · {progress.totalRuns} completed {progress.totalRuns === 1 ? "run" : "runs"} · {progress.totalXp.toLocaleString()} earned XP</p>
-              <p className="workspace-meta">Mastery estimates use fresh drill answers and later reviews across difficulty levels.</p>
-              <ul className="home-skill-list">
-                {homeSkillRows.map(({ key, label }) => (
-                  <li key={key}><span>{label}</span><strong>{assessed.has(key) ? `${Math.round(progress.skills[key] || 0)}% estimated` : "Not assessed"}</strong></li>
-                ))}
-              </ul>
-            </>
-          )}
-        </section>
-        <section aria-labelledby="home-activity-title">
-          <h2 id="home-activity-title">Recent practice</h2>
-          {recentDays.length ? (
-            <ul className="home-skill-list">{recentDays.map(([day, count]) => (
-              <li key={day}><time dateTime={day}>{new Date(`${day}T12:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</time>
-                <strong>{count} completed {count === 1 ? "run" : "runs"}</strong></li>
-            ))}</ul>
-          ) : <div className="workspace-empty"><strong>No recent sessions</strong><p>Completed practice sessions will appear here.</p></div>}
-          {recentMode && <button className="workspace-text-action" onClick={() => openPractice(recentMode)}>Practise {practiceModeInfo(recentMode).name} again <ArrowRight size={15} /></button>}
-          {favoriteMode && favoriteMode.id !== recentMode && (
-            <button className="workspace-text-action" onClick={() => openPractice(favoriteMode.id)}>
-              {favoriteMode.name} · {favoritePlays} runs, {favoriteBest}% best accuracy <ArrowRight size={15} />
-            </button>
-          )}
-        </section>
+  const { progress, recommendedMode, favoriteMode, favoriteBest, guestMode,
+    pendingAssignmentResult, submitAssignedResult, resumeSession, dismissNotice, discardResume,
+    resumePractice, startBaseline, openAccount, navigate, notice, sessionAccountId } = state;
+  const suggested = practiceModeInfo(recommendedMode);
+  const hasProgress = progress.totalRuns > 0;
+  const [task, setTask] = useState<HomeAssignment | null>(null);
+  const [classroomUnavailable, setClassroomUnavailable] = useState(false);
+  const [showDiagram, setShowDiagram] = useState(() => window.matchMedia("(min-width: 1100px)").matches);
+  useEffect(() => {
+    const media=window.matchMedia("(min-width: 1100px)");
+    const update=()=>setShowDiagram(media.matches);
+    media.addEventListener("change",update);
+    return ()=>media.removeEventListener("change",update);
+  },[]);
+  const [reviews] = useState(() => {
+    try { return Object.values(readStudyStore(localStorage, sessionAccountId || "guest").lessons).filter(item => item?.reviewAt && Date.parse(item.reviewAt) <= Date.now()).length; }
+    catch { return 0; }
+  });
+  useEffect(() => {
+    let current = true;
+    if (guestMode || !sessionAccountId || !auth) return;
+    void (async () => {
+      try {
+        const {data:user,error:userError} = await auth!.auth.getUser();
+        if (userError || user.user?.id !== sessionAccountId || !current) return;
+        const {data,error} = await auth!.rpc("classroom_command",{p_action:"workspace",p_data:{}});
+        if (error) throw error;
+        if (current) setTask(nextClassroomTask(data,sessionAccountId));
+      } catch { if (current) setClassroomUnavailable(true); }
+    })();
+    return () => { current = false; };
+  },[guestMode,sessionAccountId]);
+  const taskFirst = task && (!task.feedback || task.resubmission) && !resumeSession;
+  return <div className="mockup-home">
+    <div className="home-heading"><div><h1 className="mockup-heading">Make your next argument stronger.</h1><p className="mockup-sub">Build a clear claim. Find its support. Test the other side.</p></div></div>
+    {pendingAssignmentResult && <section className="home-attention" role="status"><div><strong>Your assignment is ready to send</strong><p>A completed activity still needs delivery to Classroom.</p></div><button className="workspace-secondary" onClick={() => void submitAssignedResult(pendingAssignmentResult.assignment, pendingAssignmentResult.content, pendingAssignmentResult.activity)}>Retry submission</button></section>}
+    {notice && <p className="mockup-message" role="status">{notice} <button className="mockup-text" onClick={dismissNotice}>Dismiss</button></p>}
+    <div className="home-launchpad"><section className="mockup-hero" aria-label={resumeSession ? "Resume practice" : taskFirst ? "Next classroom assignment" : "Suggested practice"}>
+      <span className="home-activity-icon" aria-hidden="true">{taskFirst ? <GraduationCap size={25} /> : <Target size={25} />}</span>
+      <div className="mockup-label">{resumeSession ? "Pick up where you left off" : taskFirst ? "From your classroom" : "Your next step"}</div>
+      <h2>{resumeSession ? `Continue ${practiceModeInfo(resumeSession.mode).name}` : taskFirst ? task.title : hasProgress ? suggested.name : "Spot the weak link."}</h2>
+      <p className="mockup-hint">{resumeSession ? `Your answers are saved. Continue at question ${resumeSession.questionIndex + 1} of ${resumeSession.questions.length}.` : taskFirst ? task.resubmission ? "Your teacher requested a revision. Open the assignment to see what to improve." : "A published assignment is waiting for your response." : hasProgress ? suggested.description : "Try a reasoning exercise, weigh the alternatives, and see why an answer works."}</p>
+      <div className="mockup-meta"><span className="mockup-pill">{taskFirst ? task.resubmission ? "Revision requested" : "Assigned work" : resumeSession ? "Saved session" : hasProgress ? "Skills practice" : "3-question introduction"}</span><span className="mockup-pill">{taskFirst && task.dueAt ? `Due ${new Date(task.dueAt).toLocaleDateString(undefined,{month:"short",day:"numeric"})}` : "Go at your own pace"}</span></div>
+      <div className="home-hero-actions"><button type="button" className="mockup-btn" onClick={() => resumeSession ? resumePractice() : taskFirst ? navigate("classroom") : hasProgress ? state.openPractice(recommendedMode) : startBaseline("fallacy")}>{resumeSession ? "Continue practice" : taskFirst ? "Open assignment" : "Start practice"}</button>
+        {resumeSession ? <button className="mockup-text" onClick={() => { if (window.confirm("End this session? Your current answers will be discarded.")) discardResume(); }}>End saved session</button> : <span className="home-hero-note">{taskFirst ? "Your teacher’s instructions come first." : "An explanation after every answer."}</span>}
       </div>
-
-      <section className="home-formats" aria-labelledby="home-formats-title">
-        <h2 id="home-formats-title">Practice formats</h2>
-        <ul>{practiceModes.map(item => {
-          const Icon = modeDetails[item.id].icon;
-          return <li key={item.id}><button className="home-format" onClick={() => openPractice(item.id)}>
-            <Icon size={19} aria-hidden="true" /><span><strong>{item.name}</strong><small>{item.description}</small></span><ArrowRight size={16} aria-hidden="true" />
-          </button></li>;
-        })}</ul>
-      </section>
-
-      <section className="home-secondary" aria-labelledby="home-secondary-title">
-        <h2 id="home-secondary-title">More ways to practise</h2>
-        <div>
-          <button className="workspace-text-action" onClick={() => navigate("daily")}><Flame size={17} />Daily Challenge</button>
-          <button className="workspace-text-action" onClick={() => navigate("study")}><BookOpen size={17} />Study paths</button>
-          <a className="workspace-text-action" href="/demo/index.html"><GraduationCap size={17} />Preview the club workflow</a>
-        </div>
-      </section>
-
-      {guestMode && <aside className="workspace-note">
-        <strong>Guest practice</strong>
-        <p>Your progress is saved on this device. {isSupabaseConfigured ? "An account is required for AI debates, Evidence Lab, live matches, and Classroom." : "Account and live services are unavailable in this installation."}</p>
-        {isSupabaseConfigured && <button type="button" className="workspace-text-action" onClick={openAccount}>Create an account <ArrowRight size={15} /></button>}
-      </aside>}
-      {notice && <div className="workspace-note" role="status">{notice}<button className="workspace-text-action" onClick={dismissNotice}>Dismiss</button></div>}
-      {pendingAssignmentResult && <div className="workspace-note" role="status">
-        <p>Your completed assignment is saved in this tab and still needs delivery to Classroom.</p>
-        <button className="workspace-text-action" onClick={() => void submitAssignedResult(pendingAssignmentResult.assignment, pendingAssignmentResult.content, pendingAssignmentResult.activity)}>Retry submission</button>
-      </div>}
+    </section><details className="home-diagram-guide" open={showDiagram}><summary>How a strong argument connects</summary><ReasoningDiagram /></details></div>
+    {(reviews > 0 || (task && !taskFirst)) && <div className="home-followups">{reviews > 0 && <button onClick={() => navigate("study")}><BookOpen size={18} /><span><strong>{reviews} {reviews === 1 ? "lesson" : "lessons"} ready for review</strong><small>Revisit an idea while it’s still familiar.</small></span></button>}{task && !taskFirst && <button onClick={() => navigate("classroom")}><GraduationCap size={18} /><span><strong>{task.feedback ? "Feedback available" : task.resubmission ? "Revision requested" : "Classroom assignment"}</strong><small>{task.title}</small></span></button>}</div>}
+    <div className="mockup-sectionhead"><h2>Choose your next move</h2></div>
+    <div className="mockup-grid">
+      <button className="mockup-tile" data-tone="learn" onClick={() => navigate("study")}><span className="home-tile-icon" aria-hidden="true"><BookOpen size={24} /></span><strong>Build a new skill</strong><span>Short lessons, worked examples, and a chance to try it yourself.</span><small>Explore lessons</small></button>
+      <button className="mockup-tile" data-tone="debate" onClick={() => navigate("ai-setup")}><span className="home-tile-icon" aria-hidden="true"><MessageSquareText size={24} /></span><strong>Make your case</strong><span>Choose a motion and respond to an AI counterargument.</span><small>Set up a debate</small></button>
+      <button className="mockup-tile" data-tone="classroom" onClick={() => navigate("classroom")}><span className="home-tile-icon" aria-hidden="true"><GraduationCap size={24} /></span><strong>Learn with your class</strong><span>Find assigned work, your teacher’s feedback and discussion.</span><small>Open Classroom</small></button>
     </div>
-  );
+    {classroomUnavailable && <p className="workspace-meta">Classroom updates couldn’t load here. <button className="mockup-text" onClick={() => navigate("classroom")}>Check in Classroom</button></p>}
+    <div className="home-progress-line"><div><span className="mockup-label">Your practice so far</span><p>{hasProgress ? `${progress.totalRuns} completed runs. Each one is a chance to test your reasoning.` : "Start your first session. Your practice history will grow from here."}</p>{favoriteMode && <small>{favoriteMode.name} · best drill result {favoriteBest}%</small>}</div><button className="mockup-text" onClick={() => navigate("profile")}>View your progress</button></div>
+    {guestMode && <div className="mockup-guest"><span>Exploring as a guest. Progress is saved on this device.</span><button className="mockup-text" onClick={openAccount}>Create an account</button></div>}
+  </div>;
 }

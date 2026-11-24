@@ -1,3 +1,4 @@
+import { boundedRequestText, RequestSizeError } from "../../../../../app/supabase/functions/_shared/request-size";
 import { supabaseFunctionTimeouts } from "../../../lib/supabase-function-timeouts";
 
 const ALLOWED_FUNCTIONS = new Set(["assess-evidence", "exa-search", "ai-debate", "classroom-service"]);
@@ -20,8 +21,10 @@ export async function POST(request: Request) {
 
   let input: { functionName?: unknown; body?: unknown };
   try {
-    input = await request.json();
-  } catch {
+    input = JSON.parse(await boundedRequestText(request));
+    if (!input || typeof input !== "object" || Array.isArray(input)) return routeError("Invalid request body.", 400, requestId);
+  } catch (error) {
+    if (error instanceof RequestSizeError) return routeError("Request is too large.", 413, requestId);
     return routeError("Invalid request body.", 400, requestId);
   }
 

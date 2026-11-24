@@ -239,7 +239,7 @@ export function readPlan(response: unknown, claim: string): Plan {
       const qualifier = object(rawQualifier);
       const kind = qualifierTypes.find(value => value === qualifier?.kind);
       const span = bounded(qualifier?.text, 120);
-      return kind && span && includesText(claim, span) ? [{ kind, text: span }] : [];
+      return kind && span && includesText(policy ? text : claim, span) ? [{ kind, text: span }] : [];
     }).slice(0, 8);
     return [{ id: `q${index + 1}`, text, outcome, causal: isCausal(text) || target?.causal === true, qualifiers }];
   });

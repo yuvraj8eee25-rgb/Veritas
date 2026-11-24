@@ -25,8 +25,10 @@ const {
   canonicalPageUrl, readAssessment, readPlan, readSearchPages, VERIFICATION_VERSION: version,
 } = await import("../../app/supabase/functions/_shared/evidence-verification.ts");
 const { handleVerification } = await import("../../app/supabase/functions/assess-evidence/verification.ts");
+const { assessEvidencePractice } = await import("../../app/supabase/functions/ai-debate/evidence-practice.ts");
+const { buildEvidenceCard, compareArgumentWording, readEvidenceCards, saveEvidenceCards, suggestEvidenceQuote } = await import("../src/lib/evidence-cards.ts");
 const {
-  createInvestigationRun, mergePages, retryAssessment, reviewEvidence, runInvestigation,
+  canRetryAssessment, createInvestigationRun, MAX_ASSESSMENT_CALLS, mergePages, retryAssessment, reviewEvidence, runInvestigation,
 } = await import("../src/lib/evidence-investigation.ts");
 
 const { claim, outcome, positive, positive2, negative, proxy, observational } = synthetic;
@@ -50,7 +52,7 @@ const makeFinding = (page, overrides = {}) => ({
   ...overrides,
 });
 const batch = (pages, getFindings = page => [makeFinding(page)]) => ({
-  ok: true, version, assessments: pages.map(page => ({ id: page.id, findings: getFindings(page) })),
+  ok: true, version, paperAware: true, assessments: pages.map(page => ({ id: page.id, findings: getFindings(page) })),
 });
 const safeHtml = result => renderToStaticMarkup(React.createElement(EvidenceResults, {
   result, retry() {}, retrying: false, canRetry: true,
@@ -168,10 +170,10 @@ test("real quotes about a proxy or a correlation cannot determine a causal verdi
 test("directions, conflicts within one record, and missing propositions render distinctly", () => {
   const a = makeHit("a");
   const b = makeHit("b", positive2);
-  assert.match(safeHtml(scored([a, b])), /Supported by retrieved evidence/);
+  assert.match(safeHtml(scored([a, b])), /Supports the claim/);
   assert.match(safeHtml(scored([makeHit("na", negative), makeHit("nb", negative)], {
     findings: page => [makeFinding(page, { stance: "contradicts", interpretation: "The trial reported no reduction." })],
-  })), /Refuted by retrieved evidence/);
+  })), /Challenges the claim/);
   const conflicting = scored([makeHit("a", `${positive}\n${negative}`)], {
     findings: page => [
       makeFinding(page, { quote: positive }),
@@ -180,9 +182,10 @@ test("directions, conflicts within one record, and missing propositions render d
   });
   const conflictHtml = safeHtml(conflicting);
   assert.equal(conflicting.review.weightedCount, 1);
-  assert.match(conflictHtml, /Mixed evidence/);
+  assert.match(conflictHtml, /Supports the claim/);
+  assert.match(conflictHtml, /Challenges the claim/);
   assert.match(conflictHtml, /Different findings within one record/);
-  assert.doesNotMatch(conflictHtml, /No independently verified (?:supporting|challenging) finding/);
+  assert.doesNotMatch(conflictHtml, /No direct (?:supporting|challenging) finding/);
   const compound = "Urban trees reduce heat-related illness during summer and improve air quality.";
   const result = scored([a, b], {
     claim: compound,
@@ -192,8 +195,8 @@ test("directions, conflicts within one record, and missing propositions render d
     ] }),
   });
   assert.deepEqual(result.review.targets.map(target => target.status), ["supported", "insufficient"]);
-  assert.match(safeHtml(result), /Unresolved.*air quality/);
-  assert.match(safeHtml(result), /Insufficient evidence/);
+  assert.match(safeHtml(result), /Limited direct evidence.*air quality/);
+  assert.doesNotMatch(safeHtml(result), /Verdict from retrieved evidence|Insufficient evidence/);
 });
 
 test("policy questions review factual premises without issuing a policy verdict", () => {
@@ -205,9 +208,8 @@ test("policy questions review factual premises without issuing a policy verdict"
     findings: page => [makeFinding(page, { interpretation: "The trial measured classroom distraction.", stance: "neutral" })],
   });
   const html = safeHtml(result);
-  assert.match(html, /Policy evidence review/);
-  assert.match(html, /policy decision is yours/);
-  assert.match(html, /Factual premises and trade-offs/);
+  assert.match(html, /Source analysis/);
+  assert.match(html, /factual premises and trade-offs/);
   assert.doesNotMatch(html, /Verdict from retrieved evidence/);
 });
 
@@ -215,7 +217,10 @@ function scenario({ verify, search, trace = [] } = {}) {
   const calls = [];
   const request = async (name, body) => {
     calls.push({ name, body });
-    if (name === "exa-search") return { ok: true, results: search ? await search(body.query) : [makeHit("a"), makeHit("b", positive2)] };
+    if (name === "exa-search") {
+      if (body.provider === "openalex") return { ok: true, provider: "openalex", results: [] };
+      return { ok: true, results: search ? await search(body.query) : [makeHit("a"), makeHit("b", positive2)] };
+    }
     if (body.action === "plan_verification") return plan();
     const pages = pageList(body.sources);
     return verify ? verify(pages, calls.filter(call => call.body.action === "verify_passages").length) : batch(pages);
@@ -237,9 +242,9 @@ for (const kind of ["timeout", "provider failure", "invalid response", "incomple
     const failed = await fixture.run();
     assert.equal(failed.state, "unavailable");
     const html = safeHtml(failed);
-    assert.match(html, /Assessment unavailable/);
+    assert.match(html, /Source analysis unavailable/);
     assert.match(html, /Unassessed/);
-    assert.match(html, /Full retrieved excerpt/);
+    assert.match(html, /Read excerpt/);
     assert.match(html, /href="https:\/\/doi\.org\/10\.1234\/a"/);
     assert.doesNotMatch(html, /confidence|data-stance|What the passages establish|Verdict from retrieved evidence/i);
     const prior = fixture.calls.at(-1).body;
@@ -287,12 +292,12 @@ test("a stronger follow-up can enter a full batch; failed reassessment keeps the
   for (const shouldFail of [false, true]) {
     const trace = [];
     const fixture = scenario({
-      trace, search: lookup, verify: (pages, count) => count === 2 && shouldFail ? { ok: false } : classify(pages),
+      trace, search: lookup, verify: pages => pages.some(page => page.url === added.url) && shouldFail ? { ok: false } : classify(pages),
     });
     const result = await fixture.run();
     const batches = fixture.calls.filter(call => call.body.action === "verify_passages");
-    assert.deepEqual(batches.map(call => call.body.sources.length), [12, 1]);
-    assert.ok(batches[1].body.sources.some(page => page.url === added.url));
+    assert.deepEqual(batches.map(call => call.body.sources.length), [4, 4, 4, 1]);
+    assert.ok(batches.at(-1).body.sources.some(page => page.url === added.url));
     assert.ok(trace.length <= 10);
     assert.ok(result.snapshot.searches.length <= 5);
     assert.equal(result.snapshot.pages.length, 13);
@@ -301,7 +306,7 @@ test("a stronger follow-up can enter a full batch; failed reassessment keeps the
       assert.equal(result.review.weightedCount, 2);
       assert.ok(!result.assessments.some(entry => entry.id === added.url));
       const html = safeHtml(result);
-      assert.match(html, /Partial coverage/);
+      assert.match(html, /Searches that returned no sources/);
       assert.match(html, /Follow-up assessment was unavailable/);
       assert.match(html, /Unassessed/);
     } else {
@@ -309,6 +314,90 @@ test("a stronger follow-up can enter a full batch; failed reassessment keeps the
       assert.equal(result.review.weightedCount, 3);
     }
   }
+});
+
+test("a Supabase 546 splits the affected batch and retries only its remaining excerpts", async () => {
+  const hits = Array.from({ length: 11 }, (_, i) => makeHit(`resource-${i}`, positive + " ".repeat(i)));
+  let failedBatch;
+  let remaining;
+  let retriedManually = false;
+  const trace = [];
+  const limit = () => Object.assign(new Error("Supabase function returned 546. Reference: fixture-ref"), { status: 546 });
+  const fixture = scenario({
+    trace, search: query => query === claim ? hits : [],
+    verify: pages => {
+      if (!retriedManually && pages.length === 4 && !failedBatch) {
+        failedBatch = pages.map(page => page.id);
+        throw limit();
+      }
+      if (!retriedManually && pages.length === 2 && pages[0].id === failedBatch[0]) {
+        remaining = pages;
+        throw limit();
+      }
+      return batch(pages, () => []);
+    },
+  });
+  const partial = await fixture.run();
+  assert.equal(partial.state, "complete");
+  assert.equal(partial.assessments.length, 9);
+  assert.equal(partial.snapshot.pages.length, 11);
+  assert.equal(canRetryAssessment(partial), true);
+  assert.match(safeHtml(partial), /Retry remaining excerpts/);
+  assert.match(safeHtml(partial), /Unassessed/);
+  assert.ok(trace.some(step => step.notes.some(note => note.includes("fixture-ref"))));
+
+  const previousCalls = fixture.calls.length;
+  retriedManually = true;
+  const result = await retryAssessment(partial, fixture.request, activeSignal(), () => {});
+  assert.equal(result.assessments.length, 11);
+  assert.equal(canRetryAssessment(result), false);
+  const retries = fixture.calls.slice(previousCalls);
+  assert.equal(retries.length, 1);
+  assert.equal(retries[0].body.action, "verify_passages");
+  assert.deepEqual(retries[0].body.sources.map(({ url, text }) => [url, text]),
+    remaining.map(page => [page.url, page.passage.text]));
+});
+
+test("a repeated resource limit keeps the request budget and all retrieved sources", async () => {
+  const hits = Array.from({ length: 12 }, (_, i) => makeHit(`resource-${i}`));
+  const fixture = scenario({
+    search: query => query === claim ? hits : [],
+    verify() { throw Object.assign(new Error("Supabase function returned 546."), { status: 546 }); },
+  });
+  const result = await fixture.run();
+  assert.equal(result.state, "unavailable");
+  assert.equal(result.snapshot.pages.length, 12);
+  assert.equal(result.snapshot.calls, MAX_ASSESSMENT_CALLS);
+  assert.equal(fixture.calls.filter(call => call.name === "assess-evidence").length, MAX_ASSESSMENT_CALLS);
+  assert.equal(canRetryAssessment(result), false);
+  assert.match(result.reason, /stopped before it could finish/);
+  assert.match(safeHtml(result), /Read excerpt/);
+});
+
+test("a malformed finding leaves its page unassessed while validated pages from the same batch remain", async () => {
+  const good = makeHit("kept");
+  const bad = makeHit("retry");
+  const trace = [];
+  let retrying = false;
+  const fixture = scenario({
+    trace, search: query => query === claim ? [good, bad] : [],
+    verify: pages => batch(pages, page => [makeFinding(page, page.url === bad.url && !retrying ? {
+      passageId: "incorrect-passage", interpretation: "REJECTED FINDING",
+    } : {})]),
+  });
+  const partial = await fixture.run();
+  assert.equal(partial.state, "complete");
+  assert.deepEqual(partial.assessments.map(entry => entry.id), [good.url]);
+  assert.match(safeHtml(partial), /Retry remaining excerpts/);
+  assert.doesNotMatch(safeHtml(partial), /REJECTED FINDING|malformed finding/);
+  assert.ok(trace.some(step => step.notes.includes("Assessment returned a malformed finding.")));
+
+  const calls = fixture.calls.length;
+  retrying = true;
+  const completed = await retryAssessment(partial, fixture.request, activeSignal(), () => {});
+  assert.equal(completed.assessments.length, 2);
+  assert.equal(canRetryAssessment(completed), false);
+  assert.deepEqual(fixture.calls.slice(calls).flatMap(call => call.body.sources.map(page => page.url)), [bad.url]);
 });
 
 test("a gap in verified records triggers Tavily while the first searches use Exa", async () => {
@@ -349,7 +438,7 @@ test("a search limit keeps existing evidence and skips further provider requests
   const result = await runInvestigation(claim, request, activeSignal(), step => trace.push(step));
   assert.equal(result.state, "complete");
   assert.equal(result.snapshot.pages.length, 1);
-  assert.equal(calls.length, 3);
+  assert.equal(calls.length, 4);
   assert.ok(calls.every(body => body.provider !== "tavily"));
   assert.match(result.caveats[0], /search limit.*sources it found before/);
   assert.ok(trace.some(step => step.notes.some(note => note.includes("skipped after the search limit"))));
@@ -362,7 +451,7 @@ test("a search limit on the first request is reported separately from empty resu
     searches++;
     throw Object.assign(new Error("Too many requests."), { status: 429 });
   }, activeSignal(), () => {});
-  assert.equal(searches, 1);
+  assert.equal(searches, 2);
   assert.equal(result.state, "search-failed");
   assert.match(result.reason, /search limit.*Wait a few minutes/);
 });
@@ -379,8 +468,215 @@ test("search failure, empty search and a failed direction remain distinguishable
   }).run();
   assert.equal(result.review.status, "supported");
   assert.match(safeHtml(result), /cannot establish consensus/);
+  assert.match(safeHtml(result), /Web searches unavailable.*Counterevidence/);
+  assert.match(safeHtml(result), /Searches that returned no sources.*Research papers/);
   assert.match(trace.flatMap(step => step.notes).join(" "), /counter evidence · failed \(counter timed out\)/);
   assert.doesNotMatch(trace.flatMap(step => step.notes).join(" "), /confidence|\d+%/i);
+});
+
+test("the OpenAlex limit leaves web results usable and distinguishes an empty web search", async () => {
+  for (const hits of [[makeHit("web-source")], []]) {
+    const calls = [];
+    const trace = [];
+    const result = await runInvestigation(claim, async (name, body) => {
+      if (name === "exa-search") {
+        calls.push(body);
+        if (body.provider === "openalex") {
+          // The Edge Function translates a provider 429 to 502. Only a Veritas 429 stops the investigation.
+          throw Object.assign(new Error("OpenAlex reached its own request limit. Reference: test-reference"), { status: 502 });
+        }
+        return { ok: true, provider: body.provider ?? "exa", results: body.query === claim ? hits : [] };
+      }
+      if (body.action === "plan_verification") return plan();
+      return batch(pageList(body.sources));
+    }, activeSignal(), step => trace.push(step));
+
+    assert.equal(calls.length, 5);
+    assert.equal(calls.filter(call => call.provider === "openalex").length, 1);
+    assert.equal(result.state, hits.length ? "complete" : "empty");
+    const html = safeHtml(result);
+    assert.match(html, /Research paper search unavailable/);
+    assert.doesNotMatch(html, /Search interrupted|Evidence search failed|test-reference/);
+    assert.ok(trace.some(step => step.notes.some(note => note.includes("Research papers (OpenAlex)") && note.includes("test-reference"))));
+    if (hits.length) assert.match(html, /You can still read and use the web sources below\./);
+    else assert.match(html, /No sources found/);
+  }
+});
+
+const evidenceTopic = { motion: "Cities should plant more urban trees.", side: "for", claim };
+const abstractQuote = "Greater tree cover was associated with fewer heat-related hospital visits in the surveyed districts.";
+const paperHit = {
+  url: "https://doi.org/10.1234/trees", title: "Trees and health", text: abstractQuote, textType: "abstract",
+  paper: { provider: "openalex", workId: "W12345", doi: "https://doi.org/10.1234/trees", title: "Trees and health", authors: ["Example Author"], year: 2024 },
+};
+const cardNotes = { quote: abstractQuote, interpretation: "The study found an association.", limitation: "The study does not establish causation." };
+
+test("an older assessor cannot attach web findings to OpenAlex abstracts or discard valid web results", async () => {
+  const webHit = makeHit("valid-web");
+  for (const inputPaper of [paperHit, { ...paperHit, url: "https://journal.example/tree-study", paper: { ...paperHit.paper, doi: null } }]) {
+    const [currentPaper] = pageList([inputPaper]);
+    const [legacyPaper] = pageList([{ ...inputPaper, paper: undefined }]);
+    const trace = [];
+    const result = await runInvestigation(claim, async (name, body) => {
+      if (name === "exa-search") {
+        return { ok: true, provider: body.provider ?? "exa",
+          results: body.provider === "openalex" ? [inputPaper] : [webHit] };
+      }
+      if (body.action === "plan_verification") return plan();
+      const response = batch(pageList(body.sources.map(source => ({ ...source, paper: undefined }))), page =>
+        page.id === legacyPaper.id ? [] : [makeFinding(page)]
+      );
+      const staleAbstract = response.assessments.find(entry => entry.id === legacyPaper.id);
+      staleAbstract.articleSummary = { text: "OLD ABSTRACT SUMMARY", quote: abstractQuote };
+      return { ...response, paperAware: undefined };
+    }, activeSignal(), step => trace.push(step));
+    assert.equal(result.state, "complete");
+    assert.ok(result.snapshot.pages.some(page => page.id === currentPaper.id && page.passage.scope === "abstract"));
+    assert.deepEqual(result.assessments.map(entry => entry.id), [webHit.url]);
+    const html = safeHtml(result);
+    assert.doesNotMatch(html, /OLD ABSTRACT SUMMARY/);
+    assert.match(html, /Unassessed/);
+    assert.match(html, /needs an update to check research abstracts/);
+    assert.ok(trace.some(step => step.notes.some(note => note.includes("assessment service needs an update"))));
+  }
+});
+
+test("the paper-aware assessor returns the current passage identity after checking an abstract", async () => {
+  const [paper] = pageList([paperHit]);
+  const response = await handleVerification({
+    version, action: "verify_passages", claim, plan: plan(), sources: [paperHit],
+  }, async prompt => {
+    if (prompt.startsWith("Verify proposed")) {
+      return JSON.stringify({ checks: [{ key: "0:0", decision: "keep", recordConfirmed: true }] });
+    }
+    assert.match(prompt, /"textType":"abstract"/);
+    return JSON.stringify({ assessments: [{ id: 0, findings: [{
+      ...makeFinding(paper),
+      passageIndex: 0,
+      stance: "neutral", match: "indirect", strength: "weak",
+      interpretation: "The abstract reports an association.",
+    }] }] });
+  });
+  assert.equal(response.status, 200);
+  const payload = await response.json();
+  assert.equal(payload.paperAware, true);
+  const result = readAssessment(payload, [paper], readPlan(plan(), claim).targets);
+  assert.equal(result[0].findings[0].passageId, paper.passage.id);
+  assert.equal(result[0].findings[0].quote, abstractQuote);
+  assert.equal(result[0].findings[0].match, "indirect");
+});
+
+test("only a quote retrieved from a source can be saved and cards stay scoped to the account", () => {
+  const [page, metadata] = pageList([paperHit, { ...paperHit, textType: "metadata only" }]);
+  const card = buildEvidenceCard(evidenceTopic, page, cardNotes, "card-1");
+  assert.equal(card.textType, "abstract");
+  assert.equal(card.quote, abstractQuote);
+  assert.equal(card.url, paperHit.url);
+  assert.deepEqual(card.authors, ["Example Author"]);
+  assert.equal(card.year, 2024);
+  assert.equal(buildEvidenceCard(evidenceTopic, page, { ...cardNotes, quote: "Tree cover caused fewer hospital visits." }, "card-2"), null);
+  assert.equal(buildEvidenceCard(evidenceTopic, metadata, cardNotes, "card-3"), null);
+  const withoutNotes = buildEvidenceCard({ motion: evidenceTopic.motion, claim }, page, { quote: abstractQuote }, "card-4");
+  assert.equal(withoutNotes?.interpretation, "");
+  assert.equal(withoutNotes?.limitation, "");
+  assert.equal(withoutNotes?.side, null);
+  assert.equal(suggestEvidenceQuote(page, "Fabricated words about the study."), abstractQuote);
+  assert.equal(suggestEvidenceQuote(metadata), "");
+  const values = new Map();
+  const storage = { getItem: key => values.get(key) ?? null, setItem: (key, value) => values.set(key, value) };
+  saveEvidenceCards(storage, "student-a", [card]);
+  assert.deepEqual(readEvidenceCards(storage, "student-a"), [card]);
+  assert.deepEqual(readEvidenceCards(storage, "student-b"), []);
+});
+
+test("a metadata-only paper can be opened but cannot become an evidence card", () => {
+  const [page] = pageList([{ ...paperHit, textType: "metadata only" }]);
+  const snapshot = { claim, plan: readPlan(plan(), claim), pages: [page], selected: [], searches: [], calls: 1 };
+  const result = { state: "complete", snapshot, assessments: [], review: reviewEvidence(snapshot, []), caveats: [] };
+  const html = renderToStaticMarkup(React.createElement(EvidenceResults, {
+    result, retry() {}, retrying: false, canRetry: true, topic: evidenceTopic, onSave() {}, onPractice() {},
+  }));
+  assert.match(html, /Citation only/);
+  assert.match(html, /Open paper via DOI/);
+  assert.doesNotMatch(html, /Use this quote/);
+});
+
+test("motion research searches planned factual questions within the existing budget", async () => {
+  const motion = "Cities should invest in more urban trees.";
+  const targets = [
+    { text: "Tree cover reduces hospital visits in urban districts.", outcome: "hospital visits", causal: true, qualifiers: [{ kind: "location", text: "urban districts" }] },
+    { text: "Tree cover lowers summer temperatures.", outcome: "summer temperatures", causal: true, qualifiers: [] },
+  ];
+  const planned = await handleVerification({ version, action: "plan_verification", claim: motion, researchMode: "motion" }, async prompt => {
+    assert.match(prompt, /factual yes\/no questions/);
+    return JSON.stringify({ complete: true, targets, counterQuery: "counter", primaryQuery: "primary" });
+  });
+  assert.equal(planned.status, 200);
+  const motionPlan = await planned.json();
+  assert.deepEqual(motionPlan.targets[0].qualifiers, targets[0].qualifiers);
+  const queries = [];
+  const result = await runInvestigation(motion, async (name, body) => {
+    if (name === "exa-search") {
+      queries.push(body.query);
+      return { ok: true, provider: body.provider ?? "exa", results: body.provider === "openalex" ? [paperHit] : [] };
+    }
+    if (body.action === "plan_verification") {
+      assert.equal(body.researchMode, "motion");
+      return motionPlan;
+    }
+    return batch(pageList(body.sources), () => []);
+  }, activeSignal(), () => {}, "motion");
+  assert.equal(result.state, "complete");
+  assert.ok(queries.length <= 5);
+  for (const target of targets) assert.ok(queries.some(query => query.includes(target.text)));
+  const html = renderToStaticMarkup(React.createElement(EvidenceResults, {
+    result, retry() {}, retrying: false, canRetry: true, mode: "motion",
+  }));
+  assert.match(html, /Factual questions behind the motion/);
+  for (const target of targets) assert.ok(html.includes(target.text));
+  assert.doesNotMatch(html, /Supports the claim/);
+});
+
+test("the argument comparison marks edited wording and preserves both original texts", () => {
+  const original = "Tree cover proves that heat illness fell.";
+  const revision = "Tree cover was linked to lower heat illness.";
+  const diff = compareArgumentWording(original, revision);
+  assert.equal(diff.original.map(part => part.text).join(""), original);
+  assert.equal(diff.revised.map(part => part.text).join(""), revision);
+  assert.equal(diff.original.find(part => part.text.includes("proves"))?.changed, true);
+  assert.equal(diff.revised.find(part => part.text.includes("was linked"))?.changed, true);
+  assert.equal(diff.original.find(part => part.text.includes("Tree cover"))?.changed, false);
+  assert.ok(compareArgumentWording(original, original).revised.every(part => !part.changed));
+});
+
+test("evidence practice validates exact spans for an association, revision, and unused source", async () => {
+  const card = buildEvidenceCard(evidenceTopic, pageList([paperHit])[0], cardNotes, "card-1");
+  const original = "This study proves that planting trees prevents hospital visits.";
+  const revision = "In the surveyed districts, greater tree cover was associated with fewer heat-related hospital visits.";
+  const challenge = {
+    question: "Does an association show that planting trees caused the decrease?",
+    studentSpan: "proves that planting trees prevents hospital visits",
+    sourceSpan: "was associated with fewer heat-related hospital visits",
+  };
+  const challenged = await assessEvidencePractice({ action: "evidence_challenge", card, original }, async prompt => {
+    assert.ok(prompt.includes(abstractQuote));
+    assert.match(prompt, /association does not establish causation/);
+    return JSON.stringify(challenge);
+  });
+  assert.deepEqual(challenged.body, { ok: true, challenge });
+  const feedback = {
+    original: { status: "overstated", explanation: "The abstract reports an association.", studentSpan: challenge.studentSpan, sourceSpan: challenge.sourceSpan },
+    revised: { status: "accurate", explanation: "The revision preserves the study’s scope and reports an association.", studentSpan: "In the surveyed districts", sourceSpan: challenge.sourceSpan },
+    nextStep: "Look for a study designed to test causation.",
+  };
+  const request = { action: "evidence_feedback", card, original, revision, challenge: challenged.body.challenge };
+  assert.deepEqual((await assessEvidencePractice(request, async () => JSON.stringify(feedback))).body, { ok: true, feedback });
+  const unused = { status: "source_not_used", explanation: "This argument did not draw on the abstract.", studentSpan: null, sourceSpan: null };
+  const unusedResult = await assessEvidencePractice({ ...request, revision: "Trees look lovely in every city." }, async () => JSON.stringify({ ...feedback, revised: unused }));
+  assert.deepEqual(unusedResult.body.feedback?.revised, unused);
+  const fabricated = { ...feedback, revised: { ...feedback.revised, sourceSpan: "randomized controlled trial" } };
+  assert.equal((await assessEvidencePractice(request, async () => JSON.stringify(fabricated))).status, 502);
+  assert.equal((await assessEvidencePractice(request, async () => { throw new Error("Unavailable"); })).status, 502);
 });
 
 test("Edge verification audits the meaning and provenance of each quoted passage", async () => {
@@ -432,8 +728,9 @@ test("a malformed batch is split and only audited article summaries reach the re
   const assessments = readAssessment(result, pages.slice(0, 2), claimPlan.targets);
   const html = safeHtml({ state: "complete", snapshot, assessments, review: reviewEvidence(snapshot, assessments), caveats: [] });
   assert.match(html, /Article summary/);
-  assert.match(html, /Read the passage behind this summary/);
-  assert.ok(html.includes(summary));
+  const summaryDetails = html.match(/<details[^>]*><summary>Article summary<\/summary>(.*?)<\/details>/)?.[1];
+  assert.ok(summaryDetails?.includes(summary));
+  assert.ok(summaryDetails.includes(`<blockquote>${positive}</blockquote>`));
   assert.match(html, /Unassessed/);
 });
 
@@ -473,8 +770,11 @@ test("reference snapshots abstain appropriately and all displayed factual findin
       assert.ok(page.passage.text.includes(finding.quote), fixture.id);
       assert.ok(page.url === fixture.page.url, fixture.id);
       assert.ok(html.includes(`href="${page.url}"`), fixture.id);
-      assert.match(html, /<summary>Inspect passage \[1\]/);
-      assert.match(html, /<blockquote>/);
+      assert.match(html, /<summary>Source details \[1\]/);
+      const citation = [...html.matchAll(/<figure class="evidence-quotation"><blockquote>(.*?)<\/blockquote><figcaption>(.*?)<\/figcaption><\/figure>/g)]
+        .find(([, quote, caption]) => quote === renderToStaticMarkup(React.createElement("span", null, finding.quote)).slice(6, -7)
+          && caption.includes(`href="${page.url}"`));
+      assert.ok(citation, fixture.id);
     }
   }
 });
@@ -520,7 +820,29 @@ test("Edge assessment reports a timeout while keeping invalid responses distinct
   assert.equal(invalid.status, 502);
 });
 
-test("versioned Edge actions preserve legacy Vite classify and search response contracts", async () => {
+test("a provider rate limit stops the investigation without automatic split retries", async () => {
+  const fixture = scenario({ search: query => query === claim ? Array.from({ length: 11 }, (_, index) => makeHit(`limited-${index}`)) : [], verify: () => { throw Object.assign(new Error("Provider rate limit"), { status: 429 }); } });
+  const result = await fixture.run();
+  assert.equal(result.state, "unavailable");
+  assert.equal(fixture.calls.filter(call => call.body.action === "verify_passages").length, 1);
+  assert.equal(result.snapshot.pages.length, 11);
+  assert.match(result.reason, /rate limit/i);
+});
+
+test("provider quota and capacity failures do not fan out into split requests", async () => {
+  for (const status of [400, 429, 503]) {
+    let calls = 0;
+    const response = await handleVerification({ version, action: "verify_passages", claim, plan: plan(), sources: [makeHit("quota-a"), makeHit("quota-b")] }, async () => {
+      calls++;
+      throw Object.assign(new Error(`Gemini request failed with status ${status}`), { status });
+    });
+    assert.equal(calls, 1);
+    assert.equal(response.status, status === 400 ? 502 : status);
+    if (status !== 400) assert.equal(response.headers.get("Retry-After"), "60");
+  }
+});
+
+test("versioned Edge actions preserve legacy Vite classify and search response contracts", async t => {
   const originalFetch = globalThis.fetch;
   const originalDeno = globalThis.Deno;
   const handlers = [];
@@ -588,10 +910,69 @@ test("versioned Edge actions preserve legacy Vite classify and search response c
     assert.equal(alternative.results.length, 2);
     assert.match(alternative.results[0].text, /Article 19 of the Constitution/);
     assert.equal(alternative.results[1].text, "");
+    await t.test("schema rejection still falls back after a transient provider retry", async () => {
+      const sent = [];
+      globalThis.fetch = async (_url, request) => {
+        sent.push(JSON.parse(request.body));
+        if (sent.length === 1) return Response.json({ error: { message: "Temporary capacity" } }, { status: 503 });
+        if (sent.length === 2) return Response.json({ error: { message: "The specified schema produces a constraint that has too many states" } }, { status: 400 });
+        return Response.json({ candidates: [{ finishReason: "STOP", content: { parts: [{ text: JSON.stringify(plan()) }] } }] });
+      };
+      const result = await assess(post({ version, action: "plan_verification", claim }));
+      assert.equal(result.status, 200);
+      assert.equal((await result.json()).targets.length, 1);
+      assert.equal(sent.length, 3);
+      assert.ok(sent[1].generationConfig.responseJsonSchema);
+      assert.equal(sent[1].generationConfig.responseJsonSchema.properties.targets.maxItems, undefined);
+      assert.deepEqual(sent[1].generationConfig.responseJsonSchema.required, ["policy","complete","targets","counterQuery","primaryQuery"]);
+      assert.equal(sent[2].generationConfig.responseJsonSchema, undefined);
+      assert.equal(sent[2].generationConfig.responseMimeType, "application/json");
+    });
+    await t.test("a schema-free rejection stops instead of retrying indefinitely", async () => {
+      let calls = 0;
+      globalThis.fetch = async () => { calls++; return Response.json({ error: { message: "Invalid request fixture" } }, { status: 400 }); };
+      const result = await assess(post({ version, action: "plan_verification", claim }));
+      assert.equal(result.status, 502);
+      assert.equal(calls, 2);
+    });
   } finally {
     edgeHooks.deregister();
     globalThis.fetch = originalFetch;
     if (originalDeno) globalThis.Deno = originalDeno;
     else delete globalThis.Deno;
   }
+});
+
+for (const status of [429, 503]) {
+  test(`a planning ${status} stops later AI and search calls while retaining initial sources`, async () => {
+    const calls = [];
+    const result = await runInvestigation(claim, async (name, body) => {
+      calls.push({name,body});
+      if (name === "exa-search") return {ok:true,provider:body.provider ?? "exa",results:body.provider === "openalex" ? [] : [makeHit("saved")]};
+      throw Object.assign(new Error("Planning provider busy"), {status});
+    }, activeSignal(), () => {});
+    assert.equal(result.state,"unavailable");
+    assert.equal(result.snapshot.pages.length,1);
+    assert.equal(result.snapshot.planningNeedsRetry,true);
+    assert.equal(result.snapshot.providerBackoff,true);
+    assert.equal(calls.filter(call=>call.name === "assess-evidence").length,1);
+    assert.equal(calls.filter(call=>call.name === "exa-search").length,2);
+    assert.equal(canRetryAssessment(result),true);
+  });
+}
+test("an explicit retry can restore planning and assess saved sources without repeating searches", async () => {
+  let planning = 0; let searching = 0; let assessing = 0;
+  const request = async (name,body) => {
+    if (name === "exa-search") { searching++; return {ok:true,provider:body.provider ?? "exa",results:body.provider === "openalex" ? [] : [makeHit("saved-retry")]}; }
+    if (body.action === "plan_verification") {
+      if (++planning === 1) throw Object.assign(new Error("Planning busy"),{status:503});
+      return plan();
+    }
+    assessing++; return batch(pageList(body.sources));
+  };
+  const first = await runInvestigation(claim,request,activeSignal(),()=>{});
+  const second = await retryAssessment(first,request,activeSignal(),()=>{});
+  assert.equal(second.state,"complete"); assert.equal(second.snapshot.planningNeedsRetry,false);
+  assert.equal(planning,2); assert.equal(searching,2); assert.equal(assessing,1);
+  assert.equal(second.snapshot.calls,3);
 });

@@ -1,93 +1,67 @@
-import type { FormEvent } from "react";
-import { ArrowRight, LoaderCircle } from "lucide-react";
+import { ArrowRight, Check, LoaderCircle, Moon, Sun } from "lucide-react";
+import { useVeritasTheme } from "../../lib/use-veritas-theme";
+type ScreenState = Record<string, any>;
 
-type AuthMode = "login" | "signup" | "forgot" | "reset";
-type AuthState = {
-  busy: boolean;
-  confirmPassword: string;
-  email: string;
-  error: string;
-  isSupabaseConfigured: boolean;
-  message: string;
-  mode: AuthMode;
-  password: string;
-  setConfirmPassword: (value: string) => void;
-  setEmail: (value: string) => void;
-  setError: (value: string) => void;
-  setGuestMode: (value: boolean) => void;
-  setMessage: (value: string) => void;
-  setMode: (value: AuthMode) => void;
-  setPassword: (value: string) => void;
-  submit: (event: FormEvent<HTMLFormElement>) => void;
-};
-
-const access = {
-  login: { title: "Sign in", description: "Continue your practice and access your account.", action: "Sign in" },
-  signup: { title: "Create an account", description: "Join debates, investigate claims, and take part in Classroom.", action: "Create account" },
-  forgot: { title: "Reset your password", description: "Enter your email to receive a reset link.", action: "Send reset link" },
-  reset: { title: "Choose a new password", description: "Use at least six characters.", action: "Update password" },
-};
-
-export default function AuthScreen({ state }: { state: AuthState }) {
-  const {
-    busy, confirmPassword, email, error, isSupabaseConfigured, message, mode, password,
-    setConfirmPassword, setEmail, setError, setGuestMode, setMessage, setMode, setPassword, submit,
-  } = state;
-  const copy = access[mode];
-  function changeMode(next: AuthMode) {
-    setError("");
-    setMessage("");
-    setMode(next);
-  }
-
+export default function AuthScreen({ state }: { state: ScreenState }) {
+  const { theme, toggleTheme } = useVeritasTheme();
+    const { busy, confirmPassword, email, error, isSupabaseConfigured, message, mode, password, sessionEmail, setConfirmPassword, setEmail, setError, setGuestMode, setMessage, setMode, setPassword, signOut, submit } = state;
   return (
-    <main className="access-page">
-      <div className="access-layout">
-        <section className="access-intro" aria-labelledby="access-intro-title">
-          <div className="access-brand"><span className="workspace-monogram" aria-hidden="true">V</span>Veritas</div>
-          <h1 id="access-intro-title">A workspace for better arguments</h1>
-          <p>Practise rebuttals, weigh evidence, and see how your reasoning holds up in a debate.</p>
-          <blockquote className="access-example">
-            <p>“Everyone I know agrees, so it must be true.”</p>
-            <footer>Fallacy Hunter · Can you spot the flaw?</footer>
-          </blockquote>
-        </section>
-        <section className="access-panel" aria-labelledby="access-title">
-          <h2 id="access-title">{copy.title}</h2>
-          <p className="workspace-lead">{copy.description}</p>
-          {!isSupabaseConfigured && <p className="workspace-note" role="status">Account services are unavailable in this installation. Guest practice is available.</p>}
-          {isSupabaseConfigured && <>
-            <form onSubmit={submit}>
-              {mode !== "reset" && <label className="workspace-field">Email address
-                <input type="email" autoComplete="email" required value={email} onChange={event => setEmail(event.target.value)} />
-              </label>}
-              {mode !== "forgot" && <label className="workspace-field">{mode === "reset" ? "New password" : "Password"}
-                <input type="password" autoComplete={mode === "login" ? "current-password" : "new-password"} required minLength={6} value={password} onChange={event => setPassword(event.target.value)} />
-              </label>}
-              {mode === "reset" && <label className="workspace-field">Confirm new password
-                <input type="password" autoComplete="new-password" required minLength={6} value={confirmPassword} onChange={event => setConfirmPassword(event.target.value)} />
-              </label>}
-              {error && <p className="workspace-error" role="alert">{error}</p>}
-              {message && <p className="workspace-note" role="status">{message}</p>}
-              <button className="workspace-primary" type="submit" disabled={busy}>
-                {busy ? <><LoaderCircle size={16} className="spinner" aria-hidden="true" /> Please wait</> : <>{copy.action}<ArrowRight size={17} aria-hidden="true" /></>}
-              </button>
-            </form>
-            <div className="access-actions">
-              {mode === "login" ? <>
-                <button type="button" className="workspace-text-action" onClick={() => changeMode("signup")}>Create an account</button>
-                <button type="button" className="workspace-text-action" onClick={() => changeMode("forgot")}>Forgot password?</button>
-              </> : <button type="button" className="workspace-text-action" onClick={() => changeMode("login")}>Back to sign in</button>}
+    <main className="auth-page">
+      <button className="auth-theme-toggle" type="button" onClick={toggleTheme} aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"} aria-pressed={theme === "dark"}>{theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}{theme === "dark" ? "Light mode" : "Dark mode"}</button>
+      <div className="ambient ambient-one" aria-hidden="true" />
+      <div className="ambient ambient-two" aria-hidden="true" />
+      <section className="auth-layout" aria-labelledby="brand-title">
+        <div className="brand-panel">
+          <div className="brand-mark" aria-hidden="true"><Check size={29} strokeWidth={2.2} /></div>
+          <p className="eyebrow">THINK CLEARER. ARGUE BETTER.</p>
+          <h1 id="brand-title">VERITAS</h1>
+          <p className="brand-copy">Practice the art of making a case. Learn to test ideas, weigh evidence, and meet strong arguments with stronger ones.</p>
+          <div className="brand-note"><span className="note-line" />A better argument starts with a better question.</div>
+        </div>
+        <div className="auth-card">
+          {sessionEmail ? (
+            <div className="signed-in">
+              <span className="eyebrow">ACCOUNT READY</span>
+              <h2>Welcome back.</h2>
+              <p>Signed in as <strong>{sessionEmail}</strong></p>
+              <p className="migration-note">The React shell is set up. The next migration step will bring over your Home dashboard.</p>
+              <button className="button button-secondary" onClick={signOut}>Sign out <ArrowRight size={16} /></button>
             </div>
-          </>}
-          {(mode === "login" || !isSupabaseConfigured) && <div className="access-guest">
-            <button className={isSupabaseConfigured ? "workspace-secondary" : "workspace-primary"} type="button" onClick={() => setGuestMode(true)}>
-              Continue as guest <ArrowRight size={16} aria-hidden="true" />
-            </button>
-            <p className="workspace-meta">Practice progress stays on this device.</p>
-          </div>}
-        </section>
-      </div>
+          ) : (
+            <>
+              <div className="card-heading">
+                <span className="eyebrow">YOUR PRACTICE, YOUR PROGRESS</span>
+                <h2>{mode === "signup" ? "Create your account" : mode === "forgot" ? "Reset your password" : mode === "reset" ? "Choose a new password" : "Welcome back"}</h2>
+                <p>{mode === "signup" ? "Start building a stronger way to think." : mode === "forgot" ? "We’ll email you a link to get back in." : mode === "reset" ? "Use a strong password you have not used before." : "Sign in to continue your practice."}</p>
+              </div>
+              {mode === "login" || mode === "signup" ? <div className="tabs" role="tablist" aria-label="Account access">
+                <button role="tab" aria-selected={mode === "login"} className={mode === "login" ? "tab active" : "tab"} onClick={() => { setMode("login"); setError(""); setMessage(""); }}>Log in</button>
+                <button role="tab" aria-selected={mode === "signup"} className={mode === "signup" ? "tab active" : "tab"} onClick={() => { setMode("signup"); setError(""); setMessage(""); }}>Create account</button>
+              </div> : null}
+              <form onSubmit={submit}>
+                {mode !== "reset" && <label className="field">Email address<input type="email" autoComplete="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" /></label>}
+                {mode !== "forgot" && <label className="field">{mode === "reset" ? "New password" : "Password"}<input type="password" autoComplete={mode === "login" ? "current-password" : "new-password"} required minLength={6} value={password} onChange={e => setPassword(e.target.value)} placeholder="At least 6 characters" /></label>}
+                {mode === "reset" && <label className="field">Confirm new password<input type="password" autoComplete="new-password" required minLength={6} value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="Enter it again" /></label>}
+                {error && <p className="feedback error" role="alert">{error}</p>}
+                {message && <p className="feedback success" role="status">{message}</p>}
+                <button className="button button-primary" type="submit" disabled={busy}>
+                  {busy ? <LoaderCircle size={17} className="spin" /> : null}
+                  {busy ? "Please wait" : mode === "signup" ? "Create account" : mode === "forgot" ? "Send reset link" : mode === "reset" ? "Update password" : "Sign in"}
+                  {!busy && <ArrowRight size={17} />}
+                </button>
+              </form>
+              <div className="auth-links">
+                {mode === "login" && <button onClick={() => { setMode("forgot"); setError(""); setMessage(""); }}>Forgot password?</button>}
+                {(mode === "forgot" || mode === "reset") && <button onClick={() => { setMode("login"); setError(""); setMessage(""); }}>Back to sign in</button>}
+                {mode === "signup" && <p>Veritas is for teens (13–17) and adults. Teen live practice uses teacher-managed private assignments. Adults can opt into public matches in Profile. Read the help page for storage and AI processing details.</p>}
+              </div>
+              {mode === "login" && <button className="guest-link" type="button" onClick={()=>setGuestMode(true)}>Continue exploring as a guest</button>}
+              {!isSupabaseConfigured && <p className="config-hint">Configure Supabase to enable account access.</p>}
+            </>
+          )}
+        </div>
+      <p className="workspace-meta"><a href="/learn">Try a free lesson</a> · <a href="/help">Help and data controls</a></p></section>
+      <footer className="page-footer"><span>VERITAS</span><span>Practice with curiosity.</span></footer>
     </main>
   );
 }

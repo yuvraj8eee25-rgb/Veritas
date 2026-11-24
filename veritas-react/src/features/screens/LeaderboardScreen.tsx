@@ -35,7 +35,7 @@ export default function LeaderboardScreen({ state }: { state: LeaderboardState }
           <ol className="standings-list">{samples.map(row => <li key={row.name}><span>{row.name}</span><span className="workspace-meta">Sample entry</span><strong>{row.score.toLocaleString()} XP</strong></li>)}</ol>
         </details>
       </> : <>
-        <p className="workspace-meta">Live ratings from player profiles, ordered by rating. New profiles start at 1,200.</p>
+        <p className="workspace-meta">Players with completed rated debates, ordered by rating. Ratings with fewer than five games are provisional. New profiles start at 1,200.</p>
         {leaderLoading ? <p role="status">Loading live ratings…</p> : leaderError ? <div className="workspace-note" role="status">
           <strong>Live ratings unavailable</strong><p>{leaderError}</p>
           <button className="workspace-text-action" onClick={() => openLeaderboard("elo")}><RefreshCw size={16} /> Retry</button>

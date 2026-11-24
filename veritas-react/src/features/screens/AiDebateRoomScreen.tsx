@@ -1,9 +1,13 @@
+import DebatePlan from "../DebatePlan";
+import type { DebatePlanData } from "../DebatePlan";
+import SpeechFeedback from "../SpeechFeedback";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { ArrowDown, ArrowLeft, Copy, Mic, Send, Square } from "lucide-react";
 import type { DebateTurn } from "../../App";
 import type { View } from "../../components/AppShell";
 
 type RoomState = {
+  debatePlan: DebatePlanData | null;
   aiTurnRemaining: number | null;
   debateBusy: boolean;
   debateDraft: string;
@@ -48,7 +52,7 @@ export function DebateTranscript({ turns, playbackUrls, copy = false }: {
               }}><Copy size={16} /></button>}
             </div>
             <p>{turn.text}</p>
-            {turn.audioPath && playbackUrls[turn.audioPath] && <audio controls src={playbackUrls[turn.audioPath]} aria-label="Recorded argument" />}
+            {turn.audioPath && playbackUrls[turn.audioPath] && <SpeechFeedback source={playbackUrls[turn.audioPath]} transcript={turn.text} />}
           </li>
         ))}
       </ol>
@@ -63,7 +67,7 @@ function clock(seconds: number) {
 
 export default function AiDebateRoomScreen({ state }: { state: RoomState }) {
   const {
-    aiTurnRemaining, debateBusy, debateDraft, debateError, debateMaxTurns, debatePracticeMode, debateStance,
+    debatePlan, aiTurnRemaining, debateBusy, debateDraft, debateError, debateMaxTurns, debatePracticeMode, debateStance,
     debateTopic, debateTurns, discardSpeech, isRecording, playbackUrls, setDebateDraft, setView,
     speechBlob, speechBusy, speechNotice, speechSeconds, speechUrl, startSpeechRecording, stopSpeechRecording,
     submitAiArgument,
@@ -104,7 +108,7 @@ export default function AiDebateRoomScreen({ state }: { state: RoomState }) {
     <section className="workspace-flow debate-room">
       <button type="button" className="workspace-text-action" disabled={debateBusy || isRecording} onClick={() => setView("ai-setup")}><ArrowLeft size={16} /> Leave debate</button>
       <header className="debate-room-heading">
-        <div><p className="workspace-caption">You argue {debateStance} the motion</p><h1 className="workspace-page-title">{debateTopic}</h1></div>
+        <div><p className="workspace-caption">You argue {debateStance} the motion</p><h1 className="workspace-page-title">{debateTopic}</h1><DebatePlan plan={debatePlan} /></div>
         <div className="debate-room-round">
           <span>{turnCount} of {debateMaxTurns} turns sent</span>
           <strong role="timer" data-urgent={!debateBusy && aiTurnRemaining !== null && aiTurnRemaining <= 10}

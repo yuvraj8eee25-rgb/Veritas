@@ -1,6 +1,7 @@
 // =========================================================
 import { guardUserRequest, withCors } from "../_shared/http.ts";
 import { handleVerification } from "./verification.ts";
+import { studyPaper } from "./paper-study.ts";
 
 // VERITAS — assess-evidence (Supabase Edge Function)
 //
@@ -91,7 +92,16 @@ class GeminiRequestError extends Error {
   }
 }
 
+// Nested array cardinality bounds can exceed Gemini's serving grammar budget.
+// Keep field/type constraints; enforce counts and source IDs in our validators.
+function servingSchema(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(servingSchema);
+  if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).filter(([key]) => key !== "minItems" && key !== "maxItems").map(([key, entry]) => [key, servingSchema(entry)]));
+  return value;
+}
+
 async function callGemini(prompt: string, maxTokens: number, verificationSignal?: AbortSignal, responseSchema?: Record<string, unknown>): Promise<string> {
+  const requestSignal = verificationSignal ?? AbortSignal.timeout(55000);
   let response: Response;
   for (let attempt = 0; ; attempt++) {
     response = await fetch(
@@ -102,14 +112,14 @@ async function callGemini(prompt: string, maxTokens: number, verificationSignal?
         // Evidence excerpts can take longer than a short chat prompt. Keep the
         // server timeout below Supabase's request idle limit, while allowing a
         // slower Gemini response to finish instead of silently falling back.
-        signal: verificationSignal ?? AbortSignal.timeout(60000),
+        signal: requestSignal,
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
             temperature: 0.1,
             maxOutputTokens: maxTokens,
             thinkingConfig: { thinkingLevel: "minimal" },
-            ...(verificationSignal ? { responseMimeType: "application/json", responseJsonSchema: responseSchema } : {}),
+            ...(verificationSignal ? { responseMimeType: "application/json", responseJsonSchema: responseSchema ? servingSchema(responseSchema) : undefined } : {}),
           },
         }),
       },
@@ -117,8 +127,8 @@ async function callGemini(prompt: string, maxTokens: number, verificationSignal?
     // Gemini can briefly return 503 while a model is under heavy demand. Retry
     // just those transient responses, with short exponential backoff, so one
     // capacity spike does not immediately force keyword-based classification.
-    if (response.status === 400 && responseSchema && attempt === 0) {
-      // Fall back to JSON mode when this model rejects the optional response schema.
+    if (response.status === 400 && responseSchema) {
+      // Fall back once to JSON mode even when a transient retry preceded the schema rejection.
       // The response still goes through the same parser and validation.
       responseSchema = undefined;
       continue;
@@ -135,6 +145,7 @@ async function callGemini(prompt: string, maxTokens: number, verificationSignal?
     } catch {
       // Keep the status even if the provider returned a non-JSON error page.
     }
+    if (response.status === 400) console.warn(JSON.stringify({ event: "assessment_provider_invalid_request", status: response.status, reason: /schema|too many states/i.test(providerMessage) ? "schema-rejected" : "invalid-request" }));
     throw new GeminiRequestError(response.status, providerMessage);
   }
   const payload = await response.json();
@@ -421,9 +432,13 @@ Deno.serve(withCors(async (req) => {
     return json({ ok: false, error: "Invalid JSON body" }, 400);
   }
 
+  const generate: typeof callGemini = (prompt, maxTokens, signal, schema) => callGemini(prompt, maxTokens, AbortSignal.any([req.signal, signal ?? AbortSignal.timeout(55000)]), schema);
   try {
+    if (body?.action === "paper_summary" || body?.action === "paper_flashcards") {
+      return await studyPaper(body, generate);
+    }
     if (body?.action === "plan_verification" || body?.action === "verify_passages") {
-      return await handleVerification(body, callGemini);
+      return await handleVerification(body, generate);
     }
     if (body?.action === "plan_queries") return await handlePlanQueries(body);
     if (body?.action === "classify") return await handleClassify(body);
@@ -438,9 +453,15 @@ Deno.serve(withCors(async (req) => {
       ...(err instanceof GeminiRequestError ? {
         provider: "gemini",
         providerStatus: err.status,
-        providerMessage: err.providerMessage,
+        providerReason: err.status === 400 && /schema|too many states/i.test(err.providerMessage) ? "schema-rejected" : "provider-request-failed",
       } : {}),
     }));
-    return json({ ok: false, error: "Assessment request failed" }, 500);
+    if (err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError")) {
+      return json({ ok: false, error: "Assessment timed out. Your sources remain available; retry reading the excerpts." }, 504);
+    }
+    if (err instanceof GeminiRequestError && [429, 503].includes(err.status)) {
+      return json({ ok: false, error: "The AI assessment provider is busy. Wait briefly before retrying." }, 503);
+    }
+    return json({ ok: false, error: "Assessment request failed. Your sources remain available for review." }, 502);
   }
 }));

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { ArrowRight, Check, X } from "lucide-react";
+import { ArrowRight, Check, Pause, Trash2, X } from "lucide-react";
 import type { View } from "../../components/AppShell";
 import type { FallacyQuestion } from "../fallacy-questions";
 import type { PracticeMode, PracticeModeInfo } from "../practice-questions";
@@ -9,13 +9,14 @@ type DrillState = {
   activeModeInfo: PracticeModeInfo;
   advanceQuestion: () => void;
   currentAnswer: number | null;
+  discardPracticeRun: () => void;
+  pausePracticeRun: () => void;
   questionIndex: number;
   questions: FallacyQuestion[];
   score: number;
-  setAssignedPractice: (assignment: null) => void;
-  setNotice: (message: string) => void;
   setView: (view: View) => void;
   speedSecondsLeft: number;
+  speedLimit: number;
   streakNow: number;
   submitAnswer: (index: number) => void;
 };
@@ -29,8 +30,8 @@ const prompts = {
 
 export default function SoloDrillScreen({ state }: { state: DrillState }) {
   const {
-    activeMode, activeModeInfo, advanceQuestion, currentAnswer, questionIndex, questions, score,
-    setAssignedPractice, setNotice, setView, speedSecondsLeft, streakNow, submitAnswer,
+    activeMode, activeModeInfo, advanceQuestion, currentAnswer, discardPracticeRun, pausePracticeRun, questionIndex, questions, score,
+    setView, speedSecondsLeft, speedLimit, streakNow, submitAnswer,
   } = state;
   const question = questions[questionIndex];
   const instruction = prompts[activeMode];
@@ -53,7 +54,12 @@ export default function SoloDrillScreen({ state }: { state: DrillState }) {
     <section className={`workspace-flow drill-workspace drill-${activeMode}`}>
       <div className="drill-top">
         <div>
-          <button type="button" className="workspace-text-action" onClick={() => { setAssignedPractice(null); setView("home"); setNotice(""); }}><X size={16} /> Exit drill</button>
+          <div className="drill-session-actions">
+            <button type="button" className="workspace-text-action" onClick={pausePracticeRun}><Pause size={16} /> Pause</button>
+            <button type="button" className="workspace-text-action" onClick={() => {
+              if (window.confirm("End this session? Your current answers will be discarded.")) discardPracticeRun();
+            }}><Trash2 size={16} /> End session</button>
+          </div>
           <p className="workspace-caption">{activeModeInfo.name}</p>
         </div>
         <div className="drill-score"><strong>{score}</strong> session points</div>
@@ -63,10 +69,10 @@ export default function SoloDrillScreen({ state }: { state: DrillState }) {
         <div><span>Question {questionIndex + 1} of {questions.length} · {question.difficulty}</span>
           {streakNow >= 2 && <span role="status">{streakNow} correct in a row</span>}</div>
       </div>
-      {activeMode === "speed" && <div className="drill-timer" role="timer" aria-label={answered ? "Timer stopped" : `${speedSecondsLeft} seconds remaining`}>
-        <strong>{answered ? "Time stopped" : `0:0${speedSecondsLeft}`}</strong><span>{answered ? "Review your answer" : "Seconds left"}</span>
+      {activeMode === "speed" && speedLimit > 0 && <div className="drill-timer" role="timer" aria-label={answered ? "Timer stopped" : `${speedSecondsLeft} seconds remaining`}>
+        <strong>{answered ? "Time stopped" : `0:${String(speedSecondsLeft).padStart(2, "0")}`}</strong><span>{answered ? "Review your answer" : "Seconds left"}</span>
       </div>}
-      {activeMode === "speed" && <span className="sr-only" role="status">{!answered && speedSecondsLeft === 2 ? "Two seconds left" : ""}</span>}
+      {activeMode === "speed" && speedLimit > 0 && <span className="sr-only" role="status">{!answered && speedSecondsLeft === 2 ? "Two seconds left" : ""}</span>}
       <div className="drill-question" key={questionIndex}>
         <article className="drill-reading">
           <p className="workspace-caption">{instruction.label}</p>

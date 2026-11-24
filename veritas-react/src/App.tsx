@@ -1,9 +1,12 @@
+import type { DebatePlanData } from "./features/DebatePlan";
+import { utcDay, nextUtcReset, dailyRewardAvailable, completedDailyDate } from "./lib/daily-policy";
+import { classroomAnswers } from "./lib/classroom-answers";
 import { useEffect, useRef, useState } from "react";
 import { ArrowRight, Check, Flame, Swords, LoaderCircle } from "lucide-react";
 import { auth, isSupabaseConfigured } from "./lib/supabase";
 import { invokeVeritasFunction } from "./lib/supabase-functions";
 import { type Difficulty, type FallacyQuestion } from "./features/fallacy-questions";
-import { practiceModes, practiceQuestionBanks, practiceModeInfo, type PracticeMode } from "./features/practice-questions";
+import { practiceModes, practiceQuestionBanks, assignmentQuestionBanks, practiceModeInfo, type PracticeMode } from "./features/practice-questions";
 import Study from "./features/Study";
 import type { Assignment } from "./features/Classroom";
 import ProfileScreen from "./features/Profile";
@@ -11,7 +14,7 @@ import ArcadeDashboard from "./features/ArcadeDashboard";
 import { applyArcadeRun } from "./features/arcade";
 import { aiTopicSamples } from "./features/debate-topics";
 import { readDebateCoaching, type DebateCoaching } from "../../app/supabase/functions/_shared/debate-coaching";
-import { loadProgress, saveProgress } from "../../app/src/features/practice-state.js";
+import { loadProgress, saveProgress, mergeProgress } from "../../app/src/features/practice-state.js";
 import { recordAssessment, prioritizeAssessment } from "../../app/src/features/mastery.js";
 import HomeScreen from "./features/screens/HomeScreen";
 import PracticeSetupScreen from "./features/screens/PracticeSetupScreen";
@@ -21,6 +24,9 @@ import LeaderboardScreen from "./features/screens/LeaderboardScreen";
 import StudyScreen from "./features/screens/StudyScreen";
 import ClassroomScreen from "./features/screens/ClassroomScreen";
 import EvidenceLabScreen from "./features/screens/EvidenceLabScreen";
+import EvidencePractice from "./features/EvidencePractice";
+import type { EvidenceRound } from "./features/EvidencePractice";
+import type { EvidenceCard } from "../../app/supabase/functions/_shared/evidence-practice.ts";
 import AiDebateSetupScreen from "./features/screens/AiDebateSetupScreen";
 import AiDebateRoomScreen from "./features/screens/AiDebateRoomScreen";
 import AiDebateResultScreen from "./features/screens/AiDebateResultScreen";
@@ -34,12 +40,31 @@ import AppShell, { type View, type Destination } from "./components/AppShell";
 
 type AuthMode = "login" | "signup" | "forgot" | "reset";
 type AnswerRecord = { id: string; answer: number; prompt: string; difficulty: Difficulty; correct: boolean; tip: string };
-type RunSummary = { correct: number; total: number; accuracy: number; score: number; streak: number; xp: number; skillGain: number; assessed: number; answers: AnswerRecord[]; recommended: Difficulty; daily: boolean; mode: PracticeMode };
+type RunSummary = { correct: number; total: number; accuracy: number; score: number; streak: number; xp: number; skillGain: number; assessed: number; answers: AnswerRecord[]; recommended: Difficulty; daily: boolean; baseline?: boolean; mode: PracticeMode };
+type SavedPracticeSession = {
+  mode: PracticeMode;
+  difficulty: "all" | Difficulty;
+  questions: FallacyQuestion[];
+  questionIndex: number;
+  answers: AnswerRecord[];
+  streak: number;
+  bestStreak: number;
+  score: number;
+  currentAnswer: number | null;
+  daily: boolean;
+  baseline?: boolean;
+  attempt: number;
+  assignedPractice: Assignment | null;
+  savedAt: string;
+  dailyDate?: string;
+  speedRemainingMs?: number;
+  speedLimit?: number;
+};
 type ProfileData = { displayName:string|null; elo:number|null; wins:number; losses:number; ties:number; avatarPath:string|null; avatarUrl:string|null };
 export type LeaderRow = { name:string; score:number; self?:boolean; record?:string };
 export type DebateTurn = { speaker:"user"|"ai"; text:string; audioPath?:string|null; spent?:number };
 export type DebateVerdict = { debaterScore:number; aiScore:number; winner:string; summary:string; turnFeedback:{turn:number;logic:string;evidence:string;responsiveness:string}[]; devilsAdvocate?:{missedPoint:string;challenge:string}|null; estimated?:boolean; coaching?:DebateCoaching };
-type PendingAssignmentResult = { assignment: Assignment; request_id: string; content: string; activity: Record<string, any> };
+type PendingAssignmentResult = { owner_id: string; assignment: Assignment; request_id: string; content: string; activity: Record<string, any> };
 export type HotTopic = {text:string;tag?:string;newsUrl?:string;newsSource?:string};
 type LiveTurn = {uid:string;text:string;ts:number;audioPath?:string|null};
 type LiveRoomData = {id:string;topic:string;players:string[];player_order:string[];turn_index:number;turns:LiveTurn[];max_turns_per_player:number;turn_seconds:number;speech_seconds:number;practice_mode:string;status:string;created_at:string;last_turn_at:string|null;ai_verdict:any;ratings:Record<string,string>;is_private?:boolean};
@@ -57,34 +82,45 @@ function liveTurnStats(room:LiveRoomData) {
   return {used,entries};
 }
 function formatLiveClock(seconds:number) { const rounded=Math.max(0,Math.round(seconds));return `${Math.floor(rounded/60)}:${String(rounded%60).padStart(2,"0")}`; }
-function estimateLiveReferee(room:LiveRoomData,uid:string) {
-  const scores:Record<string,number>=Object.fromEntries(room.players.map(player=>[player,0]));
-  const rules:[RegExp,number][]=[[/\bbecause\b/i,2],[/\btherefore\b/i,2],[/\bhowever\b/i,2],[/\bbut\b/i,1],[/\bconsequently\b/i,2]];
-  for(const turn of room.turns||[]){
-    const text=(turn.text||"").trim();
-    const words=text.toLowerCase().match(/\b[a-z0-9']+\b/g)||[];
-    const unique=new Set(words).size;
-    const sentences=text.split(/[.!?]+/).filter(Boolean).length;
-    const connectors=rules.reduce((sum,[pattern,points])=>sum+(pattern.test(text)?points:0),0);
-    let points=Math.min(24,Math.sqrt(words.length)*5.2)+sentences*1.4+(words.length?Math.round(unique/words.length*4):0)+Math.min(connectors,8);
-    if(words.length>=90)points+=2;
-    const speaker=scores[turn.uid]===undefined?room.players.find(player=>player!==uid):turn.uid;
-    if(speaker)scores[speaker]=(scores[speaker]||0)+points;
-  }
-  for(const player of room.players)scores[player]=Math.round(scores[player]||0);
-  const opponent=room.players.find(player=>player!==uid)||"";
-  const winnerUid=scores[uid]===scores[opponent]?null:scores[uid]>scores[opponent]?uid:opponent;
-  return {scores,winnerUid};
-}
 type PrivateRoomData = {id:string;code:string;debate_id:string|null;expires_at:string;closed:boolean};
 
 const pendingAssignmentStorageKey = "veritas-react-pending-assignment";
+const practiceSessionStorageKey = "veritas-react-active-practice";
 function readPendingAssignmentResult(): PendingAssignmentResult | null {
   if (typeof window === "undefined") return null;
   try {
     const value = JSON.parse(sessionStorage.getItem(pendingAssignmentStorageKey) || "null");
-    return value?.assignment?.id && value?.request_id && typeof value?.content === "string" && value?.activity ? value as PendingAssignmentResult : null;
+    return typeof value?.owner_id === "string" && value.assignment?.id && value?.request_id && typeof value?.content === "string" && value?.activity ? value as PendingAssignmentResult : null;
   } catch { return null; }
+}
+
+function readPracticeSession(key: string): SavedPracticeSession | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const value = JSON.parse(sessionStorage.getItem(key) || "null");
+    return value && practiceModes.some(item => item.id === value.mode)
+      && Array.isArray(value.questions) && Array.isArray(value.answers)
+      && Number.isInteger(value.questionIndex) && value.questionIndex >= 0
+      && value.questionIndex < value.questions.length ? value as SavedPracticeSession : null;
+  } catch {
+    return null;
+  }
+}
+
+const viewValues: View[] = ["home", "setup", "daily", "profile", "leaderboard", "study", "classroom", "evidence", "ai-setup", "ai-room", "ai-result", "ai-evidence", "live-lobby", "live-search", "live-room", "game", "summary", "arcade"];
+
+function initialDestination(): View {
+  if (typeof window === "undefined") return "home";
+  const candidate = window.location.pathname.split("/")[2] || window.location.hash.slice(1);
+  return viewValues.includes(candidate as View) ? candidate as View : "home";
+}
+function safeDestination(next: View): View {
+  return next === "game" || next === "summary" ? "home"
+    : next === "ai-room" || next === "ai-result" || next === "ai-evidence" ? "ai-setup"
+      : next === "live-search" ? "live-lobby" : next;
+}
+function destinationUrl(next: View, room?: string) {
+  return `/workspace/${next}${next === "live-room" && room ? `?room=${encodeURIComponent(room)}` : ""}`;
 }
 
 function seededRandom(seed: string) {
@@ -121,10 +157,17 @@ export default function App() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [sessionEmail, setSessionEmail] = useState<string | null>(null);
+  const [sessionAccountId, setSessionAccountId] = useState<string | null>(null);
+  const [evidencePractice, setEvidencePractice] = useState<{
+    accountId: string; card: EvidenceCard; round: EvidenceRound;
+  } | null>(null);
   const [guestMode, setGuestMode] = useState(false);
   const [notice, setNotice] = useState("");
   const [progress, setProgressState] = useState(() => loadProgress());
-  const [view, setView] = useState<View>("home");
+  const progressOwner = sessionAccountId || (guestMode ? "guest" : null);
+  const progressOwnerRef = useRef<string | null>(null);
+  const [progressReadyForOwner, setProgressReadyForOwner] = useState(false);
+  const [view, setView] = useState<View>(() => safeDestination(initialDestination()));
   const viewRef=useRef<typeof view>(view);
   viewRef.current=view;
   const speechFlowRef=useRef({view,sessionEmail});
@@ -138,16 +181,27 @@ export default function App() {
   const [score, setScore] = useState(0);
   const [currentAnswer, setCurrentAnswer] = useState<number | null>(null);
   const [summary, setSummary] = useState<RunSummary | null>(null);
+  const practiceKey = guestMode ? `${practiceSessionStorageKey}:guest`
+    : sessionAccountId ? `${practiceSessionStorageKey}:${sessionAccountId}` : null;
+  const activePracticeKey = useRef<string | null>(null);
+  const [savedPractice, setSavedPractice] = useState<{ key: string; session: SavedPracticeSession } | null>(null);
+  const resumeSession = savedPractice?.key === practiceKey ? savedPractice?.session ?? null : null;
   const [pendingAssignmentResult, setPendingAssignmentResult] = useState<PendingAssignmentResult | null>(() => readPendingAssignmentResult());
-  const [assignedPractice, setAssignedPractice] = useState<Assignment | null>(() => pendingAssignmentResult?.assignment || null);
+  const currentPending = pendingAssignmentResult?.owner_id === progressOwner ? pendingAssignmentResult : null;
+  const [assignedPractice, setAssignedPractice] = useState<Assignment | null>(() => currentPending?.assignment || null);
   const [liveAssignmentStatus,setLiveAssignmentStatus]=useState("");
   const [attempt, setAttempt] = useState(0);
   const [isDailyRun, setIsDailyRun] = useState(false);
+  const [dailyDate, setDailyDate] = useState<string>();
+  const [speedLimit, setSpeedLimit] = useState(5);
+  const speedRemaining = useRef(5000);
+  const [isBaselineRun, setIsBaselineRun] = useState(false);
   const [speedSecondsLeft, setSpeedSecondsLeft] = useState(5);
   const [now, setNow] = useState(Date.now());
   const [profile, setProfile] = useState<ProfileData>({displayName:null,elo:null,wins:0,losses:0,ties:0,avatarPath:null,avatarUrl:null});
   const [profileReady, setProfileReady] = useState(false);
   const [profileMessage, setProfileMessage] = useState("");
+  const [syncAttempt, setSyncAttempt] = useState(0);
   const [nameEditing, setNameEditing] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
   const [profileBusy, setProfileBusy] = useState(false);
@@ -156,6 +210,7 @@ export default function App() {
   const [leaderLoading, setLeaderLoading] = useState(false);
   const [leaderError, setLeaderError] = useState("");
   const [debateTopic,setDebateTopic]=useState("");
+  const [debatePlan, setDebatePlan] = useState<DebatePlanData | null>(null);
   const [showAiTopicBrowser,setShowAiTopicBrowser]=useState(false);
   const [debateStance,setDebateStance]=useState<"for"|"against">("for");
   const [debateBot,setDebateBot]=useState<"sparring"|"rival"|"champion">("rival");
@@ -175,6 +230,8 @@ export default function App() {
   const [aiAssignmentStatus,setAiAssignmentStatus]=useState("");
   const [aiAssignmentTranscript,setAiAssignmentTranscript]=useState<DebateTurn[]>([]);
   const [debateEstimated,setDebateEstimated]=useState(false);
+  const [assessmentBusy, setAssessmentBusy] = useState(false);
+  const refereeInFlight = useRef(false);
   const [debatePracticeMode,setDebatePracticeMode]=useState<"written"|"speech">("written");
   const [speechSeconds,setSpeechSeconds]=useState(90);
   const [isRecording,setIsRecording]=useState(false);
@@ -222,6 +279,8 @@ export default function App() {
   const refreshedLiveRatingRef=useRef("");
   const assignmentSubmitInFlightRef=useRef(false);
   const autoSubmissionAttemptedRef=useRef(false);
+  const queueGenerationRef = useRef(0);
+  const joiningQueueRef = useRef(false);
   const matchPollRef=useRef<number|undefined>(undefined);
   const matchClockRef=useRef<number|undefined>(undefined);
   const privatePollRef=useRef<number|undefined>(undefined);
@@ -230,16 +289,127 @@ export default function App() {
   const speechTimeoutRef=useRef<number|undefined>(undefined);
   const captureGenerationRef=useRef(0);
   const aiTurnSubmitRef=useRef(false);
+  const historyNavigationRef=useRef(false);
+  const liveGeneration = useRef(0);
+  const restoredRoomOwner = useRef<string | null>(null);
+  const workspaceOwner = useRef<string | null | undefined>(undefined);
+  const assessmentGeneration = useRef(0);
 
   useEffect(() => {
     if (!auth) return;
-    auth.auth.getSession().then(({ data }) => setSessionEmail(data.session?.user.email ?? null));
+    auth.auth.getSession().then(({ data }) => {
+      setSessionEmail(data.session?.user.email ?? null);
+      setSessionAccountId(data.session?.user.id ?? null);
+    });
     const { data } = auth.auth.onAuthStateChange((event, session) => {
       setSessionEmail(session?.user.email ?? null);
+      setSessionAccountId(session?.user.id ?? null);
+      setEvidencePractice(previous => previous?.accountId === session?.user.id ? previous : null);
       if (event === "PASSWORD_RECOVERY") { setGuestMode(false); setMode("reset"); }
     });
     return () => data.subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!progressOwner) { setProgressReadyForOwner(false); return; }
+    setProgressReadyForOwner(false);
+    progressOwnerRef.current = progressOwner;
+    setProgressState(loadProgress(localStorage, progressOwner));
+    setProgressReadyForOwner(true);
+  }, [progressOwner]);
+
+  useEffect(() => {
+    const owner = sessionAccountId ?? (guestMode ? "guest" : null);
+    if (owner === null && workspaceOwner.current === undefined) return;
+    const previous = workspaceOwner.current;
+    workspaceOwner.current = owner;
+    if (previous === undefined || previous === owner) return;
+    liveGeneration.current++;
+    assessmentGeneration.current++;
+    refereeInFlight.current = false; setAssessmentBusy(false);
+    restoredRoomOwner.current = null; matchedOnceRef.current = false;
+    stopQueueTimers(); cancelSpeechCapture();
+    if (auth && liveChannelRef.current) { void auth.removeChannel(liveChannelRef.current); liveChannelRef.current = null; }
+    setLiveRoom(null); setLiveUid(""); setLiveDraft(""); setLiveTranscript(""); setPlaybackUrls({});
+    setDebateTurns([]); setDebateDraft(""); setDebateVerdict(null); setDebatePlan(null); setEvidencePractice(null);
+    setProfile({ displayName:null, elo:null, wins:0, losses:0, ties:0, avatarPath:null, avatarUrl:null });
+    setProfileReady(false); setAssignedPractice(null); setView("home");
+  }, [sessionAccountId, guestMode]);
+
+  const workspaceOpen = Boolean((sessionEmail && mode !== "reset") || guestMode);
+  useEffect(() => {
+    if (!workspaceOpen) return;
+    window.history.replaceState({ ...window.history.state, veritasView: viewRef.current }, "", destinationUrl(viewRef.current, new URLSearchParams(window.location.search).get("room") ?? undefined));
+    const onPopState = (event: PopStateEvent) => {
+      const next = event.state?.veritasView ?? initialDestination();
+      if (!viewValues.includes(next)) return;
+      const destination = safeDestination(next);
+      if (destination !== next) window.history.replaceState({ ...window.history.state, veritasView: destination }, "", destinationUrl(destination));
+      if (destination === "live-room") {
+        const room = new URLSearchParams(window.location.search).get("room");
+        if (room && room !== liveRoom?.id) { matchedOnceRef.current = false; void onMatched(room); }
+      }
+      historyNavigationRef.current = destination !== viewRef.current;
+      if (viewRef.current === "game") setAssignedPractice(null);
+      setView(destination);
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [workspaceOpen]);
+
+  useEffect(() => {
+    if (!workspaceOpen) return;
+    if (historyNavigationRef.current) {
+      historyNavigationRef.current = false;
+      return;
+    }
+    if (window.history.state?.veritasView !== view) {
+      window.history.pushState({ ...(window.history.state || {}), veritasView: view }, "", destinationUrl(view, liveRoom?.id));
+    }
+  }, [view, workspaceOpen, liveRoom?.id]);
+
+  useEffect(() => {
+    const active = workspaceOpen && (view === "game" || view === "ai-room" || view === "live-room");
+    if (!active) return;
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [view, workspaceOpen]);
+
+  useEffect(() => {
+    const session = practiceKey ? readPracticeSession(practiceKey) : null;
+    setSavedPractice(practiceKey && session ? { key: practiceKey, session } : null);
+    if (viewRef.current === "game" && activePracticeKey.current !== practiceKey) {
+      setAssignedPractice(null);
+      setView("home");
+    }
+  }, [practiceKey]);
+
+  useEffect(() => {
+    if (!practiceKey || activePracticeKey.current !== practiceKey || view !== "game" || !questions.length) return;
+    const saved: SavedPracticeSession = {
+      mode: activeMode,
+      difficulty,
+      questions,
+      questionIndex,
+      answers,
+      streak: streakNow,
+      bestStreak,
+      score,
+      currentAnswer,
+      daily: isDailyRun,
+      dailyDate, speedLimit, speedRemainingMs: speedRemaining.current,
+      baseline: isBaselineRun,
+      attempt,
+      assignedPractice,
+      savedAt: new Date().toISOString(),
+    };
+    try { sessionStorage.setItem(practiceKey, JSON.stringify(saved)); } catch { /* Resume remains available in memory. */ }
+    setSavedPractice({ key: practiceKey, session: saved });
+  }, [practiceKey, view, activeMode, difficulty, questions, questionIndex, answers, streakNow, bestStreak, score, currentAnswer, isDailyRun, dailyDate, speedLimit, speedSecondsLeft, isBaselineRun, attempt, assignedPractice]);
 
   useEffect(() => {
     if (view !== "daily") return;
@@ -263,18 +433,21 @@ export default function App() {
 
   useEffect(() => {
     if (view !== "game" || activeMode !== "speed" || currentAnswer !== null) return;
-    let remaining = 5;
-    setSpeedSecondsLeft(remaining);
-    const timer = window.setInterval(() => {
-      remaining -= 1;
-      setSpeedSecondsLeft(Math.max(remaining, 0));
-      if (remaining <= 0) {
-        window.clearInterval(timer);
-        submitAnswer(-1);
-      }
-    }, 1000);
-    return () => window.clearInterval(timer);
-  }, [view, activeMode, questionIndex, currentAnswer]);
+    if (speedLimit === 0) return;
+    const deadline = Date.now() + speedRemaining.current;
+    let submitted = false;
+    const update = () => {
+      speedRemaining.current = Math.max(0, deadline - Date.now());
+      setSpeedSecondsLeft(Math.ceil(speedRemaining.current / 1000));
+      if (!speedRemaining.current && !submitted) { submitted = true; submitAnswer(-1); }
+    };
+    update();
+    const timer = window.setInterval(update, 100);
+    return () => {
+      window.clearInterval(timer);
+      speedRemaining.current = Math.max(0, deadline - Date.now());
+    };
+  }, [view, activeMode, questionIndex, currentAnswer, speedLimit]);
 
   useEffect(() => {
     if (!liveRoom || liveRoom.status !== "active") return;
@@ -290,14 +463,21 @@ export default function App() {
   }, [liveRoom, liveUid]);
 
   useEffect(() => {
-    if(!auth||!liveRoom)return;
-    let cancelled=false;
-    void Promise.all((liveRoom.turns||[]).filter(turn=>turn.audioPath&&!playbackUrls[turn.audioPath]).map(async turn=>{
-      const {data}=await auth!.storage.from("debate-recordings").createSignedUrl(turn.audioPath!,300);
-      if(!cancelled&&data?.signedUrl)setPlaybackUrls(current=>({...current,[turn.audioPath!]:data.signedUrl}));
-    }));
-    return()=>{cancelled=true;};
-  },[liveRoom,playbackUrls]);
+    if (!auth || !liveRoom) return;
+    let cancelled = false;
+    const refresh = async () => {
+      const paths = [...new Set(liveRoom.turns.flatMap(turn => turn.audioPath ? [turn.audioPath] : []))];
+      await Promise.all(paths.map(async path => {
+        const { data } = await auth!.storage.from("debate-recordings").createSignedUrl(path, 600);
+        if (!cancelled && data?.signedUrl) setPlaybackUrls(current => ({ ...current, [path]: data.signedUrl }));
+      }));
+    };
+    void refresh();
+    const timer = window.setInterval(() => void refresh(), 240000);
+    const onVisible = () => { if (document.visibilityState === "visible") void refresh(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => { cancelled = true; window.clearInterval(timer); document.removeEventListener("visibilitychange", onVisible); };
+  }, [liveRoom]);
 
   useEffect(() => () => {
     if (auth && liveChannelRef.current) void auth.removeChannel(liveChannelRef.current);
@@ -317,6 +497,14 @@ export default function App() {
           auth.rpc("get_my_profile_progress"),
         ]);
         if (!active) return;
+        const remoteProgress = savedProgress && typeof savedProgress === "object" ? savedProgress : {};
+        const localProgress = loadProgress(localStorage, user.id);
+        const reconciled = mergeProgress(localProgress, remoteProgress);
+        saveProgress(reconciled, localStorage, user.id);
+        if (progressOwnerRef.current === user.id) {
+          setProgressState(reconciled);
+          setProgressReadyForOwner(true);
+        }
         const avatarPath = typeof savedProgress?.avatarFileId === "string" ? savedProgress.avatarFileId : null;
         setProfile({ displayName: row?.display_name ?? null, elo: row?.elo_rating ?? null, wins: row?.wins ?? 0, losses: row?.losses ?? 0, ties: row?.ties ?? 0, avatarPath, avatarUrl: null });
         setProfileReady(true);
@@ -334,12 +522,19 @@ export default function App() {
   }, [sessionEmail]);
 
   useEffect(() => {
-    if (!auth || !sessionEmail || guestMode || !profileReady) return;
+    const retry = () => setSyncAttempt(value => value + 1);
+    window.addEventListener("online", retry);
+    return () => window.removeEventListener("online", retry);
+  }, []);
+
+  useEffect(() => {
+    if (!auth || !sessionEmail || guestMode || !profileReady || !progressReadyForOwner || progressOwner !== sessionAccountId || progressOwnerRef.current !== sessionAccountId) return;
     const saved = progress;
     void auth.rpc("sync_profile", { p_display_name: profile.displayName, p_progress: { totalXp:saved.totalXp, streak:saved.streak, totalRuns:saved.totalRuns, skills:saved.skills, masteryVersion:2, assessments:saved.assessments, modeStats:saved.modeStats, avatarFileId:profile.avatarPath } }).then(({error:syncError}:any) => {
-      if (syncError) console.warn("Progress sync was unavailable; local practice remains saved.", syncError);
+      if (syncError) setProfileMessage("Progress is saved on this device. Account sync failed; retry here or reconnect to sync.");
+      else setProfileMessage(previous => previous.startsWith("Progress is saved on this device.") ? "Progress synced to your account." : previous);
     });
-  }, [sessionEmail, guestMode, profileReady, progress, profile.displayName, profile.avatarPath]);
+  }, [sessionEmail, guestMode, profileReady, progressReadyForOwner, progressOwner, sessionAccountId, progress, profile.displayName, profile.avatarPath, syncAttempt]);
 
   useEffect(()=>{
     const previous=speechFlowRef.current;
@@ -357,15 +552,10 @@ export default function App() {
   },[]);
   useEffect(()=>()=>{stopQueueTimers();if(auth&&queueChannelRef.current)void auth.removeChannel(queueChannelRef.current);},[]);
   useEffect(()=>{
-    if(!sessionEmail||!pendingAssignmentResult||autoSubmissionAttemptedRef.current)return;
+    if(!sessionAccountId||!pendingAssignmentResult||pendingAssignmentResult.owner_id!==sessionAccountId||autoSubmissionAttemptedRef.current)return;
     autoSubmissionAttemptedRef.current=true;
     void submitAssignedResult(pendingAssignmentResult.assignment,pendingAssignmentResult.content,pendingAssignmentResult.activity);
-  },[sessionEmail]);
-  useEffect(()=>{
-    if(!liveRoom||liveRoom.status!=="active")return;
-    const update=()=>{const anchor=liveRoom.last_turn_at?new Date(liveRoom.last_turn_at).getTime():new Date(liveRoom.created_at).getTime();const remaining=Math.max(0,Math.ceil((anchor+liveRoom.turn_seconds*1000-Date.now())/1000));setLiveSecondsLeft(remaining);if(remaining===0)void submitTimeoutTurn();};
-    update();const timer=window.setInterval(update,500);return()=>window.clearInterval(timer);
-  },[liveRoom,liveUid]);
+  },[sessionAccountId]);
   useEffect(()=>{
     if(!liveRoom||liveRoom.status!=="completed"||!liveUid)return;
     awardLiveDebateXpOnce(liveRoom.id,"completion",60);
@@ -380,7 +570,6 @@ export default function App() {
     if(submittedLiveAssignmentRef.current===liveRoom.id||liveAssignmentInFlightRef.current)return;
     void submitLiveAssignment(liveRoom);
   },[liveRoom,assignedPractice]);
-  useEffect(()=>()=>{if(auth&&liveChannelRef.current)void auth.removeChannel(liveChannelRef.current);},[]);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -418,19 +607,33 @@ export default function App() {
 
   async function signOut() {
     if (!auth) return;
+    clearPendingAssignment();
     const { error: result } = await auth.auth.signOut();
     if (result) setError(result.message);
   }
 
-  function startPracticeRun(mode: PracticeMode, selectedDifficulty: "all" | Difficulty, isRetry = false) {
-    const sourceBank = practiceQuestionBanks[mode];
+  function clearPendingAssignment() {
+    try {
+      sessionStorage.removeItem(pendingAssignmentStorageKey);
+      if (pendingAssignmentResult?.assignment?.id) sessionStorage.removeItem(`veritas-react-submit:${pendingAssignmentResult.assignment.id}`);
+    } catch { /* Storage may be unavailable. */ }
+    setPendingAssignmentResult(null);
+    setAssignedPractice(null);
+  }
+
+  function startPracticeRun(mode: PracticeMode, selectedDifficulty: "all" | Difficulty, isRetry = false, questionLimit = 8, baseline = false, classroomAssignment?: Assignment) {
+    const sourceBank = classroomAssignment ? assignmentQuestionBanks[mode] : practiceQuestionBanks[mode];
+    setAssignedPractice(classroomAssignment ?? null);
+    const timeLimit = classroomAssignment ? 5 : speedLimit;
+    setSpeedLimit(timeLimit);
     const source = selectedDifficulty === "all" ? sourceBank : sourceBank.filter(q => q.difficulty === selectedDifficulty);
     if (!source.length) return setNotice("There are no questions at that difficulty yet.");
     const attemptNo = isRetry ? attempt + 1 : 1;
+    activePracticeKey.current = practiceKey;
     setAttempt(attemptNo);
     const random = seededRandom(`${new Date().toISOString().slice(0,10)}-${mode}-${selectedDifficulty}-${attemptNo}`);
     const prioritized = prioritizeAssessment(shuffled(source, random), practiceModeInfo(mode).skill, progress.assessments);
-    const picked = prioritized.slice(0, Math.min(8, prioritized.length)).map(question => shuffledOptions(question, random));
+    const picked = prioritized.slice(0, Math.min(questionLimit, prioritized.length)).map(question => shuffledOptions(question, random));
     setActiveMode(mode);
     setQuestions(picked);
     setDifficulty(selectedDifficulty);
@@ -440,15 +643,72 @@ export default function App() {
     setBestStreak(0);
     setScore(0);
     setCurrentAnswer(null);
-    setSpeedSecondsLeft(5);
+    speedRemaining.current = timeLimit * 1000;
+    setSpeedSecondsLeft(timeLimit);
+    setDailyDate(undefined);
     setIsDailyRun(false);
+    setIsBaselineRun(baseline);
     setView("game");
     setNotice("");
   }
 
+  function resumePracticeRun() {
+    if (!resumeSession || !practiceKey) return;
+    activePracticeKey.current = practiceKey;
+    setActiveMode(resumeSession.mode);
+    setDifficulty(resumeSession.difficulty);
+    setQuestions(resumeSession.questions);
+    setQuestionIndex(resumeSession.questionIndex);
+    setAnswers(resumeSession.answers);
+    setStreakNow(resumeSession.streak);
+    setBestStreak(resumeSession.bestStreak);
+    setScore(resumeSession.score);
+    setCurrentAnswer(resumeSession.currentAnswer);
+    setDailyDate(resumeSession.dailyDate ?? (resumeSession.daily ? resumeSession.savedAt.slice(0,10) : undefined));
+    setSpeedLimit(resumeSession.speedLimit ?? 5);
+    speedRemaining.current = resumeSession.speedRemainingMs ?? 5000;
+    setSpeedSecondsLeft(Math.ceil(speedRemaining.current / 1000));
+    setIsDailyRun(resumeSession.daily);
+    setIsBaselineRun(Boolean(resumeSession.baseline));
+    setAttempt(resumeSession.attempt || 1);
+    setAssignedPractice(resumeSession.assignedPractice || null);
+    setView("game");
+    setNotice("");
+  }
+
+  function pausePracticeRun() {
+    if (practiceKey && savedPractice?.key === practiceKey) {
+      const session = { ...savedPractice.session, speedRemainingMs: speedRemaining.current };
+      try { sessionStorage.setItem(practiceKey, JSON.stringify(session)); } catch { /* Memory resume still works. */ }
+      setSavedPractice({ key: practiceKey, session });
+    }
+    setAssignedPractice(null);
+    setView("home");
+    setNotice("Practice paused. Resume it from your dashboard.");
+  }
+
+  function clearSavedPractice() {
+    try {
+      if (practiceKey) sessionStorage.removeItem(practiceKey);
+    } catch { /* Session is still cleared in memory. */ }
+    activePracticeKey.current = null;
+    setSavedPractice(null);
+  }
+
+  function discardPracticeRun() {
+    clearSavedPractice();
+    setQuestions([]);
+    setAnswers([]);
+    setAssignedPractice(null);
+    setView("home");
+    setNotice("Practice session ended.");
+  }
+
   function startDailyChallenge() {
-    const day = new Date().toISOString().slice(0,10);
+    const day = utcDay();
     if (progress.dailyCompletedDate === day) return;
+    activePracticeKey.current = practiceKey;
+    setAttempt(1);
     setAssignedPractice(null);
     const dayIndex = Math.floor(Date.parse(`${day}T00:00:00Z`) / 86400000);
     const mode = practiceModes[((dayIndex % practiceModes.length) + practiceModes.length) % practiceModes.length].id;
@@ -463,8 +723,11 @@ export default function App() {
     setBestStreak(0);
     setScore(0);
     setCurrentAnswer(null);
-    setSpeedSecondsLeft(5);
+    speedRemaining.current = speedLimit * 1000;
+    setSpeedSecondsLeft(speedLimit);
+    setDailyDate(day);
     setIsDailyRun(true);
+    setIsBaselineRun(false);
     setView("game");
   }
 
@@ -496,7 +759,10 @@ export default function App() {
     const baseXp = Math.round(modeInfo.xp * correct / total);
     const accuracyBonus = accuracy >= 80 ? 30 : accuracy >= 50 ? 12 : 0;
     const streakBonus = finalStreak >= 4 ? 30 : finalStreak >= 2 ? 12 : 0;
-    const xp = (baseXp + accuracyBonus + streakBonus) * (daily ? 3 : 1);
+    const completionDate = dailyDate ?? utcDay();
+    const latestProgress = loadProgress(localStorage, progressOwner || "guest");
+    const alreadyRewarded = daily && !dailyRewardAvailable(latestProgress.dailyCompletedDate, completionDate);
+    const xp = alreadyRewarded ? 0 : (baseXp + accuracyBonus + streakBonus) * (daily ? 3 : 1);
     const today = new Date().toISOString().slice(0,10);
     const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0,10);
     const next = {
@@ -505,7 +771,7 @@ export default function App() {
       totalRuns: progress.totalRuns + 1,
       streak: progress.lastPlayDate === today ? progress.streak : progress.lastPlayDate === yesterday ? progress.streak + 1 : 1,
       lastPlayDate: today,
-      dailyCompletedDate: daily ? today : progress.dailyCompletedDate,
+      dailyCompletedDate: daily ? completedDailyDate(progress.dailyCompletedDate, dailyDate ?? today) : progress.dailyCompletedDate,
       modeStats: { ...progress.modeStats, [activeMode]: { bestPct: Math.max(prevMode.bestPct, accuracy), plays: prevMode.plays + 1, bestScore: Math.max(prevMode.bestScore, finalScore), lastPlayedAt: new Date().toISOString() } },
       assessments: assessedResult.records,
       skills,
@@ -515,15 +781,20 @@ export default function App() {
     const arcadeRun = { modeKey: activeMode, correct, accuracy, bestCombo: finalStreak, score: finalScore, isDaily: daily };
     const arcade = applyArcadeRun(next, today, arcadeRun);
     const saved = arcade.state;
-    saveProgress(saved);
+    saveProgress(saved, localStorage, progressOwner || "guest");
     setProgressState(saved);
     const completedAssignment = assignedPractice;
     if (completedAssignment) {
-      const activity = { resultType: "server-scored", modeKey: activeMode, difficulty, correct, total, accuracy, score: finalScore, bestCombo: finalStreak };
+      const activity = { resultType: "server-scored", modeKey: activeMode, difficulty, correct, total, accuracy, score: finalScore, bestCombo: finalStreak,
+        answers: classroomAnswers(activeMode, runAnswers, questions, assignmentQuestionBanks[activeMode]),
+      };
       void submitAssignedResult(completedAssignment, JSON.stringify(activity), activity);
     }
-    const recommended: Difficulty = accuracy >= 80 ? (difficulty === "hard" ? "hard" : "hard") : difficulty === "hard" ? "medium" : "medium";
-    setSummary({ correct, total, accuracy, score: finalScore, streak: finalStreak, xp: xp + arcade.completed.reduce((sum, quest) => sum + quest.xp, 0), skillGain, assessed: assessedResult.assessed, answers: runAnswers, recommended, daily, mode: activeMode });
+    const recommended: Difficulty = accuracy < 50 ? "easy"
+      : accuracy < 80 ? (difficulty === "all" ? "medium" : difficulty)
+        : difficulty === "easy" ? "medium" : "hard";
+    clearSavedPractice();
+    setSummary({ correct, total, accuracy, score: finalScore, streak: finalStreak, xp: xp + arcade.completed.reduce((sum, quest) => sum + quest.xp, 0), skillGain, assessed: assessedResult.assessed, answers: runAnswers, recommended, daily, baseline: isBaselineRun, mode: activeMode });
     const rewardMessages = [
       ...arcade.completed.map(quest => `Goal complete: ${quest.text} (+${quest.xp} XP)`),
       ...arcade.unlocked.map(id => `Achievement unlocked: ${id.replaceAll("_", " ")}`),
@@ -534,6 +805,8 @@ export default function App() {
 
   function advanceQuestion() {
     if (questionIndex + 1 < questions.length) {
+      speedRemaining.current = speedLimit * 1000;
+      setSpeedSecondsLeft(speedLimit);
       setQuestionIndex(questionIndex + 1);
       setCurrentAnswer(null);
     } else {
@@ -565,7 +838,7 @@ export default function App() {
     }
     setProgressState((current:ReturnType<typeof loadProgress>)=>{
       const saved={...current,totalXp:current.totalXp+amount};
-      saveProgress(saved);
+      saveProgress(saved, localStorage, progressOwner || "guest");
       return saved;
     });
     setNotice(`Live debate reward: +${amount} XP.`);
@@ -573,7 +846,7 @@ export default function App() {
 
   function awardStudyXp(amount: number) {
     const saved = { ...progress, totalXp: progress.totalXp + amount };
-    saveProgress(saved);
+    saveProgress(saved, localStorage, progressOwner || "guest");
     setProgressState(saved);
     setNotice(`Study lesson completed. You earned ${amount} XP.`);
   }
@@ -585,7 +858,7 @@ export default function App() {
     if (!auth || guestMode) return setProfileMessage("Sign in to save a synced display name.");
     setProfileBusy(true); setProfileMessage("");
     try {
-      const saved = loadProgress();
+      const saved = progress;
       const { error: result } = await auth.rpc("sync_profile", { p_display_name:value, p_progress:{ totalXp:saved.totalXp, streak:saved.streak, totalRuns:saved.totalRuns, skills:saved.skills, masteryVersion:2, assessments:saved.assessments, modeStats:saved.modeStats, avatarFileId:profile.avatarPath } });
       if (result) throw result;
       setProfile(p=>({...p,displayName:value})); setNameEditing(false); setProfileMessage("Display name saved to your account.");
@@ -607,7 +880,7 @@ export default function App() {
       const path = `${userData.user.id}/avatar.${ext}`;
       const { error: uploadError } = await auth.storage.from("avatars").upload(path,file,{upsert:true,contentType:file.type,cacheControl:"3600"});
       if (uploadError) throw uploadError;
-      const saved = loadProgress();
+      const saved = progress;
       const { error: syncError } = await auth.rpc("sync_profile", { p_display_name:profile.displayName, p_progress:{ totalXp:saved.totalXp, streak:saved.streak, totalRuns:saved.totalRuns, skills:saved.skills, masteryVersion:2, assessments:saved.assessments, modeStats:saved.modeStats, avatarFileId:path } });
       if (syncError) throw syncError;
       const { data: signed } = await auth.storage.from("avatars").createSignedUrl(path,3600);
@@ -622,10 +895,10 @@ export default function App() {
     if(!auth) { setLeaderError("Configure Supabase to load live debate ratings."); return; }
     setLeaderLoading(true);
     try {
-      const {data,error:queryError}=await auth.from("profiles").select("uid, display_name, elo_rating, wins, losses, ties").order("elo_rating",{ascending:false}).limit(50);
+      const {data,error:queryError}=await auth.from("profiles").select("uid, display_name, elo_rating, wins, losses, ties").or("wins.gt.0,losses.gt.0,ties.gt.0").order("elo_rating",{ascending:false}).limit(50);
       if(queryError)throw queryError;
       const {data:userData}=await auth.auth.getUser();
-      setEloRows((data||[]).map((row:any)=>({name:row.display_name||"Debater",score:row.elo_rating||1200,self:row.uid===userData.user?.id,record:`${row.wins||0}W / ${row.losses||0}L / ${row.ties||0}T`})));
+      setEloRows((data||[]).map((row:any)=>({name:row.display_name||"Debater",score:row.elo_rating||1200,self:row.uid===userData.user?.id,record:`${(row.wins||0)+(row.losses||0)+(row.ties||0)<5?"Provisional · ":""}${row.wins||0}W / ${row.losses||0}L / ${row.ties||0}T`})));
     } catch(cause) { setLeaderError(cause instanceof Error?cause.message:"Could not load live ratings. Check your connection."); }
     finally { setLeaderLoading(false); }
   }
@@ -642,6 +915,7 @@ export default function App() {
   }
 
   function stopQueueTimers() {
+    queueGenerationRef.current++;
     if(matchPollRef.current)window.clearInterval(matchPollRef.current);matchPollRef.current=undefined;
     if(matchClockRef.current)window.clearInterval(matchClockRef.current);matchClockRef.current=undefined;
   }
@@ -655,6 +929,10 @@ export default function App() {
 
   async function joinPublicQueue(rematchFrom?:LiveRoomData) {
     if(!auth||guestMode){setMatchError("Sign in to find a live opponent.");return;}
+    if (joiningQueueRef.current) return;
+    joiningQueueRef.current = true;
+    stopQueueTimers();
+    const queueGeneration = queueGenerationRef.current;
     const topic=rematchFrom?.topic??liveTopic;
     const practiceMode=rematchFrom?.practice_mode??livePracticeMode;
     const turns=rematchFrom?.max_turns_per_player??liveTurns;
@@ -662,31 +940,94 @@ export default function App() {
     initialLiveEloRef.current=profile.elo;setLiveEloSummary("");
     setMatchError("");setMatchSeconds(0);matchedOnceRef.current=false;
     try {
+      if (queueChannelRef.current) { await auth.removeChannel(queueChannelRef.current); queueChannelRef.current = null; }
       const {data:userData,error:userError}=await auth.auth.getUser();if(userError||!userData.user)throw userError||new Error("Sign in to find a live opponent.");
+      if (queueGeneration !== queueGenerationRef.current) return;
       const uid=userData.user.id;
-      const channel=auth.channel(`queue-${uid}`).on("postgres_changes",{event:"UPDATE",schema:"public",table:"match_queue",filter:`uid=eq.${uid}`},payload=>{const row=payload.new as any;if(row?.status==="matched"&&row.debate_id)void onMatched(row.debate_id);}).subscribe();
+      const channel=auth.channel(`queue-${uid}`).on("postgres_changes",{event:"UPDATE",schema:"public",table:"match_queue",filter:`uid=eq.${uid}`},payload=>{const row=payload.new as any;if(queueGeneration === queueGenerationRef.current && row?.status==="matched"&&row.debate_id)void onMatched(row.debate_id);}).subscribe();
       queueChannelRef.current=channel;
       const settings={mode:practiceMode,speech_seconds:speechLength,turns,topic:assignedPractice?.kind==="live_debate"?assignedPractice.activity_settings?.topic||assignedPractice.title:topic||"",drill_mode:"fallacy",difficulty:"all"};
       const {error:joinError}=await auth.rpc("join_training_queue",{p_topic:topic||null,p_settings:settings});if(joinError)throw joinError;
+      if (queueGeneration !== queueGenerationRef.current) return;
       setView("live-search");
-      const attempt=async()=>{try{const fallback=topic||liveTopics[Math.floor(Math.random()*Math.max(liveTopics.length,1))]?.text||"Should public transport be free?";const {data,error}=await auth!.rpc("attempt_match",{p_fallback_topic:fallback});if(error)throw error;if(data)void onMatched(data as string);}catch(cause){setMatchError(cause instanceof Error?cause.message:"Match search is retrying.");}};
-      await attempt();matchPollRef.current=window.setInterval(()=>void attempt(),2500);matchClockRef.current=window.setInterval(()=>setMatchSeconds(s=>s+1),1000);
-    } catch(cause){if(auth&&queueChannelRef.current){await auth.removeChannel(queueChannelRef.current);queueChannelRef.current=null;}setMatchError(cause instanceof Error?cause.message:"Could not join the match queue.");setView("live-lobby");}
+      let attempting = false;
+      const attempt = async () => {
+        if (attempting || queueGeneration !== queueGenerationRef.current) return;
+        attempting = true;
+        try {
+          const fallback = topic || liveTopics[Math.floor(Math.random()*Math.max(liveTopics.length,1))]?.text || "Should public transport be free?";
+          const { data, error } = await auth!.rpc("attempt_match", { p_fallback_topic: fallback });
+          if (queueGeneration !== queueGenerationRef.current) return;
+          if (error) throw error;
+          if (data) { await onMatched(data as string); return; }
+          const own = await auth!.from("match_queue").select("status,debate_id").eq("uid", uid).maybeSingle();
+          if (queueGeneration !== queueGenerationRef.current) return;
+          if (own.error) throw own.error;
+          if (own.data?.status === "matched" && own.data.debate_id) { await onMatched(own.data.debate_id); return; }
+          if (!own.data) { await leaveQueue(); setMatchError("You are no longer in the public queue. Check your live-practice preferences before joining again."); }
+        } catch (cause) {
+          if (queueGeneration === queueGenerationRef.current) setMatchError(cause instanceof Error ? cause.message : "Match search is retrying.");
+        } finally { attempting = false; }
+      };
+      matchPollRef.current = window.setInterval(() => void attempt(), 2500);
+      matchClockRef.current = window.setInterval(() => setMatchSeconds(seconds => seconds + 1), 1000);
+      await attempt();
+    } catch(cause){if(queueGeneration !== queueGenerationRef.current)return;if(auth&&queueChannelRef.current){await auth.removeChannel(queueChannelRef.current);queueChannelRef.current=null;}setMatchError(cause instanceof Error?cause.message:"Could not join the match queue.");setView("live-lobby");}
+    finally { joiningQueueRef.current = false; }
   }
+
+  useEffect(() => {
+    if (!workspaceOpen || !sessionAccountId || restoredRoomOwner.current === sessionAccountId) return;
+    restoredRoomOwner.current = sessionAccountId;
+    if (viewRef.current !== "live-room") return;
+    let room = new URLSearchParams(window.location.search).get("room");
+    try { room ||= sessionStorage.getItem(`veritas:active-room:${sessionAccountId}`); } catch { /* URL is enough. */ }
+    if (room) { matchedOnceRef.current = false; void onMatched(room); }
+    else setView("live-lobby");
+  }, [workspaceOpen, sessionAccountId]);
+
+  useEffect(() => {
+    if (!auth || !liveRoom || view !== "live-room") return;
+    let active = true;
+    const reconcile = async () => {
+      const { data, error } = await auth!.from("debates").select("*").eq("id", liveRoom.id).single();
+      if (!active) return;
+      if (error) { setMatchError("Connection interrupted. Reconnecting to your debate…"); return; }
+      setLiveRoom(current => current && current.id === data.id && (current.turn_index > data.turn_index || (current.ai_verdict && !data.ai_verdict)) ? current : data as LiveRoomData);
+    };
+    const visible = () => { if (document.visibilityState === "visible") void reconcile(); };
+    window.addEventListener("online", reconcile);
+    document.addEventListener("visibilitychange", visible);
+    const timer = window.setInterval(() => void reconcile(), 5000);
+    return () => { active = false; window.clearInterval(timer); window.removeEventListener("online", reconcile); document.removeEventListener("visibilitychange", visible); };
+  }, [view, liveRoom?.id]);
 
   async function onMatched(debateId:string) {
     if(matchedOnceRef.current)return;matchedOnceRef.current=true;
+    const generation = ++liveGeneration.current;
     stopQueueTimers();if(auth&&queueChannelRef.current){await auth.removeChannel(queueChannelRef.current);queueChannelRef.current=null;}
-    setMatchedDebateId(debateId);setView("live-room");setLiveRoomLoading(true);setLiveDraft("");setLiveTranscript("");setLiveSpeechBlob(null);setLiveSpeechMessage("");setLiveRatingSent(false);timeoutSentRef.current=false;
+    setLiveRoom(null);setMatchedDebateId(debateId);setView("live-room");setLiveRoomLoading(true);setLiveDraft("");setLiveTranscript("");setLiveSpeechBlob(null);setLiveSpeechMessage("");setLiveRatingSent(false);timeoutSentRef.current=false;
     try {
       const {data:userData,error:userError}=await auth!.auth.getUser();if(userError||!userData.user)throw userError||new Error("Sign in again to open this match.");setLiveUid(userData.user.id);
       const {data,error:roomError}=await auth!.from("debates").select("*").eq("id",debateId).single();if(roomError||!data)throw roomError||new Error("Debate room not found.");
+      if (generation !== liveGeneration.current) return;
+      try { sessionStorage.setItem(`veritas:active-room:${userData.user.id}`, debateId); } catch { /* URL recovery remains available. */ }
+      window.history.replaceState({ ...window.history.state, veritasView: "live-room" }, "", destinationUrl("live-room", debateId));
       setLiveRoom(data as LiveRoomData);setLiveOpponentName("Opponent");setLiveOpponentElo(1200);
       const opponent=(data as LiveRoomData).players.find((id:string)=>id!==userData.user.id);
       if(opponent){const {data:profileRow}=await auth!.from("profiles").select("display_name,elo_rating").eq("uid",opponent).maybeSingle();if(profileRow?.display_name)setLiveOpponentName(profileRow.display_name);if(typeof profileRow?.elo_rating==="number")setLiveOpponentElo(profileRow.elo_rating);}
       if(liveChannelRef.current)await auth!.removeChannel(liveChannelRef.current);
-      liveChannelRef.current=auth!.channel(`debate-${debateId}`).on("postgres_changes",{event:"UPDATE",schema:"public",table:"debates",filter:`id=eq.${debateId}`},payload=>{const row=payload.new as LiveRoomData;setLiveRoom(row);timeoutSentRef.current=false;}).subscribe();
-    }catch(cause){setMatchError(cause instanceof Error?cause.message:"Could not load this debate room.");}
+      liveChannelRef.current=auth!.channel(`debate-${debateId}`).on("postgres_changes",{event:"UPDATE",schema:"public",table:"debates",filter:`id=eq.${debateId}`},payload=>{
+        if (generation !== liveGeneration.current) return;
+        const row = payload.new as LiveRoomData;
+        setLiveRoom(current => current && current.id === row.id && (current.turn_index > row.turn_index || (current.ai_verdict && !row.ai_verdict)) ? current : row);
+        timeoutSentRef.current=false;
+      }).subscribe(async status => {
+        if (status !== "SUBSCRIBED" || generation !== liveGeneration.current) return;
+        const { data: fresh } = await auth!.from("debates").select("*").eq("id", debateId).single();
+        if (fresh && generation === liveGeneration.current) setLiveRoom(current => current && current.id === fresh.id && (current.turn_index > fresh.turn_index || (current.ai_verdict && !fresh.ai_verdict)) ? current : fresh as LiveRoomData);
+      });
+    }catch(cause){matchedOnceRef.current=false;setMatchError(cause instanceof Error?cause.message:"Could not load this debate room.");}
     finally{setLiveRoomLoading(false);}
   }
 
@@ -797,6 +1138,7 @@ export default function App() {
   }
 
   function beginAiDebate() {
+    if (refereeInFlight.current) { setNotice("Wait for the current assessment before starting another debate."); return; }
     if (!auth || !sessionEmail) { setDebateError("Sign in to debate the AI."); return; }
     const topic = debateTopic.trim();
     if (!topic || topic.length > 200) {
@@ -812,9 +1154,11 @@ export default function App() {
     if (assignmentSubmitInFlightRef.current) return { ok: false, message: "Classroom submission is already in progress." };
     const key = `veritas-react-submit:${assignment.id}`;
     const stored = readPendingAssignmentResult();
+    if (stored && stored.owner_id !== progressOwner) return { ok: false, message: "This submission belongs to another account. Sign in to that account to retry it." };
     if (stored && stored.assignment.id !== assignment.id) return { ok: false, message: "Submit or retry the previous assignment before starting another." };
     const requestId = stored?.request_id || sessionStorage.getItem(key) || crypto.randomUUID();
-    const pending = stored || { assignment, request_id: requestId, content, activity };
+    if (!progressOwner) return { ok: false, message: "Sign in before submitting this assignment." };
+    const pending = stored || { owner_id: progressOwner, assignment, request_id: requestId, content, activity };
     sessionStorage.setItem(key, pending.request_id);
     sessionStorage.setItem(pendingAssignmentStorageKey, JSON.stringify(pending));
     setPendingAssignmentResult(pending);
@@ -960,27 +1304,41 @@ export default function App() {
   }
 
   async function scoreAiDebate(turns:DebateTurn[]) {
+    if (refereeInFlight.current) return;
+    refereeInFlight.current = true; setAssessmentBusy(true);
+    const generation = ++assessmentGeneration.current;
+    let completedVerdict: DebateVerdict | null = null;
     try {
       const data=await invokeVeritasFunction("ai-debate",{action:"referee",topic:debateTopic.trim(),transcript:turns});
+      if (generation !== assessmentGeneration.current) return;
       const v=data?.verdict;
       if(data?.ok!==true||!v||!Number.isFinite(v.debaterScore)||!Number.isFinite(v.aiScore)||typeof v.summary!=="string"||!Array.isArray(v.turnFeedback))throw new Error("Referee response malformed.");
       const rawDevil=v.devilsAdvocate;const devilsAdvocate=rawDevil&&typeof rawDevil.missedPoint==="string"&&rawDevil.missedPoint.trim()?{missedPoint:rawDevil.missedPoint.trim(),challenge:typeof rawDevil.challenge==="string"?rawDevil.challenge.trim():"Argue the strongest version of this point."}:null;
       const coaching = readDebateCoaching(v.coaching, turns.filter(turn => turn.speaker === "user").length);
-      setDebateVerdict({ ...v, devilsAdvocate, coaching } as DebateVerdict);
+      completedVerdict = { ...v, devilsAdvocate, coaching } as DebateVerdict;
+      setDebateVerdict(completedVerdict);
       setDebateEstimated(false);
     } catch {
+      if (generation !== assessmentGeneration.current) return;
       const userTurns=turns.filter(t=>t.speaker==="user");
       const connectives=["because","therefore","however","for example"];
-      let debaterScore=50;
-      const turnFeedback=userTurns.map((turn,index)=>{const words=turn.text.trim().split(/\s+/).filter(Boolean).length;const has=connectives.some(c=>turn.text.toLowerCase().includes(c));debaterScore+=Math.min(8,Math.round(words/8))+(has?6:0);return{turn:index+1,logic:has?"Used clear reasoning connectors.":"Make the reasoning link more explicit.",evidence:words>25?"Argument had useful detail.":"Add a concrete example or evidence.",responsiveness:"Estimated locally; not independently reviewed."};});
-      debaterScore=Math.max(0,Math.min(100,debaterScore));const aiScore=100-debaterScore;
-      setDebateVerdict({debaterScore,aiScore,winner:debaterScore>aiScore?"debater":debaterScore<aiScore?"ai":"tie",summary:"This is a rough local estimate based on argument length and reasoning cues. The AI referee was unavailable.",turnFeedback,estimated:true});setDebateEstimated(true);
+
+      const turnFeedback=userTurns.map((turn,index)=>{const words=turn.text.trim().split(/\s+/).filter(Boolean).length;const has=connectives.some(c=>turn.text.toLowerCase().includes(c));return{turn:index+1,logic:has?"Used clear reasoning connectors.":"Make the reasoning link more explicit.",evidence:words>25?"Argument had useful detail.":"Add a concrete example or evidence.",responsiveness:"Estimated locally; not independently reviewed."};});
+
+      setDebateVerdict({debaterScore:0,aiScore:0,winner:"unavailable",summary:"The AI referee was unavailable. No score or winner has been assigned. Review your transcript or retry the assessment.",turnFeedback,estimated:true});setDebateEstimated(true);
     } finally {
+      if (generation !== assessmentGeneration.current) return;
+      refereeInFlight.current = false; setAssessmentBusy(false);
+      try {
+        const key = `veritas:debate-reports:${progressOwner || "guest"}`;
+        const previous = JSON.parse(localStorage.getItem(key) || "[]");
+        localStorage.setItem(key, JSON.stringify([{ topic: debateTopic, transcript: turns, verdict: completedVerdict, completedAt: new Date().toISOString() }, ...(Array.isArray(previous) ? previous : [])].slice(0, 30)));
+      } catch { /* The current transcript remains available. */ }
       if (assignedPractice?.kind === "ai_debate") {
         setAiAssignmentTranscript(turns);
         void submitAiAssignment(turns);
       }
-      setView("ai-result");
+      if (["ai-room", "ai-result"].includes(viewRef.current)) setView("ai-result");
     }
   }
 
@@ -999,21 +1357,21 @@ export default function App() {
     finally { setDevilBusy(false); }
   }
 
-    const appViewModel = { ArrowRight, Check, Flame, LoaderCircle, ProfileScreen, Study, Swords, activeMode, advanceQuestion, aiAssignmentStatus, aiAssignmentTranscript, aiTopicSamples, assignedPractice, awardStudyXp, beginAiDebate, busy, confirmPassword, createPrivateRoom, currentAnswer, debateBot, debateBusy, debateDraft, debateError, debateEstimated, debateMaxTurns, debatePracticeMode, debateStance, debateTopic, debateTurnSeconds, debateTurns, debateVerdict, devilBusy, devilDraft, devilError, devilResult, difficulty, discardSpeech, eloRows, email, error, formatLiveClock, guestMode, isRecording, isSupabaseConfigured, joinPrivateRoom, joinPublicQueue, leaderError, leaderLoading, leaderTab, leaveQueue, liveAssignmentStatus, liveDraft, liveEloSummary, liveOpponentElo, liveOpponentName, livePracticeMode, liveRatingSent, liveRecording, liveRoom, liveRoomLoading, liveSecondsLeft, liveSending, liveSpeechBusy, liveSpeechMessage, liveSpeechUrl, liveTopic, liveTopics, liveTranscript, liveTurns, liveUid, matchError, matchSeconds, message, mode, nameDraft, nameEditing, notice, openLeaderboard, openLiveLobby, password, pendingAssignmentResult, playbackUrls, practiceModeInfo, practiceModes, practiceQuestionBanks, privateBusy, privateCode, privateNotice, privateRoom, profile, profileBusy, profileMessage, progress, questionIndex, questions, rateLiveDebate, saveDisplayName, score, sessionEmail, setActiveMode, setAiAssignmentStatus, setAssignedPractice, setConfirmPassword, setDebateBot, setDebateDraft, setDebateError, setDebateMaxTurns, setDebatePracticeMode, setDebateStance, setDebateTopic, setDebateTurnSeconds, setDevilDraft, setDifficulty, setEmail, setError, setGuestMode, setLiveAssignmentStatus, setLiveDraft, setLivePracticeMode, setLiveTopic, setLiveTranscript, setLiveTurns, setMatchError, setMessage, setMode, setNameDraft, setNameEditing, setNotice, setPassword, setPrivateCode, setPrivateNotice, setPrivateRoom, setProfileMessage, setShowAiTopicBrowser, setSpeechSeconds, setView, showAiTopicBrowser, signOut, speechBlob, speechBusy, speechNotice, speechSeconds, speechUrl, speedSecondsLeft, startDailyChallenge, startLiveRecording, startPracticeRun, startSpeechRecording, stopSpeechRecording, streakNow, submit, submitAiArgument, submitAiAssignment, submitAnswer, submitAssignedResult, submitDevilsAdvocateDrill, submitLiveAssignment, submitLiveTurn, submittedLiveAssignmentRef, summary, uploadAvatar };
+    const appViewModel = { debatePlan: debatePlan?.motion === debateTopic.trim() ? debatePlan : null, assessmentBusy, ArrowRight, Check, Flame, LoaderCircle, ProfileScreen, Study, Swords, activeMode, advanceQuestion, aiAssignmentStatus, aiAssignmentTranscript, aiTopicSamples, assignedPractice, awardStudyXp, beginAiDebate, busy, confirmPassword, createPrivateRoom, currentAnswer, debateBot, debateBusy, debateDraft, debateError, debateEstimated, debateMaxTurns, debatePracticeMode, debateStance, debateTopic, debateTurnSeconds, debateTurns, debateVerdict, devilBusy, devilDraft, devilError, devilResult, difficulty, discardPracticeRun, discardSpeech, eloRows, email, error, formatLiveClock, guestMode, isRecording, isSupabaseConfigured, joinPrivateRoom, joinPublicQueue, leaderError, leaderLoading, leaderTab, leaveQueue, liveAssignmentStatus, liveDraft, liveEloSummary, liveOpponentElo, liveOpponentName, livePracticeMode, liveRatingSent, liveRecording, liveRoom, liveRoomLoading, liveSecondsLeft, liveSending, liveSpeechBusy, liveSpeechMessage, liveSpeechUrl, liveTopic, liveTopics, liveTranscript, liveTurns, liveUid, matchError, matchSeconds, message, mode, nameDraft, nameEditing, notice, openLeaderboard, openLiveLobby, password, pausePracticeRun, pendingAssignmentResult, playbackUrls, practiceModeInfo, practiceModes, practiceQuestionBanks, privateBusy, privateCode, privateNotice, privateRoom, profile, profileBusy, profileMessage, progress, questionIndex, questions, rateLiveDebate, saveDisplayName, score, sessionAccountId, sessionEmail, setSyncAttempt, setProgressState, setActiveMode, setAiAssignmentStatus, setAssignedPractice, setConfirmPassword, setDebateBot, setDebateDraft, setDebateError, setDebateMaxTurns, setDebatePracticeMode, setDebateStance, setDebateTopic, setDebateTurnSeconds, setDevilDraft, setDifficulty, setEmail, setError, setGuestMode, setLiveAssignmentStatus, setLiveDraft, setLivePracticeMode, setLiveTopic, setLiveTranscript, setLiveTurns, setMatchError, setMessage, setMode, setNameDraft, setNameEditing, setNotice, setPassword, setPrivateCode, setPrivateNotice, setPrivateRoom, setProfileMessage, setShowAiTopicBrowser, setSpeechSeconds, setView, showAiTopicBrowser, signOut, speechBlob, speechBusy, speechNotice, speechSeconds, speechUrl, speedLimit, setSpeedLimit, scoreAiDebate, speedSecondsLeft, startDailyChallenge, startLiveRecording, startPracticeRun, startSpeechRecording, stopSpeechRecording, streakNow, submit, submitAiArgument, submitAiAssignment, submitAnswer, submitAssignedResult, submitDevilsAdvocateDrill, submitLiveAssignment, submitLiveTurn, submittedLiveAssignmentRef, summary, uploadAvatar };
 if ((sessionEmail && mode !== "reset") || guestMode) {
-    const tomorrow = new Date(); tomorrow.setHours(24,0,0,0);
-    const remaining = Math.max(0, Math.floor((tomorrow.getTime()-now)/1000));
+    const tomorrow = nextUtcReset(now);
+    const remaining = Math.max(0, Math.floor((tomorrow-now)/1000));
     const countdown = `${String(Math.floor(remaining/3600)).padStart(2,"0")}:${String(Math.floor((remaining%3600)/60)).padStart(2,"0")}:${String(remaining%60).padStart(2,"0")}`;
-    const todayDate = new Date().toISOString().slice(0,10);
+    const todayDate = new Date(now).toISOString().slice(0,10);
     const todayIndex = Math.floor(Date.parse(`${todayDate}T00:00:00Z`) / 86400000);
     const dailyModeInfo = practiceModes[((todayIndex % practiceModes.length) + practiceModes.length) % practiceModes.length];
     const activeModeInfo = practiceModeInfo(activeMode);
-    const liveRefereeEstimate=liveRoom&&liveRoom.status==="completed"&&!liveRoom.ai_verdict?estimateLiveReferee(liveRoom,liveUid):null;
+    const liveRefereeEstimate = null;
     const liveStats=liveRoom?liveTurnStats(liveRoom):null;
     const activeLiveUid=liveRoom?.status==="active"?liveRoom.player_order[liveRoom.turn_index%2]:null;
     const liveTurnTotal=liveRoom?liveRoom.max_turns_per_player*2:0;
-    const liveRefereeWinnerUid=liveRoom?.ai_verdict?.winnerUid??liveRefereeEstimate?.winnerUid;
-    const liveRefereeWinnerLabel=liveRoom?.ai_verdict?(liveRefereeWinnerUid?(liveRefereeWinnerUid===liveUid?"Your side wins":`${liveOpponentName} wins`):"The debate is tied"):(liveRefereeWinnerUid?`Estimated leader: ${liveRefereeWinnerUid===liveUid?"your side":liveOpponentName}`:"Estimated tie");
+    const liveRefereeWinnerUid=liveRoom?.ai_verdict?.winnerUid;
+    const liveRefereeWinnerLabel=liveRoom?.ai_verdict?(liveRefereeWinnerUid?(liveRefereeWinnerUid===liveUid?"Your side wins":`${liveOpponentName} wins`):"The debate is tied"):"Assessment pending — no winner assigned";
     const selectedQuestionCount = (practiceQuestionBanks[activeMode] || []).filter(question => difficulty === "all" || question.difficulty === difficulty).length;
     const dailyDone = progress.dailyCompletedDate === todayDate;
     const aiTurnLimit = debatePracticeMode === "speech" ? speechSeconds + 180 : debateTurnSeconds;
@@ -1032,11 +1390,10 @@ if ((sessionEmail && mode !== "reset") || guestMode) {
     const favoritePlays=favoritePractice?Math.max(0,Math.floor(Number(favoritePractice[1]?.plays)||0)):0;
     const favoriteBest=favoritePractice?Math.max(0,Math.min(100,Math.round(Number(favoritePractice[1]?.bestPct)||0))):0;
     const badges=[{id:"first_win",name:"First practice run",icon:"✓",on:progress.totalRuns>=1},{id:"streak3",name:"3-Day Streak",icon:"♨",on:progress.streak>=3},{id:"streak7",name:"7-Day Streak",icon:"✦",on:progress.streak>=7},{id:"fallacy_master",name:"Fallacy Master",icon:"⚡",on:(progress.modeStats.fallacy?.bestPct||0)>=90},{id:"steelman_pro",name:"Steelman Pro",icon:"⬟",on:(progress.modeStats.steelman?.bestPct||0)>=80},{id:"speed_demon",name:"Quick Thinker",icon:"◷",on:(progress.modeStats.speed?.bestPct||0)>=90},{id:"xp1000",name:"1K Club",icon:"✧",on:progress.totalXp>=1000},{id:"all_modes",name:"Well Rounded",icon:"◎",on:Object.keys(progress.modeStats||{}).length>=4}];
-    const profileSkills=skillRows.map(skill=>({
-      ...skill,
-      value:Math.max(0,Math.min(100,Number(progress.skills?.[skill.key])||0)),
-      assessed:Object.values(progress.assessments||{}).some((record:any)=>record?.skill===skill.key),
-    }));
+    const profileSkills=skillRows.map(skill=>{
+      const records = Object.values(progress.assessments||{}).filter((record:any)=>record?.skill===skill.key) as {at:number}[];
+      return {...skill,value:Math.max(0,Math.min(100,Number(progress.skills?.[skill.key])||0)),assessed:records.length>0,samples:records.length,lastAssessed:records.length?Math.max(...records.map(record=>record.at)):null};
+    });
     let rngSeed=42;const rng=()=>{rngSeed|=0;rngSeed=(rngSeed+0x6D2B79F5)|0;let t=Math.imul(rngSeed^(rngSeed>>>15),1|rngSeed);t=(t+Math.imul(t^(t>>>7),61|t))^t;return((t^(t>>>14))>>>0)/4294967296;};
     const xpRows:LeaderRow[]=["Aria K.","Devon P.","Lena W.","Mika T.","Sam R.","Priya N.","Jonas L.","Talia M.","Eli B.","Nadia F."].map(name=>({name,score:Math.floor(400+rng()*3200)}));
     xpRows.push({name:profile.displayName||sessionEmail?.split("@")[0]||"You",score:progress.totalXp,self:true});xpRows.sort((a,b)=>b.score-a.score);
@@ -1049,6 +1406,7 @@ if ((sessionEmail && mode !== "reset") || guestMode) {
         return;
       }
       setNotice("");
+      if (view === "game" || destination === "setup") setAssignedPractice(null);
       if (destination === "leaderboard") {
         void openLeaderboard("xp");
       } else if (destination === "live-lobby") {
@@ -1063,18 +1421,31 @@ if ((sessionEmail && mode !== "reset") || guestMode) {
     }
         const screenViewModel = { ...appViewModel, activeLiveUid, activeModeInfo, aiTurnRemaining, badges, countdown, dailyDone, dailyModeInfo, favoriteBest, favoriteMode, favoritePlays, homeSkillRows, liveRefereeEstimate, liveRefereeWinnerLabel, liveStats, liveTurnTotal, navigate, nextRank, recentMode, pct, profileSkills, rank, recommendedMode, selectedQuestionCount, winRate, xpRows };
     const screenContent = (() => { switch (view) {
-      case "home": return <HomeScreen state={{
-        progress, recommendedMode, recentMode, favoriteMode, favoriteBest, favoritePlays, homeSkillRows,
-        guestMode, isSupabaseConfigured, pendingAssignmentResult, submitAssignedResult, notice,
+      case "home": return <HomeScreen key={sessionAccountId || "guest"} state={{
+        progress, recommendedMode, recentMode, favoriteMode, favoriteBest, favoritePlays, rank, nextRank, pct, homeSkillRows,
+        guestMode, isSupabaseConfigured, pendingAssignmentResult, submitAssignedResult, notice, resumeSession,
         dismissNotice: () => setNotice(""),
-        openPractice: (id) => { setActiveMode(id); navigate("setup"); },
+        discardResume: discardPracticeRun,
+        resumePractice: resumePracticeRun,
+        startBaseline: (id) => {
+          setAssignedPractice(null);
+          startPracticeRun(id, "all", false, 3, true);
+        },
+        openPractice: (id) => { setAssignedPractice(null); setActiveMode(id); navigate("setup"); },
         openAccount: () => { setMode("signup"); setGuestMode(false); setError(""); setMessage(""); },
         navigate,
+        dailyDone, dailyModeInfo, countdown, sessionEmail, sessionAccountId, displayName: profile.displayName,
       }} />;
       case "arcade": return <><h1 className="workspace-page-title">Arcade</h1><p className="workspace-lead">Daily practice goals and achievements earned from your activity.</p><ArcadeDashboard progress={progress} /></>;
       case "study": return <StudyScreen state={screenViewModel} />;
       case "classroom": return <ClassroomScreen state={screenViewModel} />;
-      case "evidence": return <EvidenceLabScreen state={screenViewModel} />;
+      case "evidence": return null;
+      case "ai-evidence": return evidencePractice && evidencePractice.accountId === sessionAccountId
+        ? <EvidencePractice key={evidencePractice.card.id} card={evidencePractice.card} round={evidencePractice.round}
+          onChange={change => setEvidencePractice(previous => previous?.card.id === evidencePractice.card.id
+            ? { ...previous, round: { ...previous.round, ...change } } : previous)}
+          onBack={() => setView("evidence")} />
+        : <AiDebateSetupScreen state={screenViewModel} />;
       case "setup": return <PracticeSetupScreen state={screenViewModel} />;
       case "daily": return <DailyChallengeScreen state={screenViewModel} />;
       case "profile": return <ProfileViewScreen state={screenViewModel} />;
@@ -1090,9 +1461,22 @@ if ((sessionEmail && mode !== "reset") || guestMode) {
       default: return <PracticeSummaryScreen state={screenViewModel} />;
     } })();
     return (
-      <AppShell view={view} guest={guestMode} account={profile.displayName || sessionEmail || "Profile"}
+      <AppShell view={view} guest={guestMode} practiceRuns={progress.totalRuns} account={profile.displayName || sessionEmail || "Profile"}
         navigate={navigate} signOut={guestMode ? () => setGuestMode(false) : () => void signOut()}>
         {view !== "home" && notice && <p className="workspace-note" role="status">{notice}</p>}
+        <div hidden={view !== "evidence"}>
+          <EvidenceLabScreen state={{ ...screenViewModel, sessionAccountId }}
+            onPrepareDebate={(motion, outline) => { setAssignedPractice(null); setDebateTopic(motion); setDebatePlan({ motion, outline }); setView("ai-setup"); }}
+            onResumePractice={evidencePractice?.accountId === sessionAccountId ? () => setView("ai-evidence") : undefined}
+            onPractice={card => {
+              if (!sessionAccountId) return;
+              setEvidencePractice(previous => previous?.accountId === sessionAccountId
+                && previous.card.id === card.id && previous.card.quote === card.quote
+                ? { ...previous, card }
+                : { accountId: sessionAccountId, card, round: { side: card.side, original: "", revision: "", challenge: null, feedback: null } });
+              setView("ai-evidence");
+            }} />
+        </div>
         {screenContent}
       </AppShell>
     );

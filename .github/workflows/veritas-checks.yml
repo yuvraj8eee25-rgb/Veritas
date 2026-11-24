@@ -1,0 +1,32 @@
+name: Veritas checks
+on: [push, pull_request]
+jobs:
+  react:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: veritas-react
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: veritas-react/package-lock.json
+      - run: npm ci
+      - run: npm run check
+      - run: npm run build
+  shared-app:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - run: npm ci
+      - run: npm run test:ci

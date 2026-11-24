@@ -1,0 +1,177 @@
+VERITAS UI COUNCIL REVIEW — 24 NOVEMBER 2026
+
+Scope: recommendations and visual research, not an implementation pass.
+Audience: teens and adults, with teacher-managed classrooms.
+
+Evidence: inspected the running signed-in Home, Study and AI setup at desktop width, and Study at a 390x844 phone viewport; inspected current React components and final stylesheet cascade. The mobile viewport was restored. No provider request, classroom post, account setting, age declaration or learning completion was submitted for this review.
+
+All ten distinct callable council models completed independent source reviews:
+gpt-6.2-astra, gpt-6.2-sol, gpt-6.1-terra, gpt-6.1-sol,
+gpt-6-astra, gpt-6-sol, gpt-6-luna, gpt-5.6-sol,
+gpt-5.6-terra, gpt-5.6-luna.
+Agents did not modify files or control the browser. Parent inspection and primary-source research informed this synthesis. Agreement is not a usability test.
+
+MAIN RECOMMENDATION
+
+Build on the existing stone/cobalt light theme and slate/periwinkle dark theme. Make the product resemble a modern reasoning notebook: clear labeled tools, generous reading space, annotated claims and evidence, restrained semantic accents. Use small explanatory visuals before adding large decorative images. Keep the current single primary Home action.
+
+HIGH PRIORITY — STRUCTURE AND COMPREHENSION
+
+01. Replace repeated navigation initials with distinctive icons AND readable labels.
+Observed: AppShell.tsx uses name.charAt(0), causing Practice/Profile, Daily/Debate and Leaderboard/Live collisions. Desktop navigation starts collapsed.
+Change: visible desktop labels, meaningful Lucide icons, a small set of primary destinations and grouped secondary activities. Suggested organization: Home; Practice (drills, daily, AI/live); Study; Evidence; Classroom; account menu for Profile/settings; optional competition/Arcade under More. Test grouping with users rather than treating it as settled.
+
+02. Return the phone's width to the content.
+Observed: the 390px Study viewport has a 68px permanent rail and about 307px main content width, with the remaining difference used by the scrollbar. The result is a narrow reading column even without horizontal overflow.
+Change: compact header with a labeled drawer or a small labeled bottom bar plus More. Keep all destinations reachable, support Escape/focus return, and respect safe areas. Choose one primary mobile navigation pattern; do not render redundant bottom and side navigation.
+
+03. Make Study's next lesson the first useful block.
+Observed: the large PDF uploader and weekly goal appear before the recommended lesson, putting that lesson below the first screen on desktop and farther below on phones.
+Change: Next lesson / Review due first; Learning paths next. Give Paper Study, Notes and preferences clearly named secondary entry points. Keep paper upload disclosures next to the uploader after moving it.
+
+04. Prioritize real tasks on Home.
+Observed: the resume/recommended card is already a useful focal point. The general recommendation precedes a generic Classroom tile, and failed assignment delivery is shown late.
+Change: needs-attention delivery notice first, then an actual due assignment when available, then resume or a recommended drill. Use a concrete sample argument and a trustworthy duration estimate. Use Start for fresh practice; Continue only when work is being resumed. Do not invent deadlines, personalized reasons or progress.
+
+05. Give Classroom separate task views for each role.
+Source-observed: join/create, assignment editing, submissions, progress, announcements, people, invitations and discussions share one long surface. Populated multi-role flows were not exercised in this review.
+Change: students see Due next / In progress / Feedback; teachers see Needs review / Assignments / People / Reports. Each assignment shows status, due date, activity type and next action. Keep rubric and attempts easy to reach. Show the role for the current cohort; an account may teach one class and study in another.
+
+06. Fix the lesson stage highlight before embellishing the stepper.
+Confirmed in Study.tsx:125: stages holds capitalized labels while stage contains lowercase values, so stages.indexOf(stage) is -1 and the intended completed styling never applies.
+Change: use explicit stable stage IDs, distinguish current/completed/upcoming, and expose the current step to assistive technology. On phones, Step 2 of 5 can be clearer than five cramped labels. Do not make future steps clickable if skipping would break the learning sequence.
+
+07. Unify the visual foundation.
+Source-observed: layout.tsx loads styles.css, workspace.css and mockup-ui.css. They contain different font, color, radius and surface rules; the final layer implements Stone/Cobalt and Gill Sans. Earlier layers are not proof of the final rendered style.
+Change: a single semantic set of canvas/surface/text/action/caution/error tokens and a consistent button, field, disclosure and card family. Aim for readable 16–18px lesson/quote text, comfortable metadata and roughly 60–75 characters per line where appropriate. Verify actual contrast in both themes rather than assuming current colors fail.
+
+08. Make evidence context one reading unit.
+Source-observed: featured quotes, source details, questions, findings, interpretations, limitations and trace are distributed across several sections. Existing featured quotations and Use this quote actions are useful and should stay.
+Change: checked proposition -> quotation -> bounded interpretation -> limitation -> source/author/date -> excerpt type. Put assessment coverage and unassessed-source counts near the top. Use labels such as Abstract excerpt or Retrieved web excerpt. Add a source inspector on desktop and inline expansion on mobile. Keep sources readable when AI is unavailable. Never use a truth meter or imply a photograph verifies a finding.
+
+NEXT — VISUAL TEACHING AND FLOW
+
+09. Add an annotated argument preview to Home.
+A compact original diagram or index-card illustration can show Claim -> Reason -> Evidence, with a highlighted weak connection. Place it beside the existing CTA on desktop; shrink it or place it after the CTA on phones. It should communicate what learners do, not merely fill empty space.
+
+10. Turn Study's weak/strong examples into visual comparisons.
+Highlight a phrase such as proves changing to is associated with, with a brief explanation of why. Keep the actual text selectable, label both versions and stack them in logical order on phones. Add diagrams for claim/support, counterarguments, source independence and scope. Every instructional diagram needs an equivalent explanation.
+
+11. Make argument maps look connected.
+The current nested outline is functional. Add clear connecting rules, point-type labels and a focused branch view or optional compact overview. Keep the accessible outline available. Start with CSS/SVG relationships rather than a complex pan/zoom canvas; do not add drag-only editing.
+
+12. Make AI setup predictable before adding more settings.
+Keep the existing motion/stance choices and advanced timing disclosure. Add three neutral starter motions and a compact session brief showing side, written/speech mode, opponent behavior, turns and timing. Explain what happens after Begin. Put sign-in/service requirements near the top for guests and label teacher-locked settings. Retain quick one-page setup for returning users.
+
+13. Reframe Profile around practice evidence.
+Lead with recent completed activity, skills with sufficient evidence and the next useful practice. Keep XP, rank and live results as a separate optional competition section. Show assessment count and recency adjacent to each estimate; distinguish Unassessed from zero performance. A clear skill list is more interpretable than duplicate radar and percentage bars.
+
+14. Make empty states specific and actionable.
+No saved quotes: show a small document motif plus how to save the first one. No classroom: show Join a classroom and the code requirement. No study history: show one starter lesson. No public matching eligibility: show the relevant preferences and teacher-assignment path. Avoid large illustrations that bury the action.
+
+15. Clarify progress and failure states visually.
+Use compact status steps with a plain current phase, elapsed/long-running explanation, cancel and retry. Keep preserved work visible and separate search success from assessment success. Do not use a moving progress bar that pretends to know how much work remains.
+
+16. Refine interaction and focus treatment.
+The Home capture showed a large focus outline around the entire main region after navigation. Review the visual result while preserving skip links and route focus management. Prefer targeted keyboard-visible focus and a clear heading/active-route cue. Check loading/disabled controls and error placement. Do not simply remove focus indicators.
+
+17. Make text hierarchy calmer.
+Reduce repeated uppercase eyebrow labels and arrow decoration. Use one clear page title, a short purpose statement and a dominant action. Differentiate controls, quotations, metadata and caution text by typography and spacing. Favor a small number of meaningful surface levels over equally weighted bordered rectangles everywhere.
+
+18. Make classroom tables and long source titles phone-friendly.
+Use labeled assignment/submission rows that become cards when narrow. Preserve data labels and essential actions. Let long titles wrap. Avoid hover-only explanations and clipped status chips. Check with realistic long content rather than only empty states.
+
+IMAGE / ASSET SHORTLIST
+
+A. Recommended primary direction: original, code-native explanatory diagrams.
+Create one coherent family: claim/reason/evidence cards; supporting/challenging branches; source triangulation; scope boundaries; revision loop; review calendar; speech-turn sequence; classroom assignment board.
+Placement: Home preview, Study worked examples, argument maps and small empty states. Keep them secondary to the task. These are proposed assets, not generated or installed in this review.
+
+B. unDraw — Online reading, by Katerina Limpitsouni.
+Asset page: https://undraw.co/illustration/online-reading_jtnx
+Role: optional Study/Paper Study intro or empty state. Customize the accent toward the current cobalt/periwinkle and use one consistent family. Generic illustration is a fast fallback, less distinctive than original reasoning diagrams.
+Official license: https://undraw.co/license
+The current license permits project/commercial use without attribution but has redistribution, automation and AI/ML-development restrictions. No artwork was downloaded, repackaged or used as a generation reference here. Use the official asset page and terms for a selected implementation.
+
+C. Storyset — Discussion, Pana style.
+Asset page: https://storyset.com/illustration/discussion/pana/animate
+Role: optional collaboration introduction/empty-state reference; inspect whether the specific people/style fit the intended cohort. Prefer a static recolored version if selected; no animation is needed for the work screens.
+Official terms: https://storyset.com/terms
+The asset page says free personal/commercial use with attribution; attribution-free use requires the applicable paid license. It is a reference candidate, not artwork already licensed/installed for Veritas.
+
+D. Clay Banks — Library interior, Left Bank Books, Seattle.
+Photo: https://unsplash.com/photos/library-interior-z_DkoUqgx6M
+Role: optional public landing/help/about introduction, cropped with separate readable text. It is an actual bookstore, not a Veritas classroom or endorsement. Keep photography out of evidence findings, grading and active composition screens.
+Photo page labels it free under the Unsplash License: https://unsplash.com/license
+Photo identity/page/license were checked. The image fetch could not be previewed by the research tool, so final crop/composition still needs visual inspection.
+
+E. Lucide — consistent navigation and activity symbols.
+Library: https://lucide.dev/icons
+Veritas already depends on lucide-react. Candidate meanings: book for Study, document-search/magnifier for Evidence, messages for Debate, school/users for Classroom, chart for Progress. Verify exports against the installed version. Keep text labels; icons are not universal.
+
+IMAGE RULES
+
+Use one visual family. Limit decorative imagery to entry/empty states. For topics, choose neutral contextual photos rather than partisan or emotionally loaded images; the same image must not favor one side. Prefer consented or non-identifying imagery for school context. Decorative images should have an empty alt; informative diagrams require meaningful alternatives. Keep important text out of raster images, provide dimensions, optimize raster formats and respect reduced motion. Do not add publication logos, author faces or document thumbnails unless they are authentic and their use is appropriate.
+
+WEB REFERENCES AND WHAT TO BORROW
+
+Kialo Edu features: https://www.kialo-edu.com/features
+Borrow the idea of visible claim relationships and expandable branches; do not copy its art or equate a visual branch with valid reasoning.
+Kialo minimap: https://support.kialo-edu.com/en/hc/discussion-minimap/
+Borrow overview + focused branch orientation when maps grow.
+Brilliant: https://brilliant.org/
+Borrow visual interaction and a concrete learning example before long setup. Its product claims/certifications are not claims about Veritas.
+Readwise Reader: https://readwise.io/read
+Borrow readable documents with highlights and adjacent notes/source context; keep provenance close to a quotation.
+NN/g icon usability: https://www.nngroup.com/articles/icon-usability/
+Supports labels with ambiguous icons.
+W3C image guidance: https://www.w3.org/WAI/tutorials/images/decorative/
+Supports distinguishing decorative and informative imagery.
+W3C reflow: https://www.w3.org/WAI/WCAG22/Understanding/reflow.html
+Use for narrow/zoomed layout checks; this review is not a WCAG certification.
+
+COUNCIL DISAGREEMENTS RESOLVED
+
+- Some models read earlier CSS and inferred that mobile links disappear. The live current mobile rail showed all destinations in a scroll area. Retained finding: it consumes reading width and uses ambiguous initials; missing navigation is not asserted.
+- Several models suggested violet/mint or a new paper palette. The final CSS already has Stone/Cobalt and a dark companion theme. Consolidate that existing system before inventing another palette.
+- Some favored a multi-step debate wizard; others favored quick setup. Recommendation: keep the one-page quick path and add a compact summary first, then test whether a first-run guided path is needed.
+- Some favored balanced support/challenge columns. Show the perspectives actually found and missing coverage; do not force an equal number of sources or imply equal evidential quality.
+- Keep competition available, but secondary. Removing it outright could harm users who value live debates.
+
+SUGGESTED DELIVERY ORDER
+
+First: navigation/mobile shell, Study entry order/stage states, shared typography and components.
+Second: role-focused Classroom and task-aware Home, evidence reading hierarchy.
+Third: original instructional diagrams, one Home spot illustration, setup brief and progress presentation.
+Then: contextual public-page photography and optional source previews only where they add value.
+
+Validate with concrete tasks: locate an assignment, find the next lesson, resume a run, explain a source's limitation, save/use a quote and identify the next debate action. Check desktop and phone, keyboard and screen reader, long content, no-image mode, both themes, 200% text zoom and 320px reflow. The expected gains are design hypotheses until tested with learners and teachers.
+
+IMPLEMENTATION FOLLOW-THROUGH — 24 NOVEMBER 2026
+
+Implemented in veritas-react:
+- Shared Inter typography and Stone/Cobalt tokens with the existing dark companion theme.
+- Labeled desktop navigation, optional collapse, Explore disclosure and a full-width mobile workspace with an inert-backed modal navigation drawer.
+- Home with one primary practice action, a genuine saved-run state, account-scoped learner assignment priorities and an original claim/reasoning/evidence diagram.
+- Study with next lesson first, separate Paper Study/Field Notes/preferences views, expandable paths, correct completed/current lesson stages and annotated before/after argument examples.
+- Classroom section navigation and role-aware assignment filters, preserving unsaved forms in hidden sections. Coach accounts see review and draft queues; learner queues distinguish work, feedback and submissions.
+- Profile led by learning activity and qualified mastery estimates; competitive records remain in an optional disclosure.
+- AI debate starter motions and a live brief showing the chosen motion, side, format, turn count and timing.
+- Evidence coverage/provenance presentation distinguishing retrieved sources, selected checks and abstract availability. Retrieval is not represented as proof.
+- Theme-aware lesson, classroom and Profile control colors; container-based reflow for narrow desktop reading spaces.
+
+Artwork is original HTML/Lucide diagram content. No external stock illustration or photograph was installed. The optional photography/source-preview directions above remain future work.
+
+Verification: TypeScript and all 67 tests passed. The final Next production webpack build passed. Browser checks covered desktop 1280px, tablet 840px and narrow phone layouts around 320px, both themes, lesson Recall-to-Learn/current-stage behavior, debate brief changes and coach classroom filters/sections. The drawer was checked for initial focus, forward/backward focus wrap, Escape return and content focus after navigation. The preview was restored to Home, dark theme and its default viewport.
+
+Limits: this is not a complete screen-reader, contrast or 200% zoom audit. Learner/teacher usability outcomes require participants. Evidence-result changes passed existing contract tests; no paid live AI request was sent for the visual pass. No classroom work, announcements, submissions, age choices, account deletion or microphone recordings were created during this UI QA. The site remains a local preview at http://127.0.0.1:3000; public hosting was not configured in this pass.
+
+APPROVED COLOR / TYPE ITERATION — DESKTOP PRIORITY
+
+The user approved larger typography and clearer navigation after reviewing Chess.com, Lichess, Duolingo and Khan Academy, then chose an independent, livelier palette that avoids blue. During implementation they asked to prioritize desktop and stop spending time on phone QA.
+
+Implemented: ivory (#FAF7F0), terracotta (#AD4934), golden learning, leaf evidence and plum debate accents, with a warm charcoal (#272520) dark companion. Shared typography now uses 17px body, 18px lesson reading, 16px controls/main navigation and 14px essential captions at the default browser font size. Removed miniature font overrides and replaced legacy blue CSS literals with shared theme tokens. Desktop headers are shorter, page padding is tighter and Home activity cards have distinct accent surfaces. The reasoning diagram is supporting content beside the main action on wide screens and an optional disclosure in narrower reading spaces.
+
+Navigation is Home / Practice / Learn / Evidence / Debate / Classroom / More. AI and live debate are grouped under Debate; Daily Challenge, Arcade and Leaderboard are in More. Navigation uses real destination links and retains modified-click behavior. Help is persistent; Profile, preferences, theme and sign-out are grouped under the account disclosure. Desktop collapse/expand remains available. Lessons use a separate sticky progress column at wide widths, with a spaced toolbar. Debate opponent options use equal-width columns on desktop.
+
+Verification: 67 tests and TypeScript passed after the functional changes; the final production webpack build passed after desktop styling refinements. Browser review covered 1440px and 1280px desktop layouts, light Home/Learn/Debate/Classroom and the warm dark companion, actual 18px lesson text, Recall-to-Learn state and desktop navigation collapse/expand. No horizontal page overflow was observed at the checked desktop sizes. Calculated foreground/background contrast exceeded 4.5:1 for the selected body, muted, primary-button and activity-label pairs in both themes; this does not certify every UI state. Earlier phone checks were set aside at the user's direction, and the temporary viewport override was reset. No live AI exchange, classroom post, recording or destructive account action was submitted.

@@ -1,3 +1,4 @@
+import { boundedRequestText, RequestSizeError } from "./request-size.ts";
 const ALLOWED_HEADERS = "authorization, x-client-info, apikey, content-type, x-request-id";
 
 export function withCors(handler: (request: Request) => Promise<Response>) {
@@ -24,10 +25,14 @@ export function withCors(handler: (request: Request) => Promise<Response>) {
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
     let response: Response;
     try {
+      if (request.method === "POST" && request.body) {
+        const body = await boundedRequestText(request);
+        request = new Request(request, { body });
+      }
       response = await handler(request);
     } catch (error) {
       console.error(JSON.stringify({ requestId, event: "unhandled_error", name: error instanceof Error ? error.name : "Error" }));
-      response = new Response(JSON.stringify({ error: "The service could not complete this request.", requestId }), { status: 500 });
+      response = new Response(JSON.stringify({ error: error instanceof RequestSizeError ? "Request is too large." : "The service could not complete this request.", request_id: requestId }), { status: error instanceof RequestSizeError ? 413 : 500 });
     }
     console.info(JSON.stringify({ requestId, event: "request_complete", status: response.status }));
     const headers = new Headers(response.headers);

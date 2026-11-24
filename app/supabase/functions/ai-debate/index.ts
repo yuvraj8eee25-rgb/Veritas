@@ -30,6 +30,7 @@
 
 import { guardUserRequest, withCors } from "../_shared/http.ts";
 import { readDebateCoaching } from "../_shared/debate-coaching.ts";
+import { assessEvidencePractice } from "./evidence-practice.ts";
 
 const GEMINI_MODEL = "gemini-3.1-flash-lite";
 const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
@@ -294,6 +295,11 @@ Deno.serve(withCors(async (req) => {
       if (String(body.topic || '').length > 200 || !Array.isArray(body.transcript || []) || (body.transcript || []).length > 10 || (body.transcript || []).some((t: any) => !['user', 'ai'].includes(t.speaker) || typeof t.text !== 'string' || t.text.length > 8000)) return json({ ok: false, error: 'Invalid debate transcript.' }, 400);
     }
     switch (body?.action) {
+      case "evidence_challenge":
+      case "evidence_feedback": {
+        const result = await assessEvidencePractice(body, callGemini);
+        return json(result.body, result.status);
+      }
       case 'transcribe': return await handleTranscribe(body);
       case "opponent":
         return await handleOpponent(body);
@@ -302,7 +308,7 @@ Deno.serve(withCors(async (req) => {
       case "drill":
         return await handleDrill(body);
       default:
-        return json({ ok: false, error: "action must be one of: opponent, referee, drill, transcribe" }, 400);
+        return json({ ok: false, error: "action must be one of: opponent, referee, drill, transcribe, evidence_challenge, evidence_feedback" }, 400);
     }
   } catch (err) {
     console.error(JSON.stringify({ event: "ai_debate_failed", name: err instanceof Error ? err.name : "Error" }));

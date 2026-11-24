@@ -37,7 +37,7 @@ export async function invokeVeritasFunction(functionName: VeritasFunction, body:
       },
       body: JSON.stringify({ functionName, body }),
       cache: "no-store",
-      signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(timeout)]) : undefined,
+      signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(timeout)]) : AbortSignal.timeout(timeout),
     });
   } catch (cause) {
     if (signal?.aborted) throw signal.reason;

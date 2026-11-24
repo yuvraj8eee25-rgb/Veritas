@@ -1,21 +1,12 @@
-import { ArrowDownRight, ArrowUpRight, Check, CircleAlert, CircleHelp, Scale } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, Check, CircleAlert, Search } from "lucide-react";
+import { useRef, useState } from "react";
 import { safeSourceUrl } from "../../../app/supabase/functions/_shared/evidence-verification.ts";
 import type { Page } from "../../../app/supabase/functions/_shared/evidence-verification.ts";
 import type { CitedFinding, Investigation } from "../lib/evidence-investigation.ts";
 
-const outcomes = {
-  supported: { label: "Supported by retrieved evidence", tone: "supports", icon: Check },
-  refuted: { label: "Refuted by retrieved evidence", tone: "contradicts", icon: ArrowDownRight },
-  mixed: { label: "Mixed evidence", tone: "mixed", icon: Scale },
-  insufficient: { label: "Insufficient evidence", tone: "uncertain", icon: CircleHelp },
-};
-
-const targetLabels = {
-  supported: "Supported",
-  refuted: "Challenged",
-  mixed: "Mixed",
-  insufficient: "Unresolved",
-};
+import type { EvidenceCard, ResearchTopic } from "../../../app/supabase/functions/_shared/evidence-practice.ts";
+import { suggestEvidenceQuote } from "../lib/evidence-cards.ts";
+import { EvidenceCardEditor } from "./EvidenceCard.tsx";
 
 function dateLabel(value: string | null) {
   const date = value ? new Date(value) : null;
@@ -57,14 +48,13 @@ function Citation({ item, number }: { item: CitedFinding; number: number }) {
   const { page, finding, recordId } = item;
   const recordUrl = recordId && finding.record ? safeSourceUrl(finding.record.url) : null;
   return <details className="research-passage">
-    <summary>{page.passage.scope === "abstract" ? "Inspect abstract excerpt" : "Inspect passage"} [{number}] · {page.paper?.title ?? page.title}</summary>
+    <summary>Source details [{number}]</summary>
     <PaperDetails page={page} />
     <p className="workspace-meta">
       {page.passage.scope === "abstract" ? "Abstract excerpt" : page.paper ? "Retrieved web excerpt" : "Retrieved excerpt"}
       {!page.paper && ` · ${dateLabel(page.date)}`} · {recordId && finding.record ? finding.record.type : "Source type or independence unverified"}
     </p>
-    <blockquote>{finding.quote}</blockquote>
-    {finding.limitation && <p className="workspace-meta">Limit: {finding.limitation}</p>}
+    <a className="workspace-text-action" href={`#evidence-source-${number}`}>View source and card options</a>
     <OriginalPage page={page} />
     <PaperRecord page={page} />
     {recordUrl && finding.record?.relation === "secondary" && <a className="workspace-text-action"
@@ -75,162 +65,267 @@ function Citation({ item, number }: { item: CitedFinding; number: number }) {
 function FindingList({ findings, numbers }: { findings: CitedFinding[]; numbers: Map<string, number> }) {
   return <ul className="research-verification-findings">
     {findings.map((item, index) => <li key={`${item.page.passage.id}:${item.finding.targetId}:${index}`}>
-      <p className="workspace-meta">Checked proposition · {item.targetText}</p>
-      <p><span className="workspace-meta">AI interpretation · </span>{item.finding.interpretation}</p>
+      <SourceQuotation page={item.page} quote={item.finding.quote} />
+      <p className="workspace-meta">Checked point · {item.targetText}</p>
+      <p>{item.finding.interpretation}</p>
+      {item.finding.limitation && <p className="evidence-source-limit"><strong>Limit:</strong> {item.finding.limitation}</p>}
       <p className="workspace-meta">{item.finding.match === "direct" ? "Direct" : "Indirect"} · {item.finding.strength} finding{!item.recordId ? " · independence unverified" : ""}</p>
       <Citation item={item} number={numbers.get(item.page.id)!} />
     </li>)}
   </ul>;
 }
 
-function SourceList({ result, numbers }: { result: Investigation; numbers: Map<string, number> }) {
-  return <aside className="research-sources" aria-labelledby="research-sources-title">
-    <h3 id="research-sources-title">Retrieved sources · {result.snapshot.pages.length}</h3>
-    <p className="workspace-meta">The review uses saved web and abstract excerpts. Open the linked sources to check the full context.</p>
-    <ol>{result.snapshot.pages.map(page => {
-      const assessment = result.state === "complete" ? result.assessments.find(entry => entry.id === page.id) : undefined;
-      const findings = result.state === "complete" ? result.review.findings.filter(entry => entry.page.id === page.id) : [];
-      const verified = findings.find(entry => entry.recordId && entry.finding.record);
-      const number = numbers.get(page.id)!;
-      const isAbstract = page.passage.scope === "abstract";
-      const metadataOnly = page.passage.scope === "metadata only";
-      const label = metadataOnly ? "Metadata only · no usable abstract was retrieved"
-        : !assessment ? "Unassessed" : verified ? `Linked to ${verified.finding.record?.type}` : "Independence unverified";
-      return <li key={page.id}>
-        <span className="research-source-number">[{number}]</span>
-        <h4>{page.paper?.title ?? page.title}</h4>
-        <PaperDetails page={page} />
-        {page.paper ? <p className="workspace-meta">{isAbstract ? "Abstract excerpt" : metadataOnly ? "Paper record" : "Retrieved web excerpt"}</p>
-          : <>
-            <p className="workspace-meta">{safeSourceUrl(page.url)?.hostname} · {dateLabel(page.date)}</p>
-            {page.author && <p className="workspace-meta">By {page.author}</p>}
-          </>}
-        <p className="research-source-status">{label}</p>
-        {assessment && <div className="research-article-summary">
-          <strong>{isAbstract ? "Abstract summary" : "Article summary"}</strong>
-          {assessment.articleSummary ? <>
-            <p>{assessment.articleSummary.text}</p>
-            <details className="research-passage">
-              <summary>{isAbstract ? "Read the abstract passage behind this summary" : "Read the passage behind this summary"}</summary>
-              <blockquote>{assessment.articleSummary.quote}</blockquote>
-            </details>
-          </> : <p className="workspace-meta">A summary could not be verified from the retrieved excerpt.</p>}
-        </div>}
-        <OriginalPage page={page} />
-        <PaperRecord page={page} />
-        {page.passage.text && <details className="research-passage">
-          <summary>{isAbstract ? "Read the saved abstract excerpt" : "Full retrieved excerpt"}</summary>
-          <blockquote>{page.passage.text}</blockquote>
-        </details>}
-        {findings.length > 0 && <details className="research-passage">
-          <summary>Validated findings from this page</summary>
-          <FindingList findings={findings} numbers={numbers} />
-        </details>}
-      </li>;
-    })}</ol>
-  </aside>;
+type CardActions = { topic?: ResearchTopic; onSave?: (card: EvidenceCard) => void; onPractice?: (card: EvidenceCard) => void };
+type Source = { page: Page; finding?: CitedFinding; summary?: string; summaryQuote?: string; quote: string; assessed: boolean };
+
+function sourceType(page: Page) {
+  return page.passage.scope === "metadata only" || !page.passage.text.trim() ? "Citation only"
+    : page.passage.scope === "abstract" ? "Abstract excerpt" : "Web excerpt";
 }
 
-export default function EvidenceResults({ result, retry, retrying, canRetry }: {
+function SourceQuotation({ page, quote }: { page: Page; quote: string }) {
+  const title = page.paper?.title ?? page.title;
+  const byline = page.paper
+    ? [page.paper.authors.slice(0, 4).join(", ") + (page.paper.authors.length > 4 ? ", et al." : ""), page.paper.year].filter(Boolean).join(" · ")
+    : page.author;
+  const url = safeSourceUrl(page.url);
+  return <figure className="evidence-quotation">
+    <blockquote>{quote}</blockquote>
+    <figcaption>
+      <span>{sourceType(page)}{byline && ` · ${byline}`}</span>
+      <cite>{url ? <a href={url.href} target="_blank" rel="noopener noreferrer">{title} <ArrowUpRight size={13} aria-hidden="true" /></a> : title}</cite>
+    </figcaption>
+  </figure>;
+}
+
+function Excerpt({ source }: { source: Source }) {
+  return <details className="research-passage evidence-excerpt">
+    <summary>Read excerpt</summary>
+    <div>
+      <blockquote className="evidence-selected-quote">{source.page.passage.text}</blockquote>
+      <OriginalPage page={source.page} />
+    </div>
+  </details>;
+}
+
+function FeaturedSource({ source, direction, choose }: {
+  source: Source; direction: "supports" | "contradicts" | undefined; choose?: (event: React.MouseEvent<HTMLButtonElement>) => void;
+}) {
+  const { page, quote, finding, assessed } = source;
+  const relation = direction === "supports" ? "Supports the checked point" : "Challenges the checked point";
+  return <article className="research-evidence-side evidence-featured-card" data-stance={direction}>
+    <SourceQuotation page={page} quote={quote} />
+    {direction && finding ? <p className="evidence-source-relation"><strong>{relation}</strong> · {finding.targetText}</p>
+      : <p className="workspace-meta">{assessed ? "Context" : "Unassessed"}</p>}
+    {finding?.finding.limitation && <p className="evidence-source-limit"><strong>Limit:</strong> {finding.finding.limitation}</p>}
+    <div className="evidence-quote-actions">
+      {choose && <button type="button" className="workspace-secondary" onClick={choose}>Use this quote</button>}
+      <Excerpt source={source} />
+    </div>
+  </article>;
+}
+
+function SourceList({ sources, groups, numbers, topic, onSave, onPractice }: CardActions & {
+  sources: Source[]; groups: React.ReactNode; numbers: Map<string, number>;
+}) {
+  const [editing, setEditing] = useState<Source | null>(null);
+  const [saved, setSaved] = useState("");
+  const trigger = useRef<HTMLButtonElement | null>(null);
+  const hasActions = Boolean(topic && onSave && onPractice);
+  const featured = sources.filter(source => source.quote).slice(0, 3);
+  function choose(source: Source, button: HTMLButtonElement | null) {
+    trigger.current = button;
+    setSaved("");
+    setEditing(source);
+  }
+  function close() {
+    setEditing(null);
+    requestAnimationFrame(() => trigger.current?.focus());
+  }
+  return <>
+    {editing && topic && onSave && onPractice && <EvidenceCardEditor key={editing.page.passage.id} page={editing.page}
+      topic={topic} prefill={editing.quote} onPractice={onPractice}
+      onSave={card => { onSave(card); setSaved("Quote saved for later."); close(); }} onCancel={close} />}
+    {saved && <p className="workspace-note" role="status">{saved}</p>}
+    <div hidden={Boolean(editing)}>
+    {featured.length ? <section className="research-section evidence-featured">
+      <h3>Quotes to start with</h3>
+      <div className="evidence-featured-grid">{featured.map(source => {
+        const direction = source.finding?.recordId && source.finding.finding.match === "direct"
+          && source.finding.finding.strength !== "weak" ? source.finding.finding.stance : undefined;
+        return <FeaturedSource key={source.page.passage.id} source={source}
+          direction={direction === "supports" || direction === "contradicts" ? direction : undefined}
+          choose={hasActions ? event => choose(source, event.currentTarget) : undefined} />;
+      })}</div>
+    </section> : <p className="workspace-note">No usable excerpts came back. Try narrowing the motion or checking a specific claim.</p>}
+    {groups}
+    {sources.length > 0 && <aside className="research-sources" aria-labelledby="research-sources-title">
+      <h3 id="research-sources-title">All sources · {sources.length}</h3>
+      <ol>{[...sources].sort((a, b) => numbers.get(a.page.id)! - numbers.get(b.page.id)!).map(source => {
+        const { page, assessed } = source;
+        const number = numbers.get(page.id)!;
+        return <li key={page.passage.id} id={`evidence-source-${number}`}>
+          <span className="research-source-number">[{number}]</span>
+          {source.quote ? <SourceQuotation page={page} quote={source.quote} /> : <>
+            <h4>{page.paper?.title ?? page.title}</h4>
+            <PaperDetails page={page} />
+            {!page.paper && page.author && <p className="workspace-meta">By {page.author}</p>}
+            <p className="research-source-status">{sourceType(page)}</p>
+            <OriginalPage page={page} />
+          </>}
+          {page.passage.text && <p className="research-source-status">{!assessed ? "Unassessed"
+            : !source.finding?.recordId ? "Independence unverified" : null}</p>}
+          {source.finding?.finding.limitation && <p className="evidence-source-limit"><strong>Limit:</strong> {source.finding.finding.limitation}</p>}
+          {source.summary && source.summaryQuote && <details className="research-passage">
+            <summary>{page.passage.scope === "abstract" ? "Abstract summary" : "Article summary"}</summary>
+            <p>{source.summary}</p>
+            <blockquote>{source.summaryQuote}</blockquote>
+          </details>}
+          {source.quote && page.paper && page.paper.authors.length > 4 && <details className="research-passage">
+            <summary>View all authors</summary>
+            <p className="workspace-meta">{page.paper.authors.join(", ")}</p>
+          </details>}
+          <div className="evidence-quote-actions">
+            {hasActions && source.quote && <button type="button" className="workspace-secondary"
+              onClick={event => choose(source, event.currentTarget)}>Use this quote</button>}
+            <PaperRecord page={page} />
+            {page.passage.text && <Excerpt source={source} />}
+          </div>
+        </li>;
+      })}</ol>
+    </aside>}
+    </div>
+  </>;
+}
+
+export default function EvidenceResults({ result, retry, retrying, canRetry, topic, mode = "claim", onSave, onPractice }: CardActions & {
   result: Investigation;
   retry: () => void;
   retrying: boolean;
   canRetry: boolean;
+  mode?: "claim" | "motion";
 }) {
   const { snapshot } = result;
   const numbers = new Map(snapshot.pages.map((page, index) => [page.id, index + 1]));
-  if (result.state !== "complete") {
-    const title = result.state === "unavailable" ? "Assessment unavailable"
-      : result.state === "empty" ? "No sources found" : "Evidence search failed";
-    return <section className="research-results" aria-label="Investigation results">
-      <header className="research-conclusion" data-outcome="uncertain">
-        <div className="research-verdict-heading">
-          <span className="research-verdict-icon"><CircleAlert size={23} aria-hidden="true" /></span>
-          <h2>{title}</h2>
-        </div>
-        <blockquote>{snapshot.claim}</blockquote>
-        {result.state === "unavailable" && <p>Sources were found, but the assessment could not be completed. You can still read the excerpts and open the original pages.</p>}
-        <p className="workspace-meta">{result.reason}</p>
-        {result.state === "unavailable" && (canRetry ? <button type="button" className="workspace-primary"
-          onClick={retry} disabled={retrying}>{retrying ? "Retrying assessment…" : "Retry assessment"}</button>
-          : <p className="workspace-meta">The assessment limit was reached. Start a new investigation to try again.</p>)}
-      </header>
-      {snapshot.pages.length > 0 && <SourceList result={result} numbers={numbers} />}
-    </section>;
-  }
-
-  const { review, caveats } = result;
-  const { tone, label, icon: Icon } = outcomes[review.status];
-  const supporting = [...new Set(review.targets.flatMap(target => target.supporting))];
-  const challenging = [...new Set(review.targets.flatMap(target => target.challenging))];
-  return <section className="research-results" aria-label="Investigation results">
-    <header className="research-conclusion" data-outcome={tone}>
+  const review = result.state === "complete" ? result.review : null;
+  const supporting = [...new Set(review?.targets.flatMap(target => target.supporting))];
+  const challenging = [...new Set(review?.targets.flatMap(target => target.challenging))];
+  const directional = new Set([...supporting, ...challenging]);
+  const context = review?.findings.filter(finding => !directional.has(finding)) ?? [];
+  const assessments = new Map(result.state === "complete" ? result.assessments.map(entry => [entry.id, entry]) : []);
+  const pendingChecks = result.state === "complete" ? snapshot.selected.filter(page => !assessments.has(page.id)) : [];
+  const pendingAbstractsNeedUpdate = snapshot.paperAssessmentNeedsUpdate
+    && pendingChecks.some(page => page.passage.scope === "abstract");
+  const sources = snapshot.pages.map((page): Source => {
+    const assessment = assessments.get(page.id);
+    const finding = [...directional, ...context].find(entry => entry.page.passage.id === page.passage.id);
+    return { page, finding, summary: assessment?.articleSummary?.text, summaryQuote: assessment?.articleSummary?.quote,
+      quote: suggestEvidenceQuote(page, finding?.finding.quote ?? assessment?.articleSummary?.quote), assessed: Boolean(assessment) };
+  });
+  const byId = new Map(sources.map(source => [source.page.id, source]));
+  const featuredOrder = [...new Set([
+    supporting[0]?.page.id, challenging[0]?.page.id, ...supporting.map(item => item.page.id), ...challenging.map(item => item.page.id),
+    ...context.map(item => item.page.id), ...sources.filter(source => source.summary).map(source => source.page.id),
+    ...snapshot.selected.map(page => page.id), ...sources.map(source => source.page.id),
+  ].filter(id => id !== undefined))];
+  const paperSearchFailed = snapshot.searches.some(search => search.provider === "openalex" && search.state === "failed");
+  const webSearchFailures = [...new Set(snapshot.searches.filter(search => search.provider !== "openalex" && search.state === "failed")
+    .map(search => search.direction))];
+  const searchLimited = snapshot.searches.some(search => search.state === "limited");
+  const hasWebSources = snapshot.pages.some(page => page.passage.scope === "retrieved excerpt");
+  const empty = snapshot.searches.filter(search => search.state === "empty");
+  const title = result.state === "unavailable" ? "Source analysis unavailable"
+    : result.state === "empty" ? "No sources found" : result.state === "search-failed" ? "Evidence search failed" : "Source analysis";
+  const Icon = review ? Search : CircleAlert;
+  return <section className="research-results" aria-label="Research results">
+    <header className="research-conclusion" data-outcome="uncertain">
       <div className="research-verdict-heading">
         <span className="research-verdict-icon"><Icon size={23} aria-hidden="true" /></span>
-        <div>
-          <p className="workspace-caption">{snapshot.plan.policy ? "Factual evidence and trade-offs" : "Verdict from retrieved evidence"}</p>
-          <h2>{snapshot.plan.policy ? "Policy evidence review" : label}</h2>
-        </div>
+        <h2>{title}</h2>
       </div>
       <blockquote>{snapshot.claim}</blockquote>
-      <p className="research-verdict-context">{review.reason}</p>
-      {caveats.length > 0 && <p className="research-coverage-note"><strong>Partial coverage</strong> · {caveats[0]}</p>}
+      <dl className="evidence-coverage" aria-label="Research coverage"><div><dt>Sources retrieved</dt><dd>{snapshot.pages.length}</dd></div><div><dt>Selected excerpts checked</dt><dd>{snapshot.selected.filter(page => assessments.has(page.id)).length} <span>of {snapshot.selected.length}</span></dd></div><div><dt>Abstracts retrieved</dt><dd>{snapshot.pages.filter(page => page.passage.scope === "abstract").length}</dd></div></dl>
+      <p className="evidence-coverage-explanation">Retrieval finds material. Assessment checks an excerpt; it does not certify a source or establish that a claim is true.</p>
+      {result.state !== "complete" && <p className="workspace-meta">{result.reason}</p>}
+      {result.state === "unavailable" && (canRetry
+        ? <button type="button" className="workspace-secondary" onClick={retry} disabled={retrying}>{retrying ? "Reading excerpts…" : "Retry reading excerpts"}</button>
+        : <p className="workspace-meta">Start a new search to retry source analysis.</p>)}
+      {pendingChecks.length > 0 && <>
+        <p className="research-coverage-note"><strong>Some excerpts couldn’t be checked.</strong>{" "}
+          {pendingAbstractsNeedUpdate
+            ? "The assessment service needs an update to check research abstracts. You can still read and quote them below."
+            : "You can use the completed findings and read the other sources below."}</p>
+        {canRetry && <button type="button" className="workspace-secondary" onClick={retry} disabled={retrying}>
+          {retrying ? "Reading excerpts…" : "Retry remaining excerpts"}
+        </button>}
+      </>}
+      {paperSearchFailed && <p className="research-coverage-note"><strong>Research paper search unavailable.</strong>{" "}
+        {hasWebSources ? "You can still read and use the web sources below." : "See Search activity for details."}</p>}
+      {webSearchFailures.length > 0 && <p className="research-coverage-note"><strong>Web searches unavailable</strong> · {webSearchFailures.join(", ")}.</p>}
+      {searchLimited && result.state !== "search-failed" && <p className="research-coverage-note"><strong>Evidence Lab reached its search limit.</strong>{" "}
+        See Search activity for which queries ran.</p>}
+      {empty.length > 0 && <p className="workspace-meta">Searches that returned no sources · {empty.map(search => search.direction).join(", ")}</p>}
     </header>
+    <SourceList sources={featuredOrder.flatMap(id => byId.get(id) ?? [])} numbers={numbers} topic={topic} onSave={onSave} onPractice={onPractice}
+      groups={review && (mode === "motion"
+        ? <section className="research-section">
+          <h3>Factual questions behind the motion</h3>
+          {review.targets.filter(({ target }) => target.outcome && target.text !== snapshot.claim).map(({ target, supporting: forTarget, challenging: againstTarget }) => {
+            const related = context.filter(item => item.finding.targetId === target.id);
+            return <details className="research-passage" key={target.id}>
+              <summary>{target.text}</summary>
+              <div>
+                {forTarget.length > 0 && <><h4>Supporting findings</h4><FindingList findings={forTarget} numbers={numbers} /></>}
+                {againstTarget.length > 0 && <><h4>Challenging findings</h4><FindingList findings={againstTarget} numbers={numbers} /></>}
+                {related.length > 0 && <><h4>Context and limitations</h4><FindingList findings={related} numbers={numbers} /></>}
+                {!forTarget.length && !againstTarget.length && <p className="workspace-meta">No direct finding could be checked for this question.</p>}
+              </div>
+            </details>;
+          })}
+          {!review.targets.some(({ target }) => target.outcome && target.text !== snapshot.claim) && <p className="workspace-meta">Specific research questions were unavailable. Browse the sources below or check a narrower claim.</p>}
+          {result.state === "complete" && result.caveats.length > 0 && <details className="research-passage"><summary>Search limitations</summary>
+            <div><ul>{result.caveats.map(caveat => <li key={caveat}>{caveat}</li>)}</ul></div>
+          </details>}
+        </section>
+        : <AnalysisGroups result={result} review={review} numbers={numbers} supporting={supporting} challenging={challenging} context={context} />)} />
+  </section>;
+}
 
-    <div className="research-breakdown">
-      <dl aria-label="Source and record counts">
-        <div><dt>Retrieved sources</dt><dd>{snapshot.pages.length}</dd></div>
-        <div><dt>Independent records identified</dt><dd>{review.independentCount}</dd></div>
-        <div><dt>Records that contributed</dt><dd>{review.weightedCount}</dd></div>
-      </dl>
-      <p className="workspace-meta">One underlying record counts once, even when several pages report it. Only direct, credible findings contribute.</p>
+function AnalysisGroups({ result, review, numbers, supporting, challenging, context }: {
+  result: Investigation;
+  review: Extract<Investigation, { state: "complete" }>["review"];
+  numbers: Map<string, number>;
+  supporting: CitedFinding[];
+  challenging: CitedFinding[];
+  context: CitedFinding[];
+}) {
+  return <>
+    <div className="research-evidence-grid evidence-analysis-grid">
+      <section className="research-evidence-side" data-stance="supports">
+        <header className="research-evidence-heading"><Check size={19} aria-hidden="true" /><h3>Supports the claim</h3></header>
+        {supporting.length ? <FindingList findings={supporting} numbers={numbers} /> : <p className="workspace-meta">No direct supporting finding from an independently verified record.</p>}
+      </section>
+      <section className="research-evidence-side" data-stance="contradicts">
+        <header className="research-evidence-heading"><ArrowDownRight size={19} aria-hidden="true" /><h3>Challenges the claim</h3></header>
+        {challenging.length ? <FindingList findings={challenging} numbers={numbers} /> : <p className="workspace-meta">No direct challenging finding from an independently verified record.</p>}
+      </section>
+    </div>
+    <section className="research-section">
+      <h3>Context and limitations</h3>
+      {result.snapshot.plan.policy && <p className="workspace-meta">The findings address factual premises and trade-offs in this motion.</p>}
+      {review.conflictingRecords.length > 0 && <p className="workspace-meta">Different findings within one record. Compare their quotes and scope.</p>}
+      {review.targets.filter(target => !target.supporting.length && !target.challenging.length).map(({ target }) =>
+        <p className="workspace-meta" key={target.id}>Limited direct evidence · {target.text}</p>)}
+      {context.length > 0 && <FindingList findings={context} numbers={numbers} />}
+      {result.state === "complete" && result.caveats.length > 0 && <ul>{result.caveats.map(caveat => <li key={caveat}>{caveat}</li>)}</ul>}
       {review.records.length > 0 && <details className="research-passage">
-        <summary>See independent records</summary>
+        <summary>Independent records · {review.independentCount}</summary>
         <ul>{review.records.map(record => <li key={record.id}>
-          <strong>{record.primary.page.paper?.title ?? record.primary.page.title}</strong>
-          <PaperDetails page={record.primary.page} />
-          <p className="workspace-meta">{record.primary.finding.record?.type} · {record.pages.length} linked {record.pages.length === 1 ? "page" : "pages"} · {record.contributes ? "Contributed" : "Did not contribute"}</p>
+          <p>{record.primary.page.paper?.title ?? record.primary.page.title}</p>
+          <p className="workspace-meta">{record.primary.finding.record?.type} · {record.pages.length} linked {record.pages.length === 1 ? "page" : "pages"}</p>
           <OriginalPage page={record.primary.page} />
         </li>)}</ul>
       </details>}
-    </div>
-
-    <section className="research-section">
-      <h3>{snapshot.plan.policy ? "Factual premises and trade-offs" : "Propositions checked"}</h3>
-      <ul className="research-targets">{review.targets.map(({ target, status }) => <li key={target.id}
-        data-stance={status === "supported" ? "supports" : status === "refuted" ? "contradicts" : undefined}>
-        <strong>{targetLabels[status]}</strong> · {target.text}
-        {target.qualifiers.length > 0 && <p className="workspace-meta">{target.qualifiers.map(qualifier => `${qualifier.kind}: ${qualifier.text}`).join(" · ")}</p>}
-      </li>)}</ul>
     </section>
-
-    {review.summary.length > 0 && <section className="research-section">
-      <h3>What the passages establish</h3>
-      <FindingList findings={review.summary} numbers={numbers} />
-    </section>}
-
-    <section className="research-section">
-      <h3>Compare direct findings</h3>
-      <div className="research-evidence-grid">
-        <section className="research-evidence-side" data-stance="supports">
-          <header className="research-evidence-heading"><Check size={19} aria-hidden="true" /><h4>Supporting findings</h4></header>
-          {supporting.length ? <FindingList findings={supporting} numbers={numbers} /> : <p className="workspace-meta">No independently verified supporting finding was retained.</p>}
-        </section>
-        <section className="research-evidence-side" data-stance="contradicts">
-          <header className="research-evidence-heading"><ArrowDownRight size={19} aria-hidden="true" /><h4>Challenging findings</h4></header>
-          {challenging.length ? <FindingList findings={challenging} numbers={numbers} /> : <p className="workspace-meta">No independently verified challenging finding was retained.</p>}
-        </section>
-      </div>
-      {review.conflictingRecords.map((findings, index) => <section key={index} className="research-record-conflict">
-        <h4>Different findings within one record</h4>
-        <FindingList findings={findings} numbers={numbers} />
-      </section>)}
-    </section>
-
-    {caveats.length > 0 && <section className="research-section">
-      <h3>Search and evidence limits</h3>
-      <ul>{caveats.map(caveat => <li key={caveat}>{caveat}</li>)}</ul>
-    </section>}
-    <SourceList result={result} numbers={numbers} />
-  </section>;
+  </>;
 }

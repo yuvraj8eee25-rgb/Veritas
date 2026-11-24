@@ -1,3 +1,4 @@
+import TurnRevision from "../TurnRevision";
 import { ArrowRight } from "lucide-react";
 import type { FormEvent } from "react";
 import type { DebateTurn, DebateVerdict } from "../../App";
@@ -7,6 +8,8 @@ import type { Assignment } from "../Classroom";
 import { DebateTranscript } from "./AiDebateRoomScreen";
 
 type ResultState = {
+  assessmentBusy: boolean;
+  scoreAiDebate: (turns: DebateTurn[]) => Promise<void>;
   aiAssignmentStatus: string;
   aiAssignmentTranscript: DebateTurn[];
   assignedPractice: Assignment | null;
@@ -30,13 +33,13 @@ type ResultState = {
 
 export default function AiDebateResultScreen({ state }: { state: ResultState }) {
   const {
-    aiAssignmentStatus, aiAssignmentTranscript, assignedPractice, beginAiDebate, debateEstimated,
+    aiAssignmentStatus, aiAssignmentTranscript, assignedPractice, beginAiDebate, debateEstimated, scoreAiDebate, assessmentBusy,
     debateTopic, debateTurns, debateVerdict, devilBusy, devilDraft, devilError, devilResult, playbackUrls,
     setActiveMode, setDebateTopic, setDevilDraft, setView, submitAiAssignment, submitDevilsAdvocateDrill,
   } = state;
   const estimate = debateEstimated || debateVerdict?.estimated;
-  const source = !debateVerdict ? "Assessment unavailable" : estimate ? "Local heuristic estimate" : "Provider-backed AI assessment";
-  const outcome = debateVerdict?.winner === "debater" ? "Your case scored higher"
+  const source = !debateVerdict ? "Assessment unavailable" : estimate ? "Assessment unavailable" : "Provider-backed AI assessment";
+  const outcome = estimate ? "Assessment unavailable — no winner assigned" : debateVerdict?.winner === "debater" ? "Your case scored higher"
     : debateVerdict?.winner === "ai" ? "The opponent scored higher"
       : debateVerdict?.winner === "tie" ? "The debate was scored a tie" : "Outcome unavailable";
   const missed = debateVerdict?.devilsAdvocate;
@@ -60,32 +63,46 @@ export default function AiDebateResultScreen({ state }: { state: ResultState }) 
       <section className="debate-report-overview">
         <h2>{outcome}</h2>
         {debateVerdict ? <>
-          <dl className="debate-score-comparison">
-            <div><dt>Your score</dt><dd>{Math.round(debateVerdict.debaterScore)} <small>/ 100</small></dd></div>
-            <div><dt>Opponent score</dt><dd>{Math.round(debateVerdict.aiScore)} <small>/ 100</small></dd></div>
-          </dl>
           <p>{debateVerdict.summary}</p>
-          {!estimate && <p className="workspace-meta">The scores apply to this exchange. The referee reviews logic, evidence, and responsiveness.</p>}
+          {!estimate && <details className="result-detail debate-score-details">
+            <summary>See score breakdown</summary>
+            <dl className="debate-score-comparison">
+              <div><dt>Your score</dt><dd>{Math.round(debateVerdict.debaterScore)} <small>/ 100</small></dd></div>
+              <div><dt>Opponent score</dt><dd>{Math.round(debateVerdict.aiScore)} <small>/ 100</small></dd></div>
+            </dl>
+            <p className="workspace-meta">Scores apply to this exchange. The referee reviews logic, evidence, and responsiveness.</p>
+          </details>}
         </> : <p className="workspace-meta">You can still review your transcript or try the debate again.</p>}
       </section>
 
+      {estimate && <button className="workspace-secondary" disabled={assessmentBusy} onClick={() => void scoreAiDebate(debateTurns)}>{assessmentBusy ? "Assessing…" : "Retry AI assessment"}</button>}
       {missingCoaching && <p className="workspace-note" role="status"><strong>Incomplete coaching detail.</strong> The referee supplied a verdict and turn feedback. Some coaching notes are unavailable for this exchange.</p>}
       {coachingNotes.length > 0 && <section className="debate-report-section">
-        <h2>Coaching notes</h2>
-        <dl className="debate-coaching-notes">{coachingNotes.map(({ label, text }) => (
-          <div key={label}><dt>{label}</dt><dd>{text}</dd></div>
-        ))}</dl>
+        <h2>What to keep and what to improve</h2>
+        <dl className="debate-coaching-priority">
+          {coachingNotes.slice(0, 2).map(({ label, text }) => <div key={label} data-coaching={label === "Strongest moment" ? "strength" : "focus"}>
+            <dt>{label}</dt><dd>{text}</dd>
+          </div>)}
+        </dl>
+        {coachingNotes.length > 2 && <details className="result-detail debate-more-coaching">
+          <summary>More coaching detail</summary>
+          <dl className="debate-coaching-notes">{coachingNotes.slice(2).map(({ label, text }) => (
+            <div key={label}><dt>{label}</dt><dd>{text}</dd></div>
+          ))}</dl>
+        </details>}
       </section>}
 
       {Boolean(debateVerdict?.turnFeedback.length) && <section className="debate-report-section">
-        <h2>Turn-by-turn feedback</h2>
-        <p className="workspace-meta">{estimate ? "Notes from the local heuristic." : "The referee provides qualitative feedback by turn."}</p>
+        <details className="result-detail debate-detailed-review">
+        <summary>Review turn-by-turn feedback</summary>
+        <p className="workspace-meta">{estimate ? "Notes from the local estimate." : "Qualitative feedback from the referee."}</p>
         {debateVerdict?.turnFeedback.map(item => <article className="debate-turn-review" key={item.turn}>
           <h3>Turn {item.turn}</h3>
           <dl>{([["Logic", item.logic], ["Evidence", item.evidence], ["Responsiveness", item.responsiveness]] as const).map(([label, feedback]) => (
             <div key={label}><dt>{label}</dt><dd>{feedback || "Feedback unavailable"}</dd></div>
-          ))}</dl>
+          ))}</dl>{debateTurns.filter(turn => turn.speaker === "user")[item.turn - 1] && <TurnRevision turn={item.turn} original={debateTurns.filter(turn => turn.speaker === "user")[item.turn - 1].text} feedback={[item.logic,item.evidence,item.responsiveness].filter(Boolean).join(" ")} />}
         </article>)}
+        </details>
       </section>}
 
       {missed && <section className="debate-report-section debate-follow-up">
@@ -104,11 +121,11 @@ export default function AiDebateResultScreen({ state }: { state: ResultState }) 
         </form>}
       </section>}
 
-      {!missed && !assignedPractice && <section className="debate-report-section">
-        <h2>Follow-up practice</h2>
+      {!assignedPractice && <section className="debate-report-section">
+        <h2>Practice this skill</h2>
         <p className="workspace-meta">Practise responding directly to an opposing argument.</p>
         <button type="button" className="workspace-secondary" onClick={() => { setActiveMode("rebuttal"); setView("setup"); }}>
-          Open Rebuttal Practice <ArrowRight size={16} />
+          Practice rebuttals <ArrowRight size={16} />
         </button>
       </section>}
 

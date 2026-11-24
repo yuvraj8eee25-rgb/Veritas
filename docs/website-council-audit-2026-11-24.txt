@@ -1,0 +1,314 @@
+VERITAS — WEBSITE FEATURE INVENTORY AND IMPROVEMENT BACKLOG
+24 November 2026 | Current working-tree review
+
+Scope and evidence
+Reviewed the current Next.js app in veritas-react/, shared application code and
+Supabase functions/migrations in app/, feature documentation, and primary web
+sources. Current uncommitted work was included. This is an audit, not a deployment
+or implementation change. A feature's presence in source is not proof of a working
+production integration. No public deployment was needed for the local preview.
+
+Local checks completed
+- Started Next.js locally using official Node 22 and webpack after the bundled
+  runtime/Turbopack path encountered native-library signing restrictions.
+- Verified guest dashboard, four-drill setup, one correct Fallacy Hunter answer
+  and explanation, paused-session dashboard, Study and guest Evidence Lab gating.
+- After user sign-in, verified account access, Classroom loading existing server
+  data, AI setup and the multiplayer lobby. Did not edit classroom records.
+- One real Evidence Lab search retrieved web results and eight OpenAlex papers
+  with abstracts. Its trace showed a failed research-planning assessment request:
+  reference 14b8222a-cf10-4e69-bb65-b9253e8c304f. Recovery searches ran and twelve
+  pages were selected for assessment. The view later returned to Home before a
+  final result was observed; the cause was not established. Do not count this as
+  a successful end-to-end evidence assessment. Investigate the request ID and
+  interrupted-search recovery before release.
+- Ran node --test tests/evidence-verification.test.mjs: 36 passed, 0 failed.
+  These tests use controlled inputs; they do not establish live provider accuracy.
+- Not fully exercised: complete AI debate/referee, microphone capture/transcription,
+  PDF provider analysis, two-account multiplayer, invitation email delivery,
+  graded teacher/student feedback, attachment access and mobile accessibility.
+- No public deployment, production build success, Lighthouse score or security
+  certification is claimed. The local preview remains at http://127.0.0.1:3000.
+
+Council: gpt-6.2-sol, gpt-6.2-astra, gpt-6.1-terra, gpt-6.1-sol,
+gpt-6-astra, gpt-6-sol, gpt-6-luna, gpt-5.6-sol, gpt-5.6-terra,
+gpt-5.6-luna. All ten returned independent reviews; recommendations below are
+deduplicated and checked against current source. Agreement is not validation.
+
+FEATURE INVENTORY
+
+1. Accounts: email/password login and registration, password reset/recovery,
+   sign-out, guest practice, account-specific local progress, remote profile sync.
+2. Home: suggested starting practice, resume paused sessions, next drill,
+   progress/XP/rank summary, favorite drill shortcut and account prompt.
+   Some richer metrics described in older documentation now live elsewhere.
+3. Solo practice: Fallacy Hunter, Rebuttal Practice, Quick Drills and Steelman
+   Challenge; difficulty choice, shuffled questions/options, answer explanations,
+   points, streak/combo feedback, summaries, recommendations and pause/resume.
+   Local preview showed banks of 9, 7, 9 and 7 questions respectively (32 total).
+4. Daily/Arcade: rotating four-question daily challenge, daily completion and
+   bonus XP, countdown, goals/quests, combos and unlockable achievements.
+5. Profile: display name, avatar/private storage, XP/rank, streak, drill records,
+   mastery estimates and live debate record. Core progress sync is best-effort;
+   it is incorrect to describe all app progress as local-only.
+6. Leaderboards: personal device XP plus explicitly labelled sample standings;
+   live ELO standings query Supabase. A genuine live XP ranking is not implemented.
+7. AI debate: custom/suggested/current topics, publisher links, random topic/side,
+   stance and opponent difficulty, 3/5 turns, written or recorded speech,
+   written timing options, AI replies/referee, turn feedback, coaching,
+   labelled local fallback and optional Devil's Advocate follow-up drill.
+8. Speech: microphone recording, cancellation/cleanup, transcription,
+   editable transcript review, private audio upload and playback.
+9. Multiplayer: public matchmaking and queue cancellation, private invite rooms,
+   written/speech turns, server-time clocks, thinking/turn statistics, transcript,
+   AI referee, live ELO, completion/winner rewards, match rating and rematches.
+10. Study: six lessons across argument, source evaluation, reasoning and response
+    paths; recall, worked examples, practice, reflection, spaced review,
+    weekly goals, Field Notes, return-visit reminders and classroom handoff.
+    Lateral reading already has a lesson; it should be extended, not reintroduced.
+11. Paper Study: signed-in PDF text extraction; question/method/finding/limitation
+    summaries and flashcards; exact passage/page citations and PDF preview.
+    Limits: selectable-text PDF, 10 MB, 40 pages and 100,000 extracted characters.
+    Scanned PDFs need another solution. Materials are browser-tab scoped.
+12. Classroom: organizations/cohorts, invitations/codes and roles; position-paper,
+    drill and AI/live/private debate assignments; templates/duplication,
+    draft/published states, deadlines, attempt/late/file/reply policies,
+    configurable rubrics, submissions, grading/feedback, private attachments,
+    announcements/read receipts, discussions/moderation, archive/delete and analytics.
+13. Evidence Lab: motion or specific-claim research; Exa/OpenAlex searches and
+    bounded recovery searches; subquestions, supporting/challenging/context sources,
+    excerpt/abstract provenance, exact-quote and scope checks, record deduplication,
+    uncertainty/abstention, investigation trace, source links and saved quote cards.
+14. Evidence practice: use a cited quote in an argument, answer an AI challenge,
+    revise, inspect original/revised wording and citation feedback; return/resume
+    between the evidence investigation and practice round.
+15. Platform: responsive shell, mobile navigation, light/dark theme, skip link,
+    focus management, reduced-motion styling, offline banner, PWA manifest/service
+    worker, health endpoint, authenticated function proxy, request IDs/timeouts.
+16. Club preview: separate browser-only sample workflow in public/demo/. Treat
+    it as a demonstration rather than a persisted classroom/club product.
+
+PRIORITIES
+P0 = needed before broad/public use; P1 = next product work; P2 = later opportunity.
+Observed = source or local UI establishes the behavior. Verify = a test or wider
+review is needed. Proposal = an enhancement, not a confirmed missing capability.
+Items involving privacy/age controls are product recommendations, not legal advice.
+
+CORRECTNESS AND RELIABILITY
+
+01 [P0, Observed] Consolidate duplicate live clock effects. App.tsx:417 and :510
+   install equivalent intervals that both invoke timeout submission. Deduplicate
+   the client calls and test server idempotency; an actual duplicate turn was not observed.
+02 [P0, Observed] Correct classroom completion denominators. Classroom.tsx:422-430
+   divides each student's work by all published assignments when All classrooms is
+   selected. Use only assignments in that student's eligible cohorts.
+03 [P0, Observed] Normalize cross-assignment score analytics. Classroom.tsx:433
+   averages raw scores despite configurable maxima. Show comparable percentages
+   or separate scales; a 5/5 and a 5/20 must not be treated as equivalent performance.
+04 [P1, Observed] Show students criterion-level rubric feedback. Scores are stored
+   per criterion, but the student feedback view shows total/comment. Display the
+   rubric before submission and earned/possible points after publication.
+05 [P0, Verify] Complete real-account release checks for invitation email,
+   teacher/student permissions, attachments, retry-safe submissions, two-player
+   debates, speech and AI/evidence providers. README expressly leaves these open.
+06 [P0, Observed/Verify] Add live-room reload/reconnect recovery. App.tsx initializes
+   Home, remaps room history to lobby, and reads then subscribes without explicit
+   reconnect reconciliation. Resume authorized rooms and resnapshot after subscription.
+07 [P1, Observed] Renew signed recording URLs. App.tsx:430 caches five-minute URLs
+   without expiry refresh. Renew on play/expiry and test replay after a long match.
+08 [P1, Observed] Define the Daily Challenge timezone and persist the run's date.
+   UTC date keys and a local-midnight countdown can disagree. Define late finishes
+   and test a paused run across midnight, travel and daylight-saving changes.
+09 [P1, Observed] Preserve Quick Drill remaining time. The effect restarts at five
+   seconds after resume and interval ticks can drift. Use a deadline or preserve
+   remaining time, with explicit timed versus accommodation rules.
+10 [P0, Observed] Fix the offline navigation fallback: sw.js caches each successful
+   navigation under the same './' key. Visiting /demo/ can replace the app fallback.
+   Cache documents by route and test app -> demo -> offline app.
+11 [P0, Observed] Scope and version caches. The service worker has a static cache
+   name and a broad same-origin GET strategy. Allowlist public assets, exclude
+   API/auth responses, bound storage, and verify updates. No data leak was demonstrated.
+12 [P0, Verify] Make CI checks discoverable and mandatory: typecheck, build,
+   existing evidence tests, critical browser journeys and backend contract checks.
+   React package scripts currently expose only dev/build/start; tests do exist.
+
+LEARNING VALUE AND CONTENT
+
+13 [P1, Proposal] Expand the 32-question bank with expert-reviewed alternatives,
+   topic variety, age bands and difficulty calibration; avoid memorized answer gains.
+14 [P1, Proposal] Expand the six-lesson curriculum around clear learning objectives,
+   examples, misconceptions and transfer to unfamiliar topics.
+15 [P1, Proposal] Connect diagnosis -> lesson -> targeted drill -> debate ->
+   revision -> delayed review. Existing pieces should hand off goals and evidence.
+16 [P1, Proposal] Extend feedback-to-revision beyond the existing evidence round:
+   replay the exact weak debate turn and compare rubric changes after revision.
+17 [P1, Verify] Calibrate AI and mastery estimates against teacher-rated work.
+   Measure agreement, failure modes and cohort/topic bias; retain human override.
+18 [P1, Proposal] Display mastery sample count, recency and coverage near scores.
+   Current estimates are not validated measures of general debate ability.
+19 [P1, Proposal] Add delayed retention/transfer checks and misconception tracking,
+   so dashboards show demonstrated growth rather than accumulated activity alone.
+20 [P2, Proposal] Adapt review intervals from recall history. Current Study uses
+   simple two/five-day scheduling; an advanced scheduler is optional, not a prerequisite.
+21 [P1, Observed/Proposal] Make Study progress/notes, quote cards and paper decks
+   optionally account-backed. Study is localStorage; cards/papers are sessionStorage.
+   Show local/synced/failed status and resolve device conflicts explicitly.
+22 [P1, Proposal] Offer an exportable learner portfolio of selected arguments,
+   feedback, revisions and citations, with deletion and share permissions.
+
+EVIDENCE AND PAPER STUDY
+
+23 [P1, Proposal] Build a durable searchable quote library with tags, topic folders,
+   provenance and source context. Existing per-tab quote cards are the starting point.
+24 [P1, Proposal] Extend the lateral-reading lesson into a live, assignable exercise:
+   students inspect the publisher/corroboration before seeing the AI assessment.
+25 [P1, Verify] Validate findings on a larger human-reviewed set of diverse claims,
+   causal questions and policies. Current tests cannot establish live verdict accuracy.
+26 [P1, Proposal] Surface publication/retraction/correction checks where verified
+   data is available; preserve uncertainty when status cannot be checked.
+27 [P1, Proposal] Add research filters for date, jurisdiction, source type and
+   population; show which sources fail the question's scope.
+28 [P1, Proposal] Add a human correction/challenge flow with retained source and
+   assessment versions, instead of treating AI findings as final authority.
+29 [P2, Proposal] Export selected citations/cards to common bibliography/text
+   formats without losing exact-quote and abstract-versus-full-text distinctions.
+30 [P2, Proposal] Add optional OCR for image PDFs, with extraction quality warnings,
+   page accuracy checks and explicit text processing disclosure.
+31 [P1, Proposal] Let users explicitly save/export paper summaries/decks and restore
+   the original PDF preview. Choose document retention separately from study retention.
+
+AI DEBATE AND SPEAKING
+
+32 [P0, Observed/Proposal] Withhold authoritative winners when the AI referee is
+   unavailable. The labelled local fallback rewards length/connectors; offer retry
+   and provisional coaching. Do not claim this fallback changes server ELO without proof.
+33 [P1, Proposal] Explain rubric scores using specific submitted passages and
+   actionable examples, and keep argument quality separate from delivery quality.
+34 [P1, Proposal] Add optional speech pace, pause and filler-word feedback with
+   timestamped playback. Validate metrics across accents and speaking needs.
+35 [P1, Proposal] Save debate reports/transcripts for authorized review and allow
+   annotated coach feedback; avoid automatically making recordings public.
+36 [P2, Proposal] Add moderated cross-examination/question rounds or formal debate
+   templates after core turn/reconnect behavior is reliable.
+37 [P1, Verify] Test mic denial, unsupported audio formats, interrupted transcription,
+   leaving mid-recording, timeout, retry and playback expiry on mobile browsers.
+38 [P2, Proposal] Add opt-in speaking goals and learner-selected feedback focus.
+   Validate demand before adding video/avatar or real-time voice complexity.
+39 [P1, Proposal] Make topic packs searchable by age, subject, format and sensitivity,
+   retaining publisher attribution for current affairs.
+
+CLASSROOM AND COLLABORATION
+
+40 [P1, Proposal] Add coach views for overdue work, misconceptions and rubric trends;
+   fix calculations before expanding analytics.
+41 [P1, Proposal] Add CSV roster/grade export and reusable rubric/topic packs.
+42 [P2, Proposal] Introduce claim -> reason -> evidence -> objection maps, reusing
+   existing quotes and debate material rather than creating an isolated workspace.
+43 [P2, Proposal] Add structured peer review with teacher-controlled visibility,
+   peer-facing aliases, moderation and criterion-specific feedback.
+44 [P1, Proposal] Offer opt-in assignment/review reminders with timezone and quiet
+   hours. Current Study reminder appears only when the learner returns.
+45 [P2, Proposal] Add LMS/SSO/grade passback only if target schools request it;
+   start with exports and pilot one integration.
+46 [P2, Proposal] Add coach observation/replay and small-group asynchronous debate
+   before investing in larger tournaments or multi-party live rooms.
+47 [P1, Verify] Audit organization/cohort/file access and role changes using isolated
+   test accounts. Existing RLS/private storage are foundations, not a completed audit.
+
+COMMUNITY, ACCOUNT AND DATA CONTROLS
+
+48 [P0, Verify/Proposal] Provide public-match report/block and an actionable moderation
+   queue; a match thumbs-down is not an incident report. No complete flow was located.
+49 [P0, Verify/Proposal] Make audio/text processing, retention and deletion choices
+   clear; establish age-appropriate school/learner controls for the intended audience.
+50 [P0, Verify/Proposal] Provide account/data export and deletion workflows. These
+   were not found in the inspected React flows; verify the wider service inventory.
+51 [P1, Proposal] Move competitive XP awards into an idempotent server ledger;
+   validate earned activity before introducing genuine public XP standings.
+52 [P2, Proposal] Prefer opt-in cohort/weekly standings to default public comparison;
+   consider learner privacy and beginners' experience.
+53 [P1, Proposal] Separate provisional/new ELO profiles from established rankings
+   with a minimum rated-game requirement.
+54 [P1, Verify/Proposal] Define guest-to-account progress import explicitly;
+   per-owner keys exist, but an explicit guest merge was not located in the reviewed path.
+
+DISCOVERY, NAVIGATION AND ACCESSIBILITY
+
+55 [P1, Observed/Proposal] Add durable top-level and assignment/report URLs.
+   Back/Forward works, but opening a fresh hash is overwritten with Home.
+56 [P1, Proposal] Add a public server-rendered product/sample lesson/help surface.
+   The main workspace is a client-only island; indexing performance was not measured.
+57 [P1, Proposal] Offer a guest sample investigation/debate report before the
+   account gate, with clear sample provenance.
+58 [P1, Verify] Test keyboard/screen-reader flows, focus visibility and error recovery.
+   Skip link/focus management already exist; do not propose them as absent.
+59 [P1, Verify] Measure contrast, reflow/zoom, motion preferences and touch targets
+   across mobile widths and both themes; no blanket WCAG violation is claimed.
+60 [P1, Proposal] Offer extended/untimed practice accommodations, while documenting
+   applicable competitive-timing rules. Existing pause is useful but not equivalent.
+61 [P1, Proposal] Give XP, mastery, AI scores and ELO nearby definitions and provenance.
+   Existing sample/estimate labels should be preserved rather than duplicated everywhere.
+62 [P2, Proposal] Add localization once target audiences are known, including
+   examples/rubrics and language-sensitive scoring rather than translated menus alone.
+
+OPERATIONS AND PRODUCT MEASUREMENT
+
+63 [P0, Verify] Reproduce clean-install production builds in CI. A bundled macOS
+   runtime hit native-library signing restrictions; this is not proof of a source bug.
+64 [P1, Verify] Measure real-user performance before optimizing. Google targets:
+   LCP <= 2.5 s, INP <= 200 ms, CLS <= 0.1 at the 75th percentile. No scores measured here.
+65 [P1, Proposal] Trace provider phases, queue wait, transcription and submission
+   failures using existing request IDs; avoid logging sensitive content by default.
+66 [P1, Verify/Proposal] Exercise bounded retries/rate limits and cost budgets;
+   preserve drafts/results on failure and distinguish retryable outages from invalid input.
+   Give long investigations clear cancel/retry controls and preserve their trace.
+67 [P1, Proposal] Show retryable sync failures and an outbox for eligible offline
+   work. Do not imply multiplayer/search can operate offline.
+68 [P1, Proposal] Track activation, completed learning loops, return rate, queue
+   success and revision quality, with appropriate analytics/data controls.
+69 [P1, Proposal] Run a teacher/learner pilot and compare pre/post unfamiliar tasks;
+   choose next features from observed needs and outcome evidence.
+70 [P2, Proposal] Consider paid school plans or premium coaching only after reliability,
+   learning value and support/retention costs are known; defer speculative feature breadth.
+
+RECOMMENDED DELIVERY ORDER
+First: items 01-12, 32, 48-50 and 63; fix trust/calculation/recovery issues and
+complete essential real-session checks before a public release.
+Next: content expansion, durable artifacts, learning handoffs, teacher feedback,
+shareable destinations and measured accessibility/performance.
+Later: argument maps, deeper speaking analysis, LMS integrations and competition.
+These are dependency/priority bands, not effort estimates or guaranteed timelines.
+
+RESEARCH SOURCES AND WHAT THEY SUPPORT
+[S1] Kialo Edu features — argument maps, targeted grading, aliases, exports/integrations.
+https://www.kialo-edu.com/features
+[S2] Yoodli practice — persona roleplay, speech practice and follow-up questions.
+https://support.yoodli.ai/en/articles/9550465-practice-with-yoodli
+[S3] VirtualSpeech — moderated questioning and one-on-one AI debate formats.
+https://virtualspeech.com/practice/debating-skills
+[S4] EEF teacher feedback — actionable feedback and opportunities to use it.
+https://educationendowmentfoundation.org.uk/education-evidence/guidance-reports/feedback
+[S5] IES practice guide — spaced learning and retrieval practice; does not prove
+that any particular adaptive scheduler is optimal for Veritas.
+https://ies.ed.gov/ncee/WWC/Docs/PracticeGuide/20072004.pdf
+[S6] W3C WCAG 2.2 — accessibility audit criteria and timing exceptions.
+https://www.w3.org/TR/WCAG22/
+https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum
+https://www.w3.org/WAI/WCAG22/Understanding/timing-adjustable
+[S7] Google Search Central — JavaScript crawling/rendering and real public URLs.
+https://developers.google.com/search/docs/crawling-indexing/javascript/javascript-seo-basics
+[S8] Google web.dev — performance measurement thresholds, caching/offline strategies.
+https://web.dev/articles/vitals
+https://web.dev/articles/offline-fallback-page
+https://web.dev/learn/pwa/caching
+[S9] UNESCO education AI guidance — human oversight, learner agency and data controls;
+recommendations are not a jurisdiction-specific legal compliance conclusion.
+https://www.unesco.org/en/articles/guidance-generative-ai-education-and-research
+
+COUNCIL SYNTHESIS
+Strongest recurring themes: verify existing end-to-end behavior; validate assessment;
+preserve learners' work; connect existing tools into one learning journey.
+Some models favored live XP rankings/tournaments. Those are deferred until reward
+integrity, privacy and actual demand are established. Argument maps are promising
+but less urgent than recovery and feedback correctness. Code/guest checks cannot
+prove all authenticated or multi-user workflows; a test passing is not a provider benchmark.

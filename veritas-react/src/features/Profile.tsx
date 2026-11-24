@@ -10,7 +10,7 @@ type ProfileData = {
   avatarUrl: string | null;
 };
 
-type ProfileSkill = { key: string; label: string; value: number; assessed: boolean };
+type ProfileSkill = { key: string; label: string; value: number; assessed: boolean; samples?: number; lastAssessed?: number | null };
 type ProfileBadge = { id: string; name: string; icon: string; on: boolean };
 
 type ProfileScreenProps = {
@@ -84,7 +84,6 @@ export default function ProfileScreen(props: ProfileScreenProps) {
     onEditName, onSaveName, onCancelName, onNameChange, onUploadAvatar,
   } = props;
   const displayName = profile.displayName || sessionEmail?.split("@")[0] || "Debater";
-  const totalDecisions = profile.wins + profile.losses + profile.ties;
   const days = Array.from({ length: 14 }, (_, index) => {
     const date = new Date();
     date.setUTCDate(date.getUTCDate() - (13 - index));
@@ -148,16 +147,11 @@ export default function ProfileScreen(props: ProfileScreenProps) {
             <h2>{displayName}</h2>
             <button type="button" className="profile-name-edit-btn" disabled={guestMode} onClick={onEditName} aria-label="Edit display name"><Pencil size={13} /></button>
           </div>}
-          <div className="profile-chips">
-            <span className="profile-chip profile-chip-rank">{rank}</span>
-            <span className="profile-chip">{totalXp.toLocaleString()} total XP</span>
-            <span className="profile-chip profile-chip-quiet">Live rating: {profile.elo?.toLocaleString() ?? "—"}{totalDecisions ? ` · ${profile.wins}W ${profile.losses}L ${profile.ties}T` : ""}</span>
-          </div>
+          <div className="profile-chips"><span className="profile-chip">{totalRuns} completed practice runs</span><span className="profile-chip profile-chip-quiet">{streak} day practice streak</span></div>
         </div>
 
         <div className="profile-head-actions">
-          <button type="button" className="profile-jump-btn" onClick={onFindMatch}>Find a match</button>
-          <button type="button" className="profile-jump-btn ghost" onClick={onLeaderboard}>Leaderboard</button>
+          <button type="button" className="profile-jump-btn" onClick={onPractice}>Keep practising</button>
         </div>
       </div>
 
@@ -165,13 +159,29 @@ export default function ProfileScreen(props: ProfileScreenProps) {
       {profileMessage && <p className="profile-message" role="status">{profileMessage}</p>}
       {guestMode && <p className="profile-message">Sign in to edit your synced name or upload an avatar. Practice stats are available to guests.</p>}
 
-      <div className="profile-stats" aria-label="Profile statistics">
-        <div className="profile-stat"><span className="profile-stat-val">{profile.elo?.toLocaleString() ?? "—"}</span><span className="profile-stat-label">Live debate rating</span></div>
-        <div className="profile-stat"><span className={`profile-stat-val ${winRate !== null && winRate >= 50 ? "positive" : winRate !== null ? "negative" : ""}`}>{winRate === null ? "—" : `${winRate}%`}</span><span className="profile-stat-label">Win rate</span></div>
-        <div className="profile-stat"><span className="profile-stat-val">{profile.wins}–{profile.losses}–{profile.ties}</span><span className="profile-stat-label">W–L–T</span></div>
-        <div className="profile-stat"><span className="profile-stat-val">{totalRuns.toLocaleString()}</span><span className="profile-stat-label">Sessions</span></div>
-        <div className="profile-stat"><span className="profile-stat-val">{streak}</span><span className="profile-stat-label">Day streak</span></div>
-      </div>
+
+
+      <section className="profile-surface profile-mastery" aria-labelledby="profile-mastery-title">
+        <h2 className="profile-surface-title" id="profile-mastery-title">Practice mastery estimates</h2>
+        <p className="profile-week-note">Estimates use distinct drill questions, difficulty and delayed reviews. They are practice signals, not validated measures of general debate ability.</p>
+        {hasAssessments ? (
+          <div className="profile-mastery-details">
+            <ul className="skill-bars">
+              {[...skills].sort((a, b) => a.value - b.value).map(skill => <li className="skill-bar-row" key={skill.key}>
+                <span className="skill-bar-name"><strong>{skill.label}</strong><small>{skill.assessed ? `${skill.samples ?? 0} distinct questions${skill.lastAssessed ? ` · Last practised ${new Date(skill.lastAssessed).toLocaleDateString()}` : ""}` : "No recorded practice yet"}</small></span>
+                <span className="skill-bar-track" aria-hidden="true"><span className="skill-bar-fill" style={{ width: `${Math.max(0, Math.min(100, skill.value))}%` }} /></span>
+                <span className="skill-bar-val">{skill.assessed ? `${Math.round(skill.value)}%` : "Unassessed"}</span>
+              </li>)}
+            </ul>
+            <details className="profile-radar-disclosure"><summary>View skill radar</summary><p className="workspace-meta">Read the skill list above for unassessed areas. The shape is only an overview of these practice estimates.</p><ProfileRadar skills={skills} /></details>
+          </div>
+        ) : (
+          <div className="profile-mastery-empty">
+            <p>Complete a drill to see your first estimate.</p>
+            <button type="button" className="workspace-secondary" onClick={onPractice}>Choose a drill</button>
+          </div>
+        )}
+      </section>
 
       <div className="profile-overview">
         <section className="profile-surface profile-week-card" aria-labelledby="profile-week-title">
@@ -185,6 +195,21 @@ export default function ProfileScreen(props: ProfileScreenProps) {
           </div>}
           <p className="profile-week-note">Counts completed sessions on this device. XP also includes bonus rewards, so the totals won’t match.</p>
         </section>
+
+      </div>
+
+
+
+
+
+      <details className="profile-competition"><summary>Debate record, XP & achievements</summary><p className="workspace-meta">Live results and activity rewards are separate from your practice estimates.</p><div className="profile-competition-actions"><button type="button" className="workspace-secondary" onClick={onFindMatch}>Find a match</button><button type="button" className="workspace-secondary" onClick={onLeaderboard}>View leaderboard</button></div>
+      <div className="profile-stats" aria-label="Profile statistics">
+        <div className="profile-stat"><span className="profile-stat-val">{profile.elo?.toLocaleString() ?? "—"}</span><span className="profile-stat-label">Live debate rating</span></div>
+        <div className="profile-stat"><span className={`profile-stat-val ${winRate !== null && winRate >= 50 ? "positive" : winRate !== null ? "negative" : ""}`}>{winRate === null ? "—" : `${winRate}%`}</span><span className="profile-stat-label">Win rate</span></div>
+        <div className="profile-stat"><span className="profile-stat-val">{profile.wins}–{profile.losses}–{profile.ties}</span><span className="profile-stat-label">W–L–T</span></div>
+        <div className="profile-stat"><span className="profile-stat-val">{totalRuns.toLocaleString()}</span><span className="profile-stat-label">Sessions</span></div>
+        <div className="profile-stat"><span className="profile-stat-val">{streak}</span><span className="profile-stat-label">Day streak</span></div>
+      </div>
         <section className="profile-surface profile-rank-card">
           <h2 className="profile-surface-title">Rank progress</h2>
           <div className="profile-rank-now">
@@ -194,30 +219,6 @@ export default function ProfileScreen(props: ProfileScreenProps) {
           <div className="profile-xp-bar" role="progressbar" aria-label="Progress to next rank" aria-valuenow={rankProgress} aria-valuemin={0} aria-valuemax={100}><span style={{ width: `${rankProgress}%` }} /></div>
           <p className="profile-week-note">XP unlocks ranks and titles. Your live debate rating changes separately through multiplayer results.</p>
         </section>
-      </div>
-
-      <section className="profile-surface profile-mastery" aria-labelledby="profile-mastery-title">
-        <h2 className="profile-surface-title" id="profile-mastery-title">Practice mastery estimates</h2>
-        <p className="profile-week-note">Estimates use distinct drill questions, difficulty, and delayed reviews.</p>
-        {hasAssessments ? (
-          <div className="profile-mastery-details">
-            <ul className="skill-bars">
-              {[...skills].sort((a, b) => a.value - b.value).map(skill => <li className="skill-bar-row" key={skill.key}>
-                <span className="skill-bar-name">{skill.label}</span>
-                <span className="skill-bar-track" aria-hidden="true"><span className="skill-bar-fill" style={{ width: `${Math.max(0, Math.min(100, skill.value))}%` }} /></span>
-                <span className="skill-bar-val">{skill.assessed ? `${Math.round(skill.value)}%` : "Unassessed"}</span>
-              </li>)}
-            </ul>
-            <ProfileRadar skills={skills} />
-          </div>
-        ) : (
-          <div className="profile-mastery-empty">
-            <p>Complete a drill to see your first estimate.</p>
-            <button type="button" className="workspace-secondary" onClick={onPractice}>Choose a drill</button>
-          </div>
-        )}
-      </section>
-
       <section className="profile-surface profile-badge-card">
         <h2 className="profile-surface-title">Achievements <em>{badges.filter(badge => badge.on).length} / {badges.length}</em></h2>
         <ul className="profile-achievements">{badges.map(badge => <li key={badge.id}>
@@ -225,6 +226,7 @@ export default function ProfileScreen(props: ProfileScreenProps) {
           <span>{badge.name}</span><small>{badge.on ? "Earned" : "Locked"}</small>
         </li>)}</ul>
       </section>
+      </details>
 
       <section className="profile-surface heatmap-card" aria-labelledby="profile-heatmap-title">
         <h2 className="profile-surface-title" id="profile-heatmap-title">Last 6 months</h2>

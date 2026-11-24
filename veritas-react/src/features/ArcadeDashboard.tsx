@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, Trophy } from "lucide-react";
+import { Check, ChevronDown, LockKeyhole, Medal, Trophy } from "lucide-react";
 import { achievementDefinitions, dailyQuestDefinitions } from "./arcade";
 
 export default function ArcadeDashboard({ progress }: { progress: Record<string, any> }) {
@@ -10,7 +10,7 @@ export default function ArcadeDashboard({ progress }: { progress: Record<string,
 
   return <section className="arcade-dashboard">
     <div className="arcade-head">
-      <div><h2>Today&apos;s goals</h2></div>
+      <div><span className="eyebrow">SMALL WINS ADD UP</span><h2>Today&apos;s goals</h2></div>
       <span className="arcade-tally">{done.size}/3 complete</span>
     </div>
     <div className="arcade-quest-list">
@@ -18,7 +18,7 @@ export default function ArcadeDashboard({ progress }: { progress: Record<string,
         const value = Math.min(quest.goal, Number(questState.prog?.[quest.id]) || 0);
         const complete = done.has(quest.id);
         return <article className={`arcade-quest ${complete ? "complete" : ""}`} key={quest.id}>
-          <span className="arcade-quest-check" aria-hidden="true">{complete ? "✓" : ""}</span>
+          <span className="arcade-quest-check" aria-hidden="true">{complete && <Check size={15} />}</span>
           <div className="arcade-quest-body">
             <strong>{quest.text}</strong>
             <div className="arcade-progress" role="progressbar" aria-label={quest.text} aria-valuenow={value} aria-valuemin={0} aria-valuemax={quest.goal}>
@@ -36,7 +36,7 @@ export default function ArcadeDashboard({ progress }: { progress: Record<string,
       {achievementDefinitions.map(item => {
         const unlocked = (progress.achievements || []).includes(item.id);
         return <article className={`arcade-achievement ${unlocked ? "unlocked" : ""}`} key={item.id}>
-          <span>{unlocked ? "✦" : "?"}</span><div><strong>{unlocked ? item.name : "Locked"}</strong><small>{item.description}</small></div>
+          <span>{unlocked ? <Medal size={18} /> : <LockKeyhole size={16} />}</span><div><strong>{unlocked ? item.name : "Locked"}</strong><small>{item.description}</small></div>
         </article>;
       })}
     </div>}

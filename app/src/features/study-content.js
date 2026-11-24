@@ -1,3 +1,4 @@
+import { additionalStudyLessons } from "./additional-study-content.js";
 export const studyPaths = [
   {
     id: "argument",
@@ -363,6 +364,9 @@ export const studyLessons = [
     saveables: [{ type: "response frame", title: "Steelman then answer", excerpt: "A fair version of the concern is ___. That matters because ___. My response is ___, while recognizing ___." }]
   }
 ];
+
+studyLessons.push(...additionalStudyLessons);
+for (const lesson of additionalStudyLessons) studyPaths.find(path => path.id === lesson.pathId)?.lessons.push(lesson.id);
 
 export const pathForLesson = lessonId => studyPaths.find(path => path.lessons.includes(lessonId)) || studyPaths[0];
 export const lessonById = lessonId => studyLessons.find(lesson => lesson.id === lessonId) || null;

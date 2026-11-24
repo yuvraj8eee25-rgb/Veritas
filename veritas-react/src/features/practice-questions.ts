@@ -1,3 +1,4 @@
+import { additionalQuestions } from "./additional-questions";
 ﻿import { fallacyQuestions, type Difficulty, type FallacyQuestion } from "./fallacy-questions";
 
 export type PracticeMode = "fallacy" | "rebuttal" | "speed" | "steelman";
@@ -184,13 +185,13 @@ const steelmanBank: BankQuestion[] = [
   { id: "st7", difficulty: "hard",
     prompt: "You disagree: \u201cSocial media platforms should be legally required to verify user identities.\u201d Pick the strongest version of this position.",
     options: [
-      "Verified-identity systems have measurably reduced coordinated harassment and bot-driven misinformation in trial regions, though the strongest version of this policy would need robust safeguards to protect vulnerable users who rely on anonymity for safety.",
+      "A serious case for identity verification would need evidence that it reduces coordinated harassment, alongside robust safeguards for vulnerable users who rely on anonymity for safety.",
       "Anonymous people online are always trolls.",
       "If you have nothing to hide, you shouldn't mind showing your identity.",
       "The internet was better before social media existed anyway."
     ],
     correct: 0,
-    explain: "This cites a real observed effect and, crucially, names the strongest counterargument (protecting vulnerable anonymous users) that a serious advocate would need to address.",
+    explain: "This identifies the evidence a serious advocate would need and acknowledges a difficult counterargument: protecting vulnerable users who rely on anonymity.",
     tip: "A true steelman doesn't just support a side \u2014 it shows awareness of the position's own hardest internal tension." }
 ];
 
@@ -209,11 +210,17 @@ export const practiceModes: PracticeModeInfo[] = [
   { id: "steelman", name: "Steelman Challenge", description: "Strengthen the position you disagree with.", skill: "rhetoric", xp: 160 },
 ];
 
+// Classroom contracts retain the published server-scored bank until a versioned
+// bank migration is deployed. Extra local practice does not change assigned sets.
+export const assignmentQuestionBanks: Record<PracticeMode, FallacyQuestion[]> = {
+  fallacy: fallacyQuestions, rebuttal: normalize(rebuttalBank), speed: normalize(speedBank), steelman: normalize(steelmanBank),
+};
+
 export const practiceQuestionBanks: Record<PracticeMode, FallacyQuestion[]> = {
-  fallacy: fallacyQuestions,
-  rebuttal: normalize(rebuttalBank),
-  speed: normalize(speedBank),
-  steelman: normalize(steelmanBank),
+  fallacy: [...fallacyQuestions, ...additionalQuestions.fallacy],
+  rebuttal: [...normalize(rebuttalBank), ...additionalQuestions.rebuttal],
+  speed: [...normalize(speedBank), ...additionalQuestions.speed],
+  steelman: [...normalize(steelmanBank), ...additionalQuestions.steelman],
 };
 
 export function practiceModeInfo(mode: PracticeMode) {
