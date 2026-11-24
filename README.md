@@ -1,21 +1,23 @@
 # Veritas
 
-Veritas is a debate practice platform. The current app is in [`veritas-react/`](veritas-react/), and the original Vite app and shared code are in [`app/`](app/). Keep both directories in the checkout: the Next.js app imports shared code from `app/`.
+Veritas is a debate practice platform with guided research, quote practice, Study, Debate AI, live debate, and Classroom. The React and Next.js app is in [veritas-react](veritas-react/). The [app](app/) directory contains shared practice code and the Supabase backend.
 
-## Run the current app
+## Run locally
 
-Use Node.js 22. From the repository root:
+Use Node.js 22.18 or newer. From the repository root:
 
 ```sh
 cd veritas-react
 cp .env.example .env.local
 ```
 
-Fill in `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` in `.env.local`. Then run:
+Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` in `.env.local` using your Supabase project URL and publishable key. Then run:
 
 ```sh
 npm ci
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). See the [Next.js app guide](veritas-react/README.md) for feature and backend details, or the [original app guide](app/README.md) for the Vite setup.
+Open [localhost:3000](http://localhost:3000). For a hosted build, set the project root to `veritas-react` and keep `app/` available to the build for shared imports. Supabase functions and migrations are in [app/supabase](app/supabase/).
+
+[Evidence Lab and quote practice](veritas-react/docs/features/evidence-lab.md)
