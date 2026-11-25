@@ -1,0 +1,76 @@
+name: Encrypted database backup
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '23 20 * * *' # 01:53 Asia/Kolkata; GitHub may delay scheduled jobs.
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: veritas-encrypted-database-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    # The owner confirms a $0 Actions budget with stop-usage enabled before activation.
+    if: github.repository == 'yuvraj8eee25-rgb/Veritas' && github.ref == 'refs/heads/main' && vars.VERITAS_BACKUPS_FREE_STORAGE_CONFIRMED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Check configuration and storage headroom
+        env:
+          VERITAS_BACKUP_DB_URL: ${{ secrets.VERITAS_BACKUP_DB_URL }}
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$VERITAS_BACKUP_DB_URL" || { echo '::error::Add the VERITAS_BACKUP_DB_URL repository secret first.'; exit 1; }
+          gh api --paginate "repos/$GITHUB_REPOSITORY/actions/artifacts?per_page=100" --jq '.artifacts[] | select(.expired == false) | .size_in_bytes' > "$RUNNER_TEMP/artifact-sizes.txt"
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          sizes = [int(v) for v in (Path(os.environ['RUNNER_TEMP']) / 'artifact-sizes.txt').read_text().split()]
+          # Conservative repository guard; account-wide free storage is protected by the owner's $0 budget.
+          if sum(sizes) + 21 * 1024 * 1024 > 250 * 1024 * 1024:
+              raise SystemExit('Repository artifact storage safety limit reached; no export was started.')
+          PY
+      - name: Install PostgreSQL 17 client and verified age binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install --yes postgresql-common ca-certificates curl
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get update -qq
+          sudo apt-get install --yes postgresql-client-17
+          echo '/usr/lib/postgresql/17/bin' >> "$GITHUB_PATH"
+          curl --fail --silent --show-error --location --retry 3 https://github.com/FiloSottile/age/releases/download/v1.3.2/age-v1.3.2-linux-amd64.tar.gz -o "$RUNNER_TEMP/age.tar.gz"
+          echo 'cbe24006683f8eb669266162894b9a522a1af52f2665fbc63a4bb032ed26ac10  '"$RUNNER_TEMP/age.tar.gz" | sha256sum --check
+          tar -xzf "$RUNNER_TEMP/age.tar.gz" -C "$RUNNER_TEMP" age/age
+          echo "$RUNNER_TEMP/age" >> "$GITHUB_PATH"
+      - name: Export and encrypt without a plaintext file
+        env:
+          VERITAS_BACKUP_DB_URL: ${{ secrets.VERITAS_BACKUP_DB_URL }}
+        run: >-
+          python3 app/scripts/encrypted-backup.py
+          --recipient age1zla3ywurpxfmlgmmj4wzhd72vr9glwkzx7pvfcvg3dmlmu8awv7sy8pk6f
+          --output "$RUNNER_TEMP/veritas-backup/database.dump.age"
+      - name: Retain only encrypted output for seven days
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: veritas-encrypted-database-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/veritas-backup/database.dump.age
+            ${{ runner.temp }}/veritas-backup/database.dump.age.sha256
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+      - name: Remove runner output
+        if: always()
+        run: rm -rf -- "$RUNNER_TEMP/veritas-backup"
